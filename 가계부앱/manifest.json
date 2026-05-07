@@ -1,0 +1,18 @@
+{
+  "name": "돈기록 가계부",
+  "short_name": "돈기록",
+  "description": "심플한 가계부 앱",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#F5F3EE",
+  "theme_color": "#F5F3EE",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

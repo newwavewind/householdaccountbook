@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>돈기록</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#F5F3EE">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="돈기록">
+<link rel="apple-touch-icon" href="icon.svg">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #F5F3EE;
+    --surface: #FFFFFF;
+    --surface2: #EFEDE8;
+    --border: rgba(0,0,0,0.08);
+    --text: #1A1A1A;
+    --text2: #6B6B6B;
+    --text3: #A0A0A0;
+    --income: #1D6A47;
+    --income-bg: #E8F5EE;
+    --expense: #B03A2E;
+    --expense-bg: #FDECEA;
+    --accent: #2C5F8A;
+    --accent-bg: #E8F0F8;
+    --tag-bg: #EFEDE8;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+  }
+
+  /* Layout */
+  .app { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+
+  /* Sidebar */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 28px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+
+  .logo {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: var(--text);
+  }
+  .logo span { color: var(--accent); }
+
+  .month-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+  }
+  .month-nav button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text2);
+    font-size: 16px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: background 0.15s;
+  }
+  .month-nav button:hover { background: var(--border); }
+  .month-label { font-weight: 500; font-size: 14px; }
+
+  .summary-cards { display: flex; flex-direction: column; gap: 10px; }
+
+  .s-card {
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+  }
+  .s-card.income { background: var(--income-bg); border-color: rgba(29,106,71,0.15); }
+  .s-card.expense { background: var(--expense-bg); border-color: rgba(176,58,46,0.15); }
+  .s-card.balance { background: var(--accent-bg); border-color: rgba(44,95,138,0.15); }
+
+  .s-label { font-size: 11px; font-weight: 500; letter-spacing: 0.5px; color: var(--text2); text-transform: uppercase; margin-bottom: 6px; }
+  .s-amount {
+    font-family: 'DM Mono', monospace;
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: -0.5px;
+  }
+  .s-card.income .s-amount { color: var(--income); }
+  .s-card.expense .s-amount { color: var(--expense); }
+  .s-card.balance .s-amount { color: var(--accent); }
+
+  .category-list { flex: 1; }
+  .cat-title { font-size: 11px; font-weight: 500; color: var(--text3); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 10px; }
+
+  .cat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .cat-item:last-child { border-bottom: none; }
+  .cat-name { color: var(--text2); display: flex; align-items: center; gap: 7px; }
+  .cat-dot { width: 7px; height: 7px; border-radius: 50%; }
+  .cat-amount { font-family: 'DM Mono', monospace; font-weight: 500; font-size: 12px; }
+
+  /* Main */
+  .main { padding: 28px 32px; }
+
+  .main-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+  }
+
+  .main-title { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+
+  .add-btn {
+    background: var(--text);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 10px 18px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: 'Noto Sans KR', sans-serif;
+    transition: opacity 0.15s, transform 0.1s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .add-btn:hover { opacity: 0.85; }
+  .add-btn:active { transform: scale(0.98); }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+
+  .modal {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 28px;
+    width: 380px;
+    transform: translateY(12px);
+    transition: transform 0.2s;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+  }
+  .modal-overlay.open .modal { transform: translateY(0); }
+
+  .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 20px; }
+
+  .type-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 16px;
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+    padding: 4px;
+  }
+  .type-btn {
+    padding: 8px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: 'Noto Sans KR', sans-serif;
+    background: transparent;
+    color: var(--text2);
+    transition: all 0.15s;
+  }
+  .type-btn.active-income { background: var(--income-bg); color: var(--income); }
+  .type-btn.active-expense { background: var(--expense-bg); color: var(--expense); }
+
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 11px; font-weight: 500; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .field input, .field select {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: 'Noto Sans KR', sans-serif;
+    background: var(--surface);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .field input:focus, .field select:focus { border-color: var(--accent); }
+
+  .modal-actions { display: flex; gap: 8px; margin-top: 20px; }
+  .btn-cancel {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: none;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: 'Noto Sans KR', sans-serif;
+    color: var(--text2);
+  }
+  .btn-submit {
+    flex: 2;
+    padding: 10px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: var(--text);
+    color: white;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: 'Noto Sans KR', sans-serif;
+    transition: opacity 0.15s;
+  }
+  .btn-submit:hover { opacity: 0.85; }
+
+  /* Filters */
+  .filters {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .filter-btn {
+    padding: 6px 14px;
+    border-radius: 100px;
+    border: 1px solid var(--border);
+    background: none;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    font-family: 'Noto Sans KR', sans-serif;
+    color: var(--text2);
+    transition: all 0.15s;
+  }
+  .filter-btn.active { background: var(--text); color: white; border-color: var(--text); }
+
+  /* Transaction list */
+  .tx-group { margin-bottom: 24px; }
+  .tx-date {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text3);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tx-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    background: var(--surface);
+    border-radius: var(--radius-sm);
+    margin-bottom: 6px;
+    border: 1px solid var(--border);
+    transition: transform 0.1s, box-shadow 0.1s;
+    animation: slideIn 0.2s ease;
+  }
+  .tx-item:hover { transform: translateX(2px); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .tx-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .tx-info { flex: 1; min-width: 0; }
+  .tx-memo { font-weight: 500; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tx-cat { font-size: 12px; color: var(--text3); margin-top: 2px; }
+
+  .tx-amount {
+    font-family: 'DM Mono', monospace;
+    font-size: 15px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .tx-amount.income { color: var(--income); }
+  .tx-amount.expense { color: var(--expense); }
+
+  .tx-delete {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text3);
+    font-size: 16px;
+    padding: 4px;
+    border-radius: 4px;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s;
+    line-height: 1;
+  }
+  .tx-item:hover .tx-delete { opacity: 1; }
+  .tx-delete:hover { color: var(--expense); }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text3);
+  }
+  .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-state p { font-size: 14px; }
+
+  /* Progress bars */
+  .cat-bar { height: 3px; background: var(--surface2); border-radius: 2px; margin-top: 4px; overflow: hidden; }
+  .cat-bar-fill { height: 100%; border-radius: 2px; transition: width 0.4s ease; }
+</style>
+</head>
+<body>
+
+<!-- 설치 배너 -->
+<div id="installBanner" style="display:none; position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#1A1A1A; color:white; border-radius:12px; padding:14px 20px; align-items:center; gap:14px; z-index:200; box-shadow:0 4px 20px rgba(0,0,0,0.2); font-family:'Noto Sans KR',sans-serif; font-size:13px; white-space:nowrap;">
+  <span>💾 돈기록 앱으로 설치하기</span>
+  <button id="installBtn" style="background:white; color:#1A1A1A; border:none; border-radius:8px; padding:7px 14px; font-size:12px; font-weight:500; cursor:pointer; font-family:'Noto Sans KR',sans-serif;">설치</button>
+  <button id="dismissBtn" style="background:none; border:none; color:rgba(255,255,255,0.5); cursor:pointer; font-size:16px; padding:0 2px;">✕</button>
+</div>
+
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="logo">돈<span>기록</span></div>
+
+    <div class="month-nav">
+      <button onclick="changeMonth(-1)">&#8249;</button>
+      <span class="month-label" id="monthLabel"></span>
+      <button onclick="changeMonth(1)">&#8250;</button>
+    </div>
+
+    <div class="summary-cards">
+      <div class="s-card income">
+        <div class="s-label">수입</div>
+        <div class="s-amount" id="totalIncome">₩0</div>
+      </div>
+      <div class="s-card expense">
+        <div class="s-label">지출</div>
+        <div class="s-amount" id="totalExpense">₩0</div>
+      </div>
+      <div class="s-card balance">
+        <div class="s-label">잔액</div>
+        <div class="s-amount" id="totalBalance">₩0</div>
+      </div>
+    </div>
+
+    <div class="category-list">
+      <div class="cat-title">카테고리별 지출</div>
+      <div id="catList"></div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="main-header">
+      <div class="main-title" id="mainTitle"></div>
+      <button class="add-btn" onclick="openModal()">
+        <span>+</span> 내역 추가
+      </button>
+    </div>
+
+    <div class="filters">
+      <button class="filter-btn active" onclick="setFilter('all', this)">전체</button>
+      <button class="filter-btn" onclick="setFilter('income', this)">수입</button>
+      <button class="filter-btn" onclick="setFilter('expense', this)">지출</button>
+    </div>
+
+    <div id="txList"></div>
+  </main>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <div class="modal-title">내역 추가</div>
+
+    <div class="type-toggle">
+      <button class="type-btn active-expense" id="btnExpense" onclick="setType('expense')">지출</button>
+      <button class="type-btn" id="btnIncome" onclick="setType('income')">수입</button>
+    </div>
+
+    <div class="field">
+      <label>금액</label>
+      <input type="number" id="inputAmount" placeholder="0" min="0">
+    </div>
+    <div class="field">
+      <label>메모</label>
+      <input type="text" id="inputMemo" placeholder="어디에 쓰셨나요?">
+    </div>
+    <div class="field">
+      <label>카테고리</label>
+      <select id="inputCategory"></select>
+    </div>
+    <div class="field">
+      <label>날짜</label>
+      <input type="date" id="inputDate">
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">취소</button>
+      <button class="btn-submit" onclick="addTransaction()">추가하기</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const CATEGORIES = {
+  expense: [
+    { name: '식비', icon: '🍚', color: '#E8845C', dot: '#E8845C' },
+    { name: '교통', icon: '🚌', color: '#5C8AE8', dot: '#5C8AE8' },
+    { name: '쇼핑', icon: '🛍️', color: '#A05CE8', dot: '#A05CE8' },
+    { name: '의료', icon: '💊', color: '#E85C7A', dot: '#E85C7A' },
+    { name: '문화', icon: '🎬', color: '#5CBDE8', dot: '#5CBDE8' },
+    { name: '육아', icon: '🍼', color: '#E8C45C', dot: '#E8C45C' },
+    { name: '주거', icon: '🏠', color: '#5CE88A', dot: '#5CE88A' },
+    { name: '기타', icon: '📦', color: '#A0A0A0', dot: '#A0A0A0' },
+  ],
+  income: [
+    { name: '급여', icon: '💰', color: '#1D6A47', dot: '#1D6A47' },
+    { name: '부업', icon: '💼', color: '#2C5F8A', dot: '#2C5F8A' },
+    { name: '투자', icon: '📈', color: '#6A4B1D', dot: '#6A4B1D' },
+    { name: '기타', icon: '🎁', color: '#A0A0A0', dot: '#A0A0A0' },
+  ]
+};
+
+let currentType = 'expense';
+let currentFilter = 'all';
+let currentYear, currentMonth;
+let transactions = JSON.parse(localStorage.getItem('txData') || '[]');
+
+function init() {
+  const now = new Date();
+  currentYear = now.getFullYear();
+  currentMonth = now.getMonth();
+  document.getElementById('inputDate').value = now.toISOString().split('T')[0];
+  updateCategorySelect();
+  render();
+}
+
+function changeMonth(dir) {
+  currentMonth += dir;
+  if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+  if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+  render();
+}
+
+function setType(type) {
+  currentType = type;
+  document.getElementById('btnExpense').className = 'type-btn' + (type === 'expense' ? ' active-expense' : '');
+  document.getElementById('btnIncome').className = 'type-btn' + (type === 'income' ? ' active-income' : '');
+  updateCategorySelect();
+}
+
+function updateCategorySelect() {
+  const sel = document.getElementById('inputCategory');
+  sel.innerHTML = CATEGORIES[currentType].map(c => `<option value="${c.name}">${c.icon} ${c.name}</option>`).join('');
+}
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+}
+
+function getCatInfo(type, name) {
+  const list = CATEGORIES[type] || CATEGORIES.expense;
+  return list.find(c => c.name === name) || { icon: '📦', color: '#A0A0A0', dot: '#A0A0A0' };
+}
+
+function fmt(n) {
+  return '₩' + Math.abs(Math.round(n)).toLocaleString('ko-KR');
+}
+
+function monthTx() {
+  return transactions.filter(tx => {
+    const d = new Date(tx.date);
+    return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+  });
+}
+
+function render() {
+  const monthNames = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  document.getElementById('monthLabel').textContent = `${currentYear}년 ${monthNames[currentMonth]}`;
+  document.getElementById('mainTitle').textContent = `${currentYear}년 ${monthNames[currentMonth]} 가계부`;
+
+  const txs = monthTx();
+  const income = txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const expense = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  const balance = income - expense;
+
+  document.getElementById('totalIncome').textContent = fmt(income);
+  document.getElementById('totalExpense').textContent = fmt(expense);
+  document.getElementById('totalBalance').textContent = (balance >= 0 ? '' : '-') + fmt(balance);
+
+  // Category breakdown
+  const catMap = {};
+  txs.filter(t => t.type === 'expense').forEach(t => {
+    catMap[t.category] = (catMap[t.category] || 0) + t.amount;
+  });
+  const catEl = document.getElementById('catList');
+  if (Object.keys(catMap).length === 0) {
+    catEl.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:8px 0;">지출 내역이 없습니다</div>';
+  } else {
+    const maxCat = Math.max(...Object.values(catMap));
+    catEl.innerHTML = Object.entries(catMap).sort((a,b) => b[1]-a[1]).map(([name, amt]) => {
+      const info = getCatInfo('expense', name);
+      const pct = Math.round((amt / maxCat) * 100);
+      return `<div class="cat-item">
+        <div class="cat-name">
+          <div class="cat-dot" style="background:${info.dot}"></div>
+          ${name}
+        </div>
+        <div>
+          <div class="cat-amount" style="text-align:right">${fmt(amt)}</div>
+          <div class="cat-bar"><div class="cat-bar-fill" style="width:${pct}%;background:${info.dot}"></div></div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // Transaction list
+  let filtered = txs;
+  if (currentFilter !== 'all') filtered = txs.filter(t => t.type === currentFilter);
+  filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  const txEl = document.getElementById('txList');
+  if (filtered.length === 0) {
+    txEl.innerHTML = `<div class="empty-state"><div class="icon">📒</div><p>내역이 없습니다<br>+ 버튼으로 추가해보세요</p></div>`;
+    return;
+  }
+
+  const grouped = {};
+  filtered.forEach(tx => {
+    const d = new Date(tx.date);
+    const key = `${d.getFullYear()}년 ${monthNames[d.getMonth()]} ${d.getDate()}일`;
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(tx);
+  });
+
+  txEl.innerHTML = Object.entries(grouped).map(([date, items]) => `
+    <div class="tx-group">
+      <div class="tx-date">${date}</div>
+      ${items.map(tx => {
+        const info = getCatInfo(tx.type, tx.category);
+        const sign = tx.type === 'income' ? '+' : '-';
+        return `<div class="tx-item">
+          <div class="tx-icon" style="background:${info.color}22">${info.icon}</div>
+          <div class="tx-info">
+            <div class="tx-memo">${tx.memo || tx.category}</div>
+            <div class="tx-cat">${tx.category}</div>
+          </div>
+          <div class="tx-amount ${tx.type}">${sign}${fmt(tx.amount)}</div>
+          <button class="tx-delete" onclick="deleteTx('${tx.id}')">✕</button>
+        </div>`;
+      }).join('')}
+    </div>
+  `).join('');
+}
+
+function openModal() {
+  document.getElementById('modalOverlay').classList.add('open');
+  document.getElementById('inputAmount').focus();
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+
+function closeModalOutside(e) {
+  if (e.target === document.getElementById('modalOverlay')) closeModal();
+}
+
+function addTransaction() {
+  const amount = parseFloat(document.getElementById('inputAmount').value);
+  const memo = document.getElementById('inputMemo').value.trim();
+  const category = document.getElementById('inputCategory').value;
+  const date = document.getElementById('inputDate').value;
+
+  if (!amount || amount <= 0) { alert('금액을 입력해주세요'); return; }
+  if (!date) { alert('날짜를 선택해주세요'); return; }
+
+  const tx = {
+    id: Date.now().toString(),
+    type: currentType,
+    amount,
+    memo,
+    category,
+    date
+  };
+
+  transactions.push(tx);
+  localStorage.setItem('txData', JSON.stringify(transactions));
+
+  // Reset
+  document.getElementById('inputAmount').value = '';
+  document.getElementById('inputMemo').value = '';
+
+  // Sync month view to the added tx
+  const d = new Date(date);
+  currentYear = d.getFullYear();
+  currentMonth = d.getMonth();
+
+  closeModal();
+  render();
+}
+
+function deleteTx(id) {
+  if (!confirm('삭제하시겠습니까?')) return;
+  transactions = transactions.filter(t => t.id !== id);
+  localStorage.setItem('txData', JSON.stringify(transactions));
+  render();
+}
+
+// Sample data for first run
+if (transactions.length === 0) {
+  const now = new Date();
+  const y = now.getFullYear(), m = String(now.getMonth()+1).padStart(2,'0');
+  const samples = [
+    { id:'s1', type:'income', amount:3200000, memo:'월급', category:'급여', date:`${y}-${m}-01` },
+    { id:'s2', type:'expense', amount:85000, memo:'마트 장보기', category:'식비', date:`${y}-${m}-03` },
+    { id:'s3', type:'expense', amount:54000, memo:'기저귀 구매', category:'육아', date:`${y}-${m}-05` },
+    { id:'s4', type:'expense', amount:62000, memo:'주유', category:'교통', date:`${y}-${m}-07` },
+    { id:'s5', type:'expense', amount:120000, memo:'병원', category:'의료', date:`${y}-${m}-10` },
+    { id:'s6', type:'income', amount:150000, memo:'비트코인 수익', category:'투자', date:`${y}-${m}-12` },
+  ];
+  transactions = samples;
+  localStorage.setItem('txData', JSON.stringify(transactions));
+}
+
+init();
+
+// PWA 설치 배너
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  const banner = document.getElementById('installBanner');
+  if (banner) banner.style.display = 'flex';
+});
+
+document.getElementById('installBtn')?.addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  if (outcome === 'accepted') {
+    document.getElementById('installBanner').style.display = 'none';
+  }
+  deferredPrompt = null;
+});
+
+document.getElementById('dismissBtn')?.addEventListener('click', () => {
+  document.getElementById('installBanner').style.display = 'none';
+});
+
+// Service Worker 등록
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
