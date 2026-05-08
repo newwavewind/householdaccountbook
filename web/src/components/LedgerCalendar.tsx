@@ -35,8 +35,6 @@ export interface LedgerCalendarProps {
   todayIso: string
   selectedIso: string | null
   rollups: Map<string, DayRollup>
-  /** 달력 셀 미리보기용 (짧은 표기). */
-  fmtCompact: Intl.NumberFormat
   onSelectDay: (iso: string) => void
   onHover: (
     detail: null | { iso: string; clientX: number; clientY: number },
@@ -49,13 +47,20 @@ export const LedgerCalendar = memo(function LedgerCalendar({
   todayIso,
   selectedIso,
   rollups,
-  fmtCompact,
   onSelectDay,
   onHover,
 }: LedgerCalendarProps) {
   const cells = useMemo(
     () => buildGrid(year, monthIndex),
     [year, monthIndex],
+  )
+
+  const fmtPlain = useMemo(
+    () =>
+      new Intl.NumberFormat('ko-KR', {
+        maximumFractionDigits: 0,
+      }),
+    [],
   )
 
   return (
@@ -70,8 +75,11 @@ export const LedgerCalendar = memo(function LedgerCalendar({
           const hol = holidayLabel(iso)
           const r = rollups.get(iso)
           const hasTx = r && r.count > 0
+          const memoLines = r?.memoLines ?? []
           const isToday = iso === todayIso
           const isSel = iso === selectedIso
+          /** 모든 날짜: 위(날짜·금액) / 아래(메모 칸) 고정 */
+          const cellMinH = 'min-h-[6.25rem] md:min-h-[7.5rem]'
 
           return (
             <button
@@ -83,10 +91,8 @@ export const LedgerCalendar = memo(function LedgerCalendar({
               }
               onMouseLeave={() => onHover(null)}
               className={[
-                'relative flex flex-col items-center justify-start rounded-lg border px-0.5 py-2 text-center',
-                hasTx && inMonth
-                  ? 'min-h-[5.75rem] md:min-h-[6.75rem]'
-                  : 'min-h-[3.5rem] md:min-h-[4.75rem]',
+                'relative flex w-full flex-col rounded-lg border px-0.5 py-1.5 text-left md:py-2',
+                cellMinH,
                 inMonth
                   ? 'border-black/[0.08] bg-white'
                   : 'border-transparent bg-neutral-cool/50 text-text-soft/60',
@@ -102,56 +108,89 @@ export const LedgerCalendar = memo(function LedgerCalendar({
                 .filter(Boolean)
                 .join(' ')}
             >
-              <span
-                className={[
-                  'text-base font-semibold tabular-nums md:text-lg',
-                  inMonth ? 'text-[rgba(0,0,0,0.87)]' : '',
-                  hol && inMonth ? 'text-gold' : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-              >
-                {day}
-              </span>
-              {hol && inMonth ? (
-                <span
-                  className={[
-                    'mt-0.5 w-full px-0.5 text-xs leading-tight text-gold md:text-[0.8125rem]',
-                    hasTx ? 'line-clamp-1' : 'line-clamp-2',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                >
-                  {hol}
-                </span>
-              ) : null}
-              {hasTx && r && inMonth ? (
-                <div className="mt-auto flex w-full max-w-full flex-col gap-px self-stretch">
-                  {r.preview.map((p, i) => (
-                    <span
-                      key={`${iso}-${i}`}
-                      className={
-                        p.type === 'income'
-                          ? 'truncate text-left text-[0.625rem] font-semibold tabular-nums leading-tight text-semantic-income md:text-[0.6875rem]'
-                          : 'truncate text-left text-[0.625rem] font-semibold tabular-nums leading-tight text-semantic-expense md:text-[0.6875rem]'
-                      }
-                      title={
-                        p.type === 'income'
-                          ? `수입 ${fmtCompact.format(p.amount)}`
-                          : `지출 ${fmtCompact.format(p.amount)}`
-                      }
-                    >
-                      {p.type === 'income' ? '+' : '−'}
-                      {fmtCompact.format(p.amount)}
-                    </span>
-                  ))}
-                  {r.restCount > 0 ? (
-                    <span className="text-[0.6rem] font-medium text-text-soft md:text-[0.65rem]">
-                      외 {r.restCount}건
+              <div className="flex min-h-0 w-full flex-1 flex-col justify-start gap-0.5">
+                <div className="w-full">
+                  <span
+                    className={[
+                      'text-base font-semibold tabular-nums md:text-lg',
+                      inMonth ? 'text-[rgba(0,0,0,0.87)]' : '',
+                      hol && inMonth ? 'text-gold' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                  >
+                    {day}
+                  </span>
+                  {hol && inMonth ? (
+                    <span className="mt-0.5 block w-full line-clamp-1 text-left text-[0.65rem] font-medium leading-tight text-gold md:text-xs">
+                      {hol}
                     </span>
                   ) : null}
                 </div>
-              ) : null}
+                {hasTx && r ? (
+                  <div className="mt-0.5 flex w-full flex-col gap-px">
+                    {r.income > 0 ? (
+                      <span
+                        className={[
+                          'text-[0.625rem] font-semibold tabular-nums leading-tight text-semantic-income md:text-[0.6875rem]',
+                          !inMonth ? 'opacity-80' : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                      >
+                        +{fmtPlain.format(r.income)}
+                      </span>
+                    ) : null}
+                    {r.expense > 0 ? (
+                      <span
+                        className={[
+                          'text-[0.625rem] font-semibold tabular-nums leading-tight text-semantic-expense md:text-[0.6875rem]',
+                          !inMonth ? 'opacity-80' : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                      >
+                        −{fmtPlain.format(r.expense)}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+              <div
+                className={[
+                  'mt-auto flex min-h-[2rem] w-full shrink-0 flex-col justify-start border-t pt-1 text-[0.5625rem] leading-snug text-text-soft md:min-h-[2.25rem] md:text-[0.625rem]',
+                  inMonth ? 'border-black/[0.08]' : 'border-black/[0.05]',
+                ].join(' ')}
+              >
+                {memoLines[0] ? (
+                  <>
+                    <p
+                      className={[
+                        'line-clamp-2 break-words',
+                        !inMonth ? 'opacity-70' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                    >
+                      {memoLines[0]}
+                    </p>
+                    {memoLines[1] ? (
+                      <p
+                        className={[
+                          'mt-px line-clamp-1 break-words',
+                          !inMonth ? 'opacity-70' : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                      >
+                        {memoLines[1]}
+                      </p>
+                    ) : null}
+                  </>
+                ) : (
+                  <span className="min-h-[1.125rem] shrink-0" aria-hidden />
+                )}
+              </div>
             </button>
           )
         })}

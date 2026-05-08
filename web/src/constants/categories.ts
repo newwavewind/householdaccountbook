@@ -9,12 +9,18 @@ export const INCOME_CATEGORIES = [
 
 export const EXPENSE_CATEGORIES = [
   '식비',
+  '배달음식',
   '교통',
+  '주유비',
   '쇼핑',
   '구독',
   '의료',
   '교육',
   '문화',
   '공과금',
+  '도시가스',
+  '아파트관리비',
+  '보험료',
+  '경조사비',
   '기타',
 ] as const

@@ -1,18 +1,11 @@
 import type { Transaction } from '../types/transaction'
 
-/** 금액 큰 순 미리보기 한 줄 (최대 3개). */
-export interface DayPreviewLine {
-  type: 'income' | 'expense'
-  amount: number
-}
-
 export interface DayRollup {
   income: number
   expense: number
   count: number
-  preview: DayPreviewLine[]
-  /** 미리보기에 안 실린 나머지 건수 (4건 이상일 때 1 이상). */
-  restCount: number
+  /** 비어 있지 않은 메모, 금액 큰 거래 우선·중복 제거, 달력 하단 미리보기용 최대 2개. */
+  memoLines: string[]
 }
 
 export function rollupByDate(transactions: Transaction[]): Map<string, DayRollup> {
@@ -33,17 +26,22 @@ export function rollupByDate(transactions: Transaction[]): Map<string, DayRollup
     }
 
     const sorted = [...txs].sort((a, b) => b.amount - a.amount)
-    const preview = sorted
-      .slice(0, 3)
-      .map((t) => ({ type: t.type, amount: t.amount }))
-    const restCount = Math.max(0, txs.length - 3)
+    const memoLines: string[] = []
+    const memoSeen = new Set<string>()
+    for (const t of sorted) {
+      const raw = t.memo?.trim()
+      if (!raw) continue
+      if (memoSeen.has(raw)) continue
+      memoSeen.add(raw)
+      memoLines.push(raw)
+      if (memoLines.length >= 2) break
+    }
 
     m.set(date, {
       income,
       expense,
       count: txs.length,
-      preview,
-      restCount,
+      memoLines,
     })
   }
   return m

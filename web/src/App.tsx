@@ -8,6 +8,7 @@ import { CalendarHoverTooltip } from './components/CalendarHoverTooltip'
 import { TransactionFormModal } from './components/TransactionFormModal'
 import { DayDetailModal } from './components/DayDetailModal'
 import { CardSpendModal } from './components/CardSpendModal'
+import { ExpenseCategoryBreakdown } from './components/ExpenseCategoryBreakdown'
 import { useLedger } from './hooks/useLedger'
 import { parseLedgerCsv } from './lib/importCsv'
 import { rollupByDate } from './lib/dayTotals'
@@ -125,18 +126,6 @@ export default function App() {
     [],
   )
 
-  const fmtKrwCompact = useMemo(
-    () =>
-      new Intl.NumberFormat('ko-KR', {
-        style: 'currency',
-        currency: 'KRW',
-        maximumFractionDigits: 0,
-        notation: 'compact',
-        compactDisplay: 'short',
-      }),
-    [],
-  )
-
   const rollups = useMemo(() => rollupByDate(transactions), [transactions])
 
   const yearIncomeTotal = useMemo(
@@ -179,6 +168,11 @@ export default function App() {
       filtered
         .filter((t) => t.type === 'expense')
         .reduce((s, t) => s + t.amount, 0),
+    [filtered],
+  )
+
+  const monthExpenseTransactions = useMemo(
+    () => filtered.filter((t) => t.type === 'expense'),
     [filtered],
   )
 
@@ -516,69 +510,85 @@ export default function App() {
       </header>
 
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 md:px-6 lg:py-8">
-        <section aria-label="월 선택">
-          <Card className="flex flex-col gap-3 bg-ceramic/80 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center justify-between gap-2 md:justify-start">
+        <section aria-label="달력">
+          <Card>
+            <div className="mb-4 flex flex-col gap-3 rounded-[var(--radius-card)] bg-ceramic/80 p-3 md:flex-row md:items-center md:justify-between md:p-4">
+              <div className="flex flex-1 items-center justify-between gap-2 md:justify-start">
+                <Button
+                  variant="outlined"
+                  className="!min-h-11 min-w-11 !px-3"
+                  aria-label="이전 달"
+                  type="button"
+                  onClick={goPrevMonth}
+                >
+                  ‹
+                </Button>
+                <p className="min-w-[10rem] flex-1 text-center text-base font-semibold text-[rgba(0,0,0,0.87)] md:text-lg">
+                  {formatMonthLabel(cursor.y, cursor.m)}
+                </p>
+                <Button
+                  variant="outlined"
+                  className="!min-h-11 min-w-11 !px-3"
+                  aria-label="다음 달"
+                  type="button"
+                  onClick={goNextMonth}
+                >
+                  ›
+                </Button>
+              </div>
               <Button
                 variant="outlined"
-                className="!min-h-11 min-w-11 !px-3"
-                aria-label="이전 달"
                 type="button"
-                onClick={goPrevMonth}
+                className="w-full shrink-0 md:w-auto"
+                onClick={goThisMonth}
               >
-                ‹
-              </Button>
-              <p className="min-w-[10rem] flex-1 text-center text-base font-semibold text-[rgba(0,0,0,0.87)] md:text-lg">
-                {formatMonthLabel(cursor.y, cursor.m)}
-              </p>
-              <Button
-                variant="outlined"
-                className="!min-h-11 min-w-11 !px-3"
-                aria-label="다음 달"
-                type="button"
-                onClick={goNextMonth}
-              >
-                ›
+                이번 달
               </Button>
             </div>
-            <Button
-              variant="outlined"
-              type="button"
-              className="w-full md:w-auto"
-              onClick={goThisMonth}
-            >
-              이번 달
-            </Button>
-          </Card>
-        </section>
 
-        <section
-          className="grid gap-4 md:grid-cols-3"
-          aria-label="요약"
-        >
-          <Card className="border-l-4 border-l-green-light bg-white">
-            <p className="text-sm font-medium text-text-soft">수입</p>
-            <p className="mt-2 text-2xl font-semibold text-semantic-income">
-              {fmtKrw.format(incomeTotal)}
+            <div className="mb-4 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-[var(--radius-card)] border border-black/[0.06] border-l-4 border-l-green-light bg-white px-3 py-3 md:px-4 md:py-4">
+                <p className="text-sm font-medium text-text-soft">수입</p>
+                <p className="mt-1 text-xl font-semibold tabular-nums text-semantic-income md:text-2xl">
+                  {fmtKrw.format(incomeTotal)}
+                </p>
+              </div>
+              <div className="rounded-[var(--radius-card)] border border-black/[0.06] border-l-4 border-l-[rgba(200,32,20,0.35)] bg-white px-3 py-3 ring-1 ring-inset ring-[#c82014]/10 md:px-4 md:py-4">
+                <p className="text-sm font-medium text-text-soft">지출</p>
+                <p className="mt-1 text-xl font-semibold tabular-nums text-semantic-expense md:text-2xl">
+                  {fmtKrw.format(expenseTotal)}
+                </p>
+              </div>
+              <div className="rounded-[var(--radius-card)] border border-black/[0.06] border-l-4 border-l-starbucks-green bg-white px-3 py-3 md:px-4 md:py-4">
+                <p className="text-sm font-medium text-text-soft">이달 순액</p>
+                <p
+                  className={`mt-1 text-xl font-semibold tabular-nums md:text-2xl ${
+                    incomeTotal - expenseTotal >= 0
+                      ? 'text-semantic-income'
+                      : 'text-semantic-expense'
+                  }`}
+                >
+                  {fmtKrw.format(incomeTotal - expenseTotal)}
+                </p>
+              </div>
+            </div>
+
+            <h2 className="!m-0 !mb-3 !text-lg font-semibold text-starbucks-green">
+              달력 · 공휴일
+            </h2>
+            <p className="mb-4 text-sm text-text-soft">
+              날짜에 마우스를 올리면 요약이 보이고, 클릭하면 상세 내역을 볼 수
+              있어요.
             </p>
-          </Card>
-          <Card className="border-l-4 border-l-[rgba(200,32,20,0.35)] bg-white ring-1 ring-inset ring-[#c82014]/10">
-            <p className="text-sm font-medium text-text-soft">지출</p>
-            <p className="mt-2 text-2xl font-semibold text-semantic-expense">
-              {fmtKrw.format(expenseTotal)}
-            </p>
-          </Card>
-          <Card className="border-l-4 border-l-starbucks-green bg-white">
-            <p className="text-sm font-medium text-text-soft">이달 순액</p>
-            <p
-              className={`mt-2 text-2xl font-semibold ${
-                incomeTotal - expenseTotal >= 0
-                  ? 'text-semantic-income'
-                  : 'text-semantic-expense'
-              }`}
-            >
-              {fmtKrw.format(incomeTotal - expenseTotal)}
-            </p>
+            <LedgerCalendar
+              year={cursor.y}
+              monthIndex={cursor.m}
+              todayIso={todayIso()}
+              selectedIso={selectedIso}
+              rollups={rollups}
+              onSelectDay={onSelectDay}
+              onHover={onCalendarHover}
+            />
           </Card>
         </section>
 
@@ -636,64 +646,18 @@ export default function App() {
           </Card>
         </section>
 
-        <section aria-label="연간 합계">
-          <Card className="border border-gold/25 bg-gold-lightest/50">
+        <section aria-label="이번 달 분류별 지출">
+          <Card>
             <h2 className="!m-0 !text-lg font-semibold text-starbucks-green">
-              {cursor.y}년 누적 합계
+              이번 달 · 분류별 지출
             </h2>
             <p className="mt-1 text-sm text-text-soft">
-              위에서 고른 달이 속한 연도(1~12월) 기준이에요. 총{' '}
-              <span className="font-medium text-[rgba(0,0,0,0.87)]">
-                {yearTxCount}건
-              </span>
+              등록 시 고른 분류 기준입니다. 분류를 누르면 이번 달 합계와 전체
+              지출 대비 비율을 도표로 볼 수 있어요.
             </p>
-            <div className="mt-4 grid gap-4 md:grid-cols-3">
-              <div className="rounded-[var(--radius-card)] border border-black/[0.06] bg-white px-4 py-4">
-                <p className="text-sm font-medium text-text-soft">연 수입</p>
-                <p className="mt-2 text-xl font-semibold text-semantic-income md:text-2xl">
-                  {fmtKrw.format(yearIncomeTotal)}
-                </p>
-              </div>
-              <div className="rounded-[var(--radius-card)] border border-black/[0.06] bg-white px-4 py-4">
-                <p className="text-sm font-medium text-text-soft">연 지출</p>
-                <p className="mt-2 text-xl font-semibold text-semantic-expense md:text-2xl">
-                  {fmtKrw.format(yearExpenseTotal)}
-                </p>
-              </div>
-              <div className="rounded-[var(--radius-card)] border border-black/[0.08] bg-white px-4 py-4">
-                <p className="text-sm font-medium text-text-soft">연 순액</p>
-                <p
-                  className={`mt-2 text-xl font-semibold md:text-2xl ${
-                    yearIncomeTotal - yearExpenseTotal >= 0
-                      ? 'text-semantic-income'
-                      : 'text-semantic-expense'
-                  }`}
-                >
-                  {fmtKrw.format(yearIncomeTotal - yearExpenseTotal)}
-                </p>
-              </div>
-            </div>
-          </Card>
-        </section>
-
-        <section aria-label="달력">
-          <Card>
-            <h2 className="!m-0 !mb-3 !text-lg font-semibold text-starbucks-green">
-              달력 · 공휴일
-            </h2>
-            <p className="mb-4 text-sm text-text-soft">
-              날짜에 마우스를 올리면 요약이 보이고, 클릭하면 상세 내역을 볼 수
-              있어요.
-            </p>
-            <LedgerCalendar
-              year={cursor.y}
-              monthIndex={cursor.m}
-              todayIso={todayIso()}
-              selectedIso={selectedIso}
-              rollups={rollups}
-              fmtCompact={fmtKrwCompact}
-              onSelectDay={onSelectDay}
-              onHover={onCalendarHover}
+            <ExpenseCategoryBreakdown
+              expenses={monthExpenseTransactions}
+              fmtKrw={fmtKrw}
             />
           </Card>
         </section>
@@ -825,6 +789,46 @@ export default function App() {
                 ))}
               </ul>
             )}
+          </Card>
+        </section>
+
+        <section aria-label="연간 합계">
+          <Card className="border border-gold/25 bg-gold-lightest/50">
+            <h2 className="!m-0 !text-lg font-semibold text-starbucks-green">
+              {cursor.y}년 누적 합계
+            </h2>
+            <p className="mt-1 text-sm text-text-soft">
+              위에서 고른 달이 속한 연도(1~12월) 기준이에요. 총{' '}
+              <span className="font-medium text-[rgba(0,0,0,0.87)]">
+                {yearTxCount}건
+              </span>
+            </p>
+            <div className="mt-4 grid gap-4 md:grid-cols-3">
+              <div className="rounded-[var(--radius-card)] border border-black/[0.06] bg-white px-4 py-4">
+                <p className="text-sm font-medium text-text-soft">연 수입</p>
+                <p className="mt-2 text-xl font-semibold text-semantic-income md:text-2xl">
+                  {fmtKrw.format(yearIncomeTotal)}
+                </p>
+              </div>
+              <div className="rounded-[var(--radius-card)] border border-black/[0.06] bg-white px-4 py-4">
+                <p className="text-sm font-medium text-text-soft">연 지출</p>
+                <p className="mt-2 text-xl font-semibold text-semantic-expense md:text-2xl">
+                  {fmtKrw.format(yearExpenseTotal)}
+                </p>
+              </div>
+              <div className="rounded-[var(--radius-card)] border border-black/[0.08] bg-white px-4 py-4">
+                <p className="text-sm font-medium text-text-soft">연 순액</p>
+                <p
+                  className={`mt-2 text-xl font-semibold md:text-2xl ${
+                    yearIncomeTotal - yearExpenseTotal >= 0
+                      ? 'text-semantic-income'
+                      : 'text-semantic-expense'
+                  }`}
+                >
+                  {fmtKrw.format(yearIncomeTotal - yearExpenseTotal)}
+                </p>
+              </div>
+            </div>
           </Card>
         </section>
 
