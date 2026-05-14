@@ -476,19 +476,23 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
   /** 가족 구성원 이름 목록 — localStorage 초기값, Supabase 유저 메타·가구 동기화 */
   const [cloudMembers, setCloudMembersState] = useState<string[]>(loadMembersFromStorage)
 
-  // userId 확정 후 Supabase 유저 메타데이터에서 구성원 로드
+  // userId 확정 후 user_family_members 테이블에서 구성원 로드 (크로스 디바이스)
   useEffect(() => {
     if (!userId) return
     const sb = getSupabase()
     if (!sb) return
-    void sb.auth.getUser().then(({ data: { user } }) => {
-      const meta = user?.user_metadata?.family_members
-      if (Array.isArray(meta) && meta.length > 0) {
-        const members = meta as string[]
-        setCloudMembersState(members)
-        saveMembersToStorage(members)
-      }
-    })
+    void sb
+      .from('user_family_members')
+      .select('members')
+      .eq('user_id', userId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data && Array.isArray(data.members) && data.members.length > 0) {
+          const members = data.members as string[]
+          setCloudMembersState(members)
+          saveMembersToStorage(members)
+        }
+      })
   }, [userId])
 
   // householdId 확정 후 Supabase households.members 로드 (가족 공유용, 우선순위 높음)
@@ -515,8 +519,8 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     saveMembersToStorage(members)
     const sb = getSupabase()
     if (!sb) return
-    // 로그인 상태면 유저 메타데이터에 저장 (단일 기기 크로스 디바이스)
-    void sb.auth.updateUser({ data: { family_members: members } })
+    // user_family_members 테이블에 upsert (크로스 디바이스 동기화)
+    void sb.rpc('upsert_user_family_members', { p_members: members })
     // 가구 ID 있으면 household에도 저장 (가족 간 공유)
     if (householdId) {
       void sb.rpc('set_household_members', {
