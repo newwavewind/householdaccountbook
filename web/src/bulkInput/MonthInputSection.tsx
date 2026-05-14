@@ -91,7 +91,8 @@ type Props = {
   defaultOpen?: boolean
   rows: BulkDraftRow[]
   onChangeRows: (payload: BulkRowsUpdater) => void
-  onApplyMonth: () => void
+  /** rows는 최신 행 데이터를 항상 넘겨주므로 stale closure 없음 */
+  onApplyMonth: (rows: BulkDraftRow[]) => void
   /** 선택 연·월 장부 vs 입력 유효 줄 집합 비교 */
   draftLedgerCompare: DraftLedgerComparison
   /** 직전 연도 동일 월 장부 수입·지출 (없으면 null) */
@@ -112,6 +113,9 @@ export function MonthInputSection({
   priorCalendarYear,
   members = [],
 }: Props) {
+  // rows의 최신값을 ref로 추적 — render 중 갱신되므로 rAF 콜백에서 읽으면 항상 최신
+  const rowsRef = useRef(rows)
+  rowsRef.current = rows
   const tbodyRef = useRef<HTMLTableSectionElement | null>(null)
   const [amountFocusLocalKey, setAmountFocusLocalKey] = useState<string | null>(
     null,
@@ -161,8 +165,8 @@ export function MonthInputSection({
         list[idx + 1]!.focus()
         return
       }
-      // End of row — auto-apply, then move to next row
-      onApplyMonth()
+      // End of row — auto-apply (rowsRef.current = latest rows after any React re-render)
+      onApplyMonth(rowsRef.current)
       const nextRow = allRows[rowIdx + 1]
       if (nextRow) {
         const nextList = collectRowFocusables(nextRow)

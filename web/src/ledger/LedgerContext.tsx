@@ -518,17 +518,22 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     setCloudMembersState(members)
     saveMembersToStorage(members)
     const sb = getSupabase()
-    if (!sb) return
-    // user_family_members 테이블에 upsert (크로스 디바이스 동기화)
-    void sb.rpc('upsert_user_family_members', { p_members: members })
-    // 가구 ID 있으면 household에도 저장 (가족 간 공유)
+    if (!sb || !userId) return
+    // user_family_members에 직접 upsert (RPC 보다 신뢰성 높음)
+    void sb
+      .from('user_family_members')
+      .upsert(
+        { user_id: userId, members, updated_at: new Date().toISOString() },
+        { onConflict: 'user_id' },
+      )
+    // 가구 ID 있으면 household.members에도 저장 (가족 간 공유)
     if (householdId) {
       void sb.rpc('set_household_members', {
         p_household_id: householdId,
         p_members: members,
       })
     }
-  }, [householdId])
+  }, [userId, householdId])
 
   const value = useMemo(
     (): LedgerContextValue => ({

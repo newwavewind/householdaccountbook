@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { startTransition, useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLedger } from '../hooks/useLedger'
 import type { BulkDraftRow } from '../bulkInput/draftRow'
@@ -73,8 +73,6 @@ export default function BulkInputPage() {
   const { replaceCalendarMonth, syncState, transactions, cloudMembers } = useLedger()
 
   const [st, setSt] = useState<InputPageState>(() => hydrateState(nowYear))
-  const stRef = useRef(st)
-  stRef.current = st          // 렌더마다 최신값 유지 (applyMonth stale closure 방지)
   const { year } = st
 
   const applyYearChoice = useCallback((y: number) => {
@@ -141,14 +139,12 @@ export default function BulkInputPage() {
     [year, transactions, draftsMatrix],
   )
 
-  const applyMonth = (monthIndex: number, silent = false) => {
-    // stRef.current을 사용해 onChange→Tab 사이의 stale closure 버그 방지
-    const latestSt = stRef.current
-    const latestMatrix = latestSt.years[latestSt.year] ?? initialMonths()
+  /** rows를 직접 받아 처리 — MonthInputSection이 rowsRef.current(최신)를 전달하므로 stale 없음 */
+  const applyMonth = (latestRows: BulkDraftRow[], monthIndex: number, silent = false) => {
     const { ok, skippedCard, skippedDay } = draftsToTransactions(
-      latestSt.year,
+      year,
       monthIndex,
-      latestMatrix[monthIndex] ?? [],
+      latestRows,
     )
     if (ok.length === 0) return
     const replacement: Transaction[] = ok.map((tx) => ({
@@ -381,7 +377,7 @@ export default function BulkInputPage() {
                 }
               })
             }
-            onApplyMonth={() => applyMonth(monthIndex, true)}
+            onApplyMonth={(latestRows) => applyMonth(latestRows, monthIndex, true)}
           />
         ))}
       </section>
