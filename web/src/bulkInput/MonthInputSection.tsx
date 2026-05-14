@@ -57,6 +57,12 @@ function collectRowFocusables(tr: HTMLTableRowElement): HTMLElement[] {
       out.push(bulkPickerBtn)
       continue
     }
+    // 확인 버튼도 Tab/Enter 네비게이션에 포함 (마지막 포커스 위치)
+    const confirmBtn = td.querySelector(':scope > button[data-confirm-row]')
+    if (confirmBtn instanceof HTMLButtonElement && !confirmBtn.disabled) {
+      out.push(confirmBtn)
+      continue
+    }
   }
   return out
 }
@@ -313,6 +319,7 @@ export function MonthInputSection({
                 <th className="py-2 pr-2 font-medium">결제</th>
                 <th className="py-2 pr-2 font-medium">카드</th>
                 {members.length > 0 && <th className="py-2 pr-2 font-medium">구성원</th>}
+                <th className="py-2 pr-2 font-medium" />
                 <th className="w-10 py-2 font-medium" />
               </tr>
             </thead>
@@ -487,6 +494,30 @@ export function MonthInputSection({
                       </select>
                     </td>
                   )}
+                  <td className="py-2 pr-2">
+                    {/* 확인 버튼: React 상태가 완전히 반영된 시점에 호출되므로 stale 없음 */}
+                    <button
+                      type="button"
+                      data-confirm-row="true"
+                      className="rounded-md bg-starbucks-green px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-starbucks-green/80 focus:outline-none focus:ring-2 focus:ring-starbucks-green/50"
+                      onClick={(e) => {
+                        onApplyMonth(rowsRef.current)
+                        // 다음 행 첫 번째 입력으로 포커스 이동
+                        const tr = (e.currentTarget as HTMLElement).closest('tr')
+                        if (tr instanceof HTMLTableRowElement) {
+                          const allRows = [
+                            ...tr.parentElement!.querySelectorAll<HTMLTableRowElement>(':scope > tr'),
+                          ]
+                          const nextTr = allRows[allRows.indexOf(tr) + 1]
+                          if (nextTr) {
+                            collectRowFocusables(nextTr)[0]?.focus()
+                          }
+                        }
+                      }}
+                    >
+                      확인
+                    </button>
+                  </td>
                   <td className="py-2 text-right">
                     <button
                       type="button"
@@ -564,11 +595,8 @@ export function MonthInputSection({
           <kbd className="rounded border border-black/15 bg-neutral-cool px-1 py-px text-[0.65rem]">
             Shift+Enter
           </kbd>
-          로 이전 칸으로 이동합니다. 마지막 칸에서{' '}
-          <kbd className="rounded border border-black/15 bg-neutral-cool px-1 py-px text-[0.65rem]">
-            Enter
-          </kbd>
-          를 치면 장부에 자동 반영됩니다.
+          로 이전 칸으로 이동합니다.{' '}
+          <span className="font-medium text-starbucks-green">확인</span> 버튼을 누르면 해당 달 전체가 장부에 반영됩니다.
         </p>
       </Card>
     </details>

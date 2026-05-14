@@ -180,7 +180,8 @@ export default function BulkInputPage() {
         <div>
           <h1 className="font-serif-display text-starbucks-green">입력</h1>
           <p className="mt-1 text-sm text-text-soft">
-            내용을 입력하고 마지막 칸에서 Enter를 치면 장부에 자동으로 반영됩니다.
+            내용을 입력하고 <strong className="font-semibold text-starbucks-green">확인</strong> 버튼을 누르면 장부에 반영됩니다.
+            Enter로 칸 이동, 구성원까지 입력 후 확인 버튼을 누르거나 클릭하세요.
             캘린더 장부에서 거래를 추가·수정·삭제하면 해당 달 표도 자동으로 맞춰집니다.
           </p>
         </div>
