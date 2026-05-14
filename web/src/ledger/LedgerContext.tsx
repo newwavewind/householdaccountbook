@@ -458,12 +458,24 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
 
   const clear = useCallback(() => { setTransactions([]) }, [])
 
-  /** Supabase households.members 에 저장되는 가족 구성원 이름 목록 */
-  const [cloudMembers, setCloudMembersState] = useState<string[]>([])
+  const LS_MEMBERS_KEY = 'household-members-v1'
 
-  // householdId가 설정되면 Supabase에서 members 로드
+  /** localStorage에서 구성원 로드 (폴백) */
+  const loadMembersFromStorage = (): string[] => {
+    try {
+      const raw = localStorage.getItem(LS_MEMBERS_KEY)
+      if (!raw) return []
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) ? (parsed as string[]) : []
+    } catch { return [] }
+  }
+
+  /** 가족 구성원 이름 목록 — localStorage에서 초기값 로드, Supabase로 크로스 디바이스 동기화 */
+  const [cloudMembers, setCloudMembersState] = useState<string[]>(loadMembersFromStorage)
+
+  // householdId가 설정되면 Supabase에서 members 로드 (Supabase > localStorage)
   useEffect(() => {
-    if (!householdId) { setCloudMembersState([]); return }
+    if (!householdId) return  // householdId 없어도 localStorage 값 유지
     const sb = getSupabase()
     if (!sb) return
     void sb
@@ -472,14 +484,19 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       .eq('id', householdId)
       .maybeSingle()
       .then(({ data }) => {
-        if (data && Array.isArray(data.members)) {
-          setCloudMembersState(data.members as string[])
+        if (data && Array.isArray(data.members) && data.members.length > 0) {
+          const members = data.members as string[]
+          setCloudMembersState(members)
+          try { localStorage.setItem(LS_MEMBERS_KEY, JSON.stringify(members)) } catch { /* ignore */ }
         }
       })
   }, [householdId])
 
   const setCloudMembers = useCallback((members: string[]) => {
     setCloudMembersState(members)
+    // 항상 localStorage에 저장 (오프라인·가구 미설정 폴백)
+    try { localStorage.setItem(LS_MEMBERS_KEY, JSON.stringify(members)) } catch { /* ignore */ }
+    // 가구 ID 있으면 Supabase에도 동기화
     const sb = getSupabase()
     if (!sb || !householdId) return
     void sb.rpc('set_household_members', {
