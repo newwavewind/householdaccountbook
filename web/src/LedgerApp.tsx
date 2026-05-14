@@ -512,40 +512,6 @@ export default function LedgerApp() {
               ))}
             </div>
 
-            {/* 선택된 구성원의 이달 수입/지출 요약 */}
-            {selectedMember !== null && (
-              <div className="mt-4 rounded-[var(--radius-card)] border border-black/[0.06] bg-ceramic/60 p-4">
-                <p className="mb-3 text-sm font-semibold text-[rgba(0,0,0,0.87)]">
-                  {selectedMember} · {formatMonthLabel(cursor.y, cursor.m)} 요약
-                </p>
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="rounded-lg bg-white px-3 py-3">
-                    <p className="text-xs text-text-soft">수입</p>
-                    <p className="mt-1 text-base font-semibold tabular-nums text-semantic-income">
-                      {fmtKrw.format(incomeTotal)}
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-white px-3 py-3">
-                    <p className="text-xs text-text-soft">지출</p>
-                    <p className="mt-1 text-base font-semibold tabular-nums text-semantic-expense">
-                      {fmtKrw.format(expenseTotal)}
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-white px-3 py-3">
-                    <p className="text-xs text-text-soft">순액</p>
-                    <p className={`mt-1 text-base font-semibold tabular-nums ${incomeTotal - expenseTotal >= 0 ? 'text-semantic-income' : 'text-semantic-expense'}`}>
-                      {fmtKrw.format(incomeTotal - expenseTotal)}
-                    </p>
-                  </div>
-                </div>
-                {incomeTotal === 0 && expenseTotal === 0 && (
-                  <p className="mt-3 text-xs text-text-soft">
-                    이 달에 <strong>{selectedMember}</strong>로 기록된 거래가 없습니다.
-                    기존 거래를 클릭해 편집하거나, 새 거래 추가 시 구성원을 선택하면 여기 집계됩니다.
-                  </p>
-                )}
-              </div>
-            )}
           </Card>
         </section>
 
