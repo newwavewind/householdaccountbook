@@ -81,10 +81,25 @@ export function CommunityRichTextEditor({
 
     setUploading(true)
     try {
+      // 인증 세션 확인 — storage RLS는 authenticated 역할만 허용
+      const { data: { session } } = await sb.auth.getSession()
+      if (!session) {
+        alert('사진을 업로드하려면 구글 로그인이 필요합니다.\n오른쪽 상단 "로그인" 버튼을 눌러 로그인해 주세요.')
+        return
+      }
+
       const ext = file.name.split('.').pop() ?? 'bin'
-      const path = `${crypto.randomUUID()}.${ext}`
-      const { error } = await sb.storage.from('community-media').upload(path, file)
-      if (error) throw new Error(error.message)
+      const path = `${session.user.id}/${crypto.randomUUID()}.${ext}`
+      const { error } = await sb.storage.from('community-media').upload(path, file, {
+        contentType: file.type || 'application/octet-stream',
+        upsert: false,
+      })
+      if (error) {
+        if (error.message.includes('row-level security') || error.message.includes('Unauthorized')) {
+          throw new Error('업로드 권한이 없습니다. 로그인 상태를 확인해 주세요.')
+        }
+        throw new Error(error.message)
+      }
 
       const { data: urlData } = sb.storage.from('community-media').getPublicUrl(path)
       const publicUrl = urlData.publicUrl

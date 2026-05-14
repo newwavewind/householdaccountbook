@@ -123,6 +123,7 @@ export default function LedgerApp() {
   const [members, setMembers] = useState<string[]>(() => loadMembers())
   const [selectedMember, setSelectedMember] = useState<string | null>(null)
   const [newMemberName, setNewMemberName] = useState('')
+  const [deleteConfirm, setDeleteConfirm] = useState<{ member: string; step: 1 | 2 } | null>(null)
 
   useEffect(() => {
     if (!settingsOpen) return
@@ -451,7 +452,10 @@ export default function LedgerApp() {
         <section aria-label="가족 구성원">
           <Card>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="!m-0 !text-base font-semibold text-starbucks-green">가족 구성원</h2>
+              <div>
+                <h2 className="!m-0 !text-base font-semibold text-starbucks-green">가족 구성원</h2>
+                <p className="mt-0.5 text-xs text-text-soft">이름을 클릭하면 해당 구성원만 필터. 우클릭하면 삭제.</p>
+              </div>
               <form
                 className="flex gap-2"
                 onSubmit={(e) => {
@@ -475,7 +479,7 @@ export default function LedgerApp() {
               </form>
             </div>
 
-            {/* 구성원 탭 (필터) */}
+            {/* 구성원 탭 (필터) — 우클릭으로 삭제 */}
             <div className="mt-3 flex flex-wrap gap-2">
               <button
                 type="button"
@@ -489,6 +493,10 @@ export default function LedgerApp() {
                   key={m}
                   type="button"
                   onClick={() => setSelectedMember(selectedMember === m ? null : m)}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    setDeleteConfirm({ member: m, step: 1 })
+                  }}
                   className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${selectedMember === m ? 'border-starbucks-green bg-starbucks-green text-white' : 'border-black/20 text-[rgba(0,0,0,0.87)] hover:bg-neutral-cool'}`}
                 >
                   {m}
@@ -506,46 +514,81 @@ export default function LedgerApp() {
                   <div className="rounded-lg bg-white px-3 py-3">
                     <p className="text-xs text-text-soft">수입</p>
                     <p className="mt-1 text-base font-semibold tabular-nums text-semantic-income">
-                      {fmtKrw.format(filtered.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0))}
+                      {fmtKrw.format(incomeTotal)}
                     </p>
                   </div>
                   <div className="rounded-lg bg-white px-3 py-3">
                     <p className="text-xs text-text-soft">지출</p>
                     <p className="mt-1 text-base font-semibold tabular-nums text-semantic-expense">
-                      {fmtKrw.format(filtered.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0))}
+                      {fmtKrw.format(expenseTotal)}
                     </p>
                   </div>
                   <div className="rounded-lg bg-white px-3 py-3">
                     <p className="text-xs text-text-soft">순액</p>
-                    <p className={`mt-1 text-base font-semibold tabular-nums ${filtered.reduce((s, t) => s + (t.type === 'income' ? t.amount : -t.amount), 0) >= 0 ? 'text-semantic-income' : 'text-semantic-expense'}`}>
-                      {fmtKrw.format(filtered.reduce((s, t) => s + (t.type === 'income' ? t.amount : -t.amount), 0))}
+                    <p className={`mt-1 text-base font-semibold tabular-nums ${incomeTotal - expenseTotal >= 0 ? 'text-semantic-income' : 'text-semantic-expense'}`}>
+                      {fmtKrw.format(incomeTotal - expenseTotal)}
                     </p>
                   </div>
                 </div>
-              </div>
-            )}
-
-            {/* 구성원 삭제 */}
-            {members.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-1 border-t border-black/[0.06] pt-3">
-                <span className="mr-1 self-center text-xs text-text-soft">삭제:</span>
-                {members.map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => {
-                      setMembers(removeMember(m))
-                      if (selectedMember === m) setSelectedMember(null)
-                    }}
-                    className="rounded-full border border-danger/30 px-2 py-0.5 text-xs text-danger hover:bg-red-50"
-                  >
-                    {m} ×
-                  </button>
-                ))}
+                {incomeTotal === 0 && expenseTotal === 0 && (
+                  <p className="mt-3 text-xs text-text-soft">
+                    아직 이 달에 {selectedMember} 이름으로 기록된 거래가 없습니다.
+                    거래 추가 시 구성원을 선택하면 여기서 확인할 수 있어요.
+                  </p>
+                )}
               </div>
             )}
           </Card>
         </section>
+
+        {/* 구성원 삭제 확인 모달 */}
+        {deleteConfirm && (
+          <div
+            className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40"
+            onClick={() => setDeleteConfirm(null)}
+          >
+            <div
+              className="w-72 rounded-[var(--radius-card)] bg-white p-6 shadow-[var(--shadow-card)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {deleteConfirm.step === 1 ? (
+                <>
+                  <p className="text-center text-base font-semibold text-[rgba(0,0,0,0.87)]">
+                    「{deleteConfirm.member}」을(를)<br />삭제하시겠습니까?
+                  </p>
+                  <div className="mt-5 flex gap-3">
+                    <Button type="button" variant="outlined" className="flex-1" onClick={() => setDeleteConfirm(null)}>아니오</Button>
+                    <Button type="button" variant="primary" className="flex-1" onClick={() => setDeleteConfirm({ ...deleteConfirm, step: 2 })}>네</Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-center text-base font-semibold text-danger">
+                    정말 삭제하시겠습니까?
+                  </p>
+                  <p className="mt-1 text-center text-xs text-text-soft">
+                    이 작업은 되돌릴 수 없습니다.
+                  </p>
+                  <div className="mt-5 flex gap-3">
+                    <Button type="button" variant="outlined" className="flex-1" onClick={() => setDeleteConfirm(null)}>아니오</Button>
+                    <Button
+                      type="button"
+                      variant="primary"
+                      className="flex-1 !bg-danger !border-danger"
+                      onClick={() => {
+                        setMembers(removeMember(deleteConfirm.member))
+                        if (selectedMember === deleteConfirm.member) setSelectedMember(null)
+                        setDeleteConfirm(null)
+                      }}
+                    >
+                      네, 삭제
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
 
         <section aria-label="달력">
           <Card>
