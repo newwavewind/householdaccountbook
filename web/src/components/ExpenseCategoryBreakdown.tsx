@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { EXPENSE_CATEGORIES } from '../constants/categories'
+import { cardBrandLabel } from '../constants/cardBrands'
 import type { Transaction } from '../types/transaction'
 
 const BAR_TONES = [
@@ -10,19 +11,21 @@ const BAR_TONES = [
   'bg-[#5a9e89]',
 ] as const
 
-const DONUT_PALETTE = [
-  '#00754a',
-  '#006241',
-  '#c82014',
-  '#cba258',
-  '#2b5148',
-  '#33433d',
-  '#007350',
-  '#8b5a2b',
-] as const
-
 function categoryKey(t: Transaction) {
   return t.category?.trim() || '미분류'
+}
+
+function shortLedgerDate(iso: string): string {
+  const p = iso.split('-').map(Number)
+  if (p.length < 3 || !p.every(Number.isFinite)) return iso
+  return `${p[1]}월 ${p[2]}일`
+}
+
+function paymentCaption(t: Transaction): string | null {
+  if (t.paymentMethod === 'cash') return '현금'
+  if (t.paymentMethod === 'card')
+    return cardBrandLabel(t.cardBrand) ?? '카드'
+  return null
 }
 
 export interface ExpenseCategoryBreakdownProps {
@@ -53,24 +56,12 @@ export function ExpenseCategoryBreakdown({
 
   const [selected, setSelected] = useState<string | null>(null)
 
-  const selAmount = selected ? (totals.get(selected) ?? 0) : 0
-  const selCount = useMemo(() => {
-    if (!selected) return 0
-    return expenses.filter((t) => categoryKey(t) === selected).length
-  }, [expenses, selected])
-
-  const pct =
-    totalSum > 0 ? Math.min(100, Math.round((selAmount / totalSum) * 1000) / 10) : 0
-
-  const R = 42
-  const stroke = 14
-  const C = 2 * Math.PI * R
-  const dashActive = (pct / 100) * C
-
-  const donutColor =
-    selected != null
-      ? DONUT_PALETTE[(keyIndex.get(selected) ?? 0) % DONUT_PALETTE.length]!
-      : DONUT_PALETTE[0]!
+  const detailsForCategory = (cat: string): Transaction[] => {
+    return expenses
+      .filter((t) => categoryKey(t) === cat)
+      .slice()
+      .sort((a, b) => b.date.localeCompare(a.date) || b.amount - a.amount)
+  }
 
   if (expenses.length === 0) {
     return (
@@ -89,111 +80,132 @@ export function ExpenseCategoryBreakdown({
           const isOn = selected === key
           const tone =
             BAR_TONES[(keyIndex.get(key) ?? 0) % BAR_TONES.length]!
+          const rowIdx = keyIndex.get(key) ?? 0
+          const detailId = `exp-cat-detail-${rowIdx}`
+          const pct =
+            totalSum > 0
+              ? Math.min(100, Math.round((sum / totalSum) * 1000) / 10)
+              : 0
+          const lines = isOn ? detailsForCategory(key) : []
+          const n = lines.length
+
+          const shell = [
+            'overflow-hidden rounded-lg border transition-colors',
+            isOn
+              ? 'border-green-accent bg-green-light/60 shadow-[inset_0_0_0_1px_rgba(0,117,74,0.12)]'
+              : 'border-black/[0.06] bg-white',
+          ].join(' ')
+
           return (
             <li key={key}>
-              <button
-                type="button"
-                onClick={() => setSelected((prev) => (prev === key ? null : key))}
-                className={[
-                  'w-full rounded-lg border px-3 py-2.5 text-left transition-colors',
-                  isOn
-                    ? 'border-green-accent bg-green-light/60 shadow-[inset_0_0_0_1px_rgba(0,117,74,0.12)]'
-                    : 'border-black/[0.06] bg-white hover:bg-neutral-cool/70',
-                ].join(' ')}
-              >
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="min-w-0 shrink text-sm font-medium text-[rgba(0,0,0,0.87)]">
-                    {key}
-                  </span>
-                  <span className="shrink-0 text-sm font-semibold tabular-nums text-semantic-expense">
-                    {fmtKrw.format(sum)}
-                  </span>
-                </div>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-ceramic/90">
+              <div className={shell}>
+                <button
+                  type="button"
+                  aria-expanded={isOn}
+                  aria-controls={detailId}
+                  onClick={() => setSelected((prev) => (prev === key ? null : key))}
+                  className={[
+                    'w-full px-3 py-2.5 text-left transition-colors',
+                    isOn ? '' : 'hover:bg-neutral-cool/70',
+                  ].join(' ')}
+                >
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="min-w-0 shrink text-sm font-medium text-[rgba(0,0,0,0.87)]">
+                      {key}
+                    </span>
+                    <span className="shrink-0 text-sm font-semibold tabular-nums text-semantic-expense">
+                      {fmtKrw.format(sum)}
+                    </span>
+                  </div>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-ceramic/90">
+                    <div
+                      className={`h-full rounded-full transition-[width] duration-300 ${
+                        sum > 0 ? tone : 'opacity-0'
+                      }`}
+                      style={{ width: `${barPct}%` }}
+                    />
+                  </div>
+                </button>
+                {isOn ? (
                   <div
-                    className={`h-full rounded-full transition-[width] duration-300 ${
-                      sum > 0 ? tone : 'opacity-0'
-                    }`}
-                    style={{ width: `${barPct}%` }}
-                  />
-                </div>
-              </button>
+                    id={detailId}
+                    role="region"
+                    aria-label={`${key} 분류 상세`}
+                    className="border-t border-black/[0.08] bg-white/80 px-3 py-3"
+                  >
+                    <p className="text-[0.7rem] font-medium uppercase tracking-wide text-text-soft">
+                      이번 달 이 분류
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-[rgba(0,0,0,0.78)]">
+                      <span className="font-semibold tabular-nums text-semantic-expense">
+                        {fmtKrw.format(sum)}
+                      </span>
+                      <span className="text-text-soft">·</span>
+                      <span>
+                        비율{' '}
+                        <span className="font-semibold tabular-nums">
+                          {pct}%
+                        </span>
+                      </span>
+                      <span className="text-text-soft">·</span>
+                      <span>{n}건</span>
+                    </div>
+                    <p className="mt-0.5 text-xs text-text-soft">
+                      전체 지출 합계 {fmtKrw.format(totalSum)}
+                    </p>
+                    {n === 0 ? (
+                      <p className="mt-3 text-sm text-text-soft">
+                        표시할 거래가 없습니다.
+                      </p>
+                    ) : (
+                      <ul className="mt-3 divide-y divide-black/[0.06]">
+                        {lines.map((t) => {
+                          const cap = paymentCaption(t)
+                          return (
+                            <li key={t.id} className="py-2.5">
+                              <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                                <span className="text-[0.7rem] font-medium uppercase tracking-wide text-text-soft tabular-nums">
+                                  {shortLedgerDate(t.date)}
+                                </span>
+                                <span className="shrink-0 text-sm font-semibold tabular-nums text-semantic-expense">
+                                  {fmtKrw.format(t.amount)}
+                                </span>
+                              </div>
+                              <div className="mt-0.5 flex min-w-0 flex-wrap gap-x-2 text-xs leading-snug text-text-soft">
+                                {t.memo?.trim() ? (
+                                  <span className="min-w-0 break-words text-[rgba(0,0,0,0.65)]">
+                                    {t.memo.trim()}
+                                  </span>
+                                ) : (
+                                  <span className="text-text-soft/90">메모 없음</span>
+                                )}
+                                {cap ? (
+                                  <>
+                                    <span aria-hidden className="text-text-soft/50">
+                                      ·
+                                    </span>
+                                    <span>{cap}</span>
+                                  </>
+                                ) : null}
+                              </div>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                ) : null}
+              </div>
             </li>
           )
         })}
       </ul>
 
-      {selected != null ? (
-        <div className="mt-6 flex flex-col items-center gap-5 rounded-[var(--radius-card)] border border-black/[0.08] bg-neutral-cool/40 px-4 py-5 sm:flex-row sm:items-center sm:justify-center sm:gap-10">
-          <div className="relative shrink-0" aria-hidden>
-            <svg
-              width="132"
-              height="132"
-              viewBox="0 0 132 132"
-              className="drop-shadow-sm"
-            >
-              <circle
-                cx="66"
-                cy="66"
-                r={R}
-                fill="none"
-                stroke="var(--color-ceramic)"
-                strokeWidth={stroke}
-              />
-              {pct > 0 ? (
-                <circle
-                  cx="66"
-                  cy="66"
-                  r={R}
-                  fill="none"
-                  stroke={donutColor}
-                  strokeWidth={stroke}
-                  strokeLinecap="round"
-                  strokeDasharray={`${dashActive} ${C}`}
-                  transform="rotate(-90 66 66)"
-                />
-              ) : null}
-            </svg>
-            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center pt-0.5 text-center">
-              <span className="text-[0.7rem] font-medium text-text-soft">
-                비율
-              </span>
-              <span className="text-xl font-bold tabular-nums text-[rgba(0,0,0,0.87)]">
-                {pct}%
-              </span>
-            </div>
-          </div>
-          <div className="min-w-0 flex-1 text-center sm:text-left">
-            <p className="text-xs font-medium uppercase tracking-wide text-text-soft">
-              선택한 분류
-            </p>
-            <p className="mt-1 text-lg font-semibold text-starbucks-green">
-              {selected}
-            </p>
-            <p className="mt-2 text-2xl font-semibold tabular-nums text-semantic-expense">
-              {fmtKrw.format(selAmount)}
-            </p>
-            <p className="mt-2 text-sm text-text-soft">
-              이번 달 지출 합계{' '}
-              <span className="font-medium text-[rgba(0,0,0,0.87)]">
-                {fmtKrw.format(totalSum)}
-              </span>
-              {' · '}
-              이 분류{' '}
-              <span className="font-medium text-[rgba(0,0,0,0.87)]">
-                {pct}%
-              </span>
-            </p>
-            <p className="mt-1 text-xs text-text-soft">
-              해당 분류 거래 {selCount}건
-            </p>
-          </div>
-        </div>
-      ) : (
+      {!selected ? (
         <p className="mt-4 text-center text-sm text-text-soft">
-          분류 줄을 누르면 합계와 이번 달 지출 대비 비율이 도표로 보여요.
+          분류를 누르면 해당 분류 거래 목록과 합계·비율이 펼쳐져 보여요.
         </p>
-      )}
+      ) : null}
     </div>
   )
 }

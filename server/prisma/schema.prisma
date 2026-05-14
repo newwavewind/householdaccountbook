@@ -1,0 +1,45 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+/// 가계부 동기화용 JSON 장부 (기존 Supabase `household_ledgers` 와 동일 역할)
+model HouseholdLedger {
+  id        String   @id
+  payload   Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("household_ledgers")
+}
+
+model Profile {
+  id          String   @id
+  email       String   @unique
+  displayName String?  @map("display_name")
+  avatarUrl   String?  @map("avatar_url")
+  role        String   @default("user")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  posts       Post[]
+
+  @@map("profiles")
+}
+
+model Post {
+  id                String   @id @default(uuid())
+  authorId          String   @map("author_id")
+  authorDisplayName String   @map("author_display_name")
+  title             String
+  body              String   @default("")
+  hidden            Boolean  @default(false)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  author            Profile  @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([authorId])
+  @@map("posts")
+}

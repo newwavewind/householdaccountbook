@@ -5,3 +5,9 @@
 web/.env
 web/.env.*
 !web/.env.example
+server/.env
+server/prisma/dev.db
+server/prisma/dev.db-journal
+server/node_modules
+server/dist
+migration-export/

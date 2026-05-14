@@ -46,23 +46,25 @@ export function TransactionFormModal({
 
   useEffect(() => {
     if (!open) return
-    if (initial) {
-      setType(initial.type)
-      setAmount(String(initial.amount))
-      setDate(initial.date)
-      setCategory(initial.category ?? '')
-      setMemo(initial.memo ?? '')
-      setPaymentMethod(initial.paymentMethod ?? 'cash')
-      setCardBrand(initial.cardBrand ?? '')
-    } else {
-      setType('expense')
-      setAmount('')
-      setDate(defaultDate ?? todayIso())
-      setCategory('')
-      setMemo('')
-      setPaymentMethod('cash')
-      setCardBrand('')
-    }
+    queueMicrotask(() => {
+      if (initial) {
+        setType(initial.type)
+        setAmount(String(initial.amount))
+        setDate(initial.date)
+        setCategory(initial.category ?? '')
+        setMemo(initial.memo ?? '')
+        setPaymentMethod(initial.paymentMethod ?? 'cash')
+        setCardBrand(initial.cardBrand ?? '')
+      } else {
+        setType('expense')
+        setAmount('')
+        setDate(defaultDate ?? todayIso())
+        setCategory('')
+        setMemo('')
+        setPaymentMethod('cash')
+        setCardBrand('')
+      }
+    })
   }, [open, initial, defaultDate])
 
   if (!open) return null

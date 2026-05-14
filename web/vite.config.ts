@@ -5,6 +5,18 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: '/householdaccountbook/',
+  server: {
+    /** OAuth redirect_to 와 Supabase Redirect URLs 가 항상 맞도록 포트 고정 */
+    port: 5173,
+    strictPort: true,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:4000',
+        changeOrigin: true,
+      },
+    },
+  },
   build: {
     rollupOptions: {
       output: {
