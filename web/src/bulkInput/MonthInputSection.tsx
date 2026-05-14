@@ -188,6 +188,8 @@ export function MonthInputSection({
       const tbody = tbodyRef.current
       if (!tbody) return
       if (e.key === 'Enter') {
+        // select 요소에서는 Enter가 옵션 확정 역할이므로 행 이동 건너뜀
+        if (e.currentTarget.tagName === 'SELECT') return
         e.preventDefault()
         if (e.shiftKey) {
           focusPrevInTable(e.currentTarget, tbody)

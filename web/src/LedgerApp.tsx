@@ -145,7 +145,14 @@ export default function LedgerApp() {
     [],
   )
 
-  const rollups = useMemo(() => rollupByDate(transactions), [transactions])
+  const rollups = useMemo(
+    () => rollupByDate(
+      selectedMember
+        ? transactions.filter(t => t.memberName === selectedMember)
+        : transactions,
+    ),
+    [transactions, selectedMember],
+  )
 
   const yearIncomeTotal = useMemo(
     () =>
