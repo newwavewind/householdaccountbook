@@ -139,41 +139,38 @@ export default function BulkInputPage() {
     [year, transactions, draftsMatrix],
   )
 
-  const applyMonth = (monthIndex: number) => {
+  const applyMonth = (monthIndex: number, silent = false) => {
     const { ok, skippedCard, skippedDay } = draftsToTransactions(
       year,
       monthIndex,
       draftsMatrix[monthIndex] ?? [],
     )
-    if (ok.length === 0) {
-      window.alert(
-        `반영할 거래가 없습니다.${skippedDay ? `\n유효하지 않은 일: ${skippedDay}건 무시.` : ''}${skippedCard ? `\n카드를 선택하지 않은 지출 행 ${skippedCard}건 무시.` : ''}`,
-      )
-      return
-    }
+    if (ok.length === 0) return
     const replacement: Transaction[] = ok.map((tx) => ({
       ...tx,
       id: crypto.randomUUID(),
     }))
     replaceCalendarMonth(year, monthIndex, replacement)
-    setSt((prev) => {
-      const base = [...(prev.years[prev.year] ?? initialMonths())]
-      const nm = [...base]
-      nm[monthIndex] = [
-        ...replacement.map(transactionToBulkDraftRow),
-        emptyDraftRow(),
+    if (!silent) {
+      setSt((prev) => {
+        const base = [...(prev.years[prev.year] ?? initialMonths())]
+        const nm = [...base]
+        nm[monthIndex] = [
+          ...replacement.map(transactionToBulkDraftRow),
+          emptyDraftRow(),
+        ]
+        return {
+          year: prev.year,
+          years: { ...prev.years, [prev.year]: nm },
+        }
+      })
+      const parts = [
+        `${replacement.length}건으로 ${year}년 ${monthIndex + 1}월 장부 줄을 교체했고, 표와 같은 내용으로 맞춰 두었습니다.`,
       ]
-      return {
-        year: prev.year,
-        years: { ...prev.years, [prev.year]: nm },
-      }
-    })
-    const parts = [
-      `${replacement.length}건으로 ${year}년 ${monthIndex + 1}월 장부 줄을 교체했고, 표와 같은 내용으로 맞춰 두었습니다.`,
-    ]
-    if (skippedDay) parts.push(`무효 일 ${skippedDay}건`)
-    if (skippedCard) parts.push(`카드 미선택 ${skippedCard}건`)
-    window.alert(parts.join('\n'))
+      if (skippedDay) parts.push(`무효 일 ${skippedDay}건`)
+      if (skippedCard) parts.push(`카드 미선택 ${skippedCard}건`)
+      window.alert(parts.join('\n'))
+    }
   }
 
   return (
@@ -182,11 +179,8 @@ export default function BulkInputPage() {
         <div>
           <h1 className="font-serif-display text-starbucks-green">입력</h1>
           <p className="mt-1 text-sm text-text-soft">
-            내용은 브라우저에 자동 저장됩니다. 캘린더 장부에서 거래를 추가·수정·삭제하면,
-            해당 연·달 표가 같은 집합(날짜·유형·금액 등)일 때까지 입력 탭 값에 맞춰 갱신됩니다. 표만
-            고치고 「반영」하지 않은 줄은 장부 바뀜이 없으면 유지되며, 장부와 다르게 표시되는 것이 정상입니다.
-            「이 달 장부에 반영」은 그 달 장부 줄을 표의 유효한 줄만으로 통째 교체해 중복 없이 맞추며, 표
-            줄도 같은 id·내용으로 즉시 동기화합니다.
+            내용을 입력하고 마지막 칸에서 Enter를 치면 장부에 자동으로 반영됩니다.
+            캘린더 장부에서 거래를 추가·수정·삭제하면 해당 달 표도 자동으로 맞춰집니다.
           </p>
         </div>
         <Link
@@ -381,7 +375,7 @@ export default function BulkInputPage() {
                 }
               })
             }
-            onApplyMonth={() => applyMonth(monthIndex)}
+            onApplyMonth={() => applyMonth(monthIndex, true)}
           />
         ))}
       </section>

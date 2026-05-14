@@ -10,7 +10,6 @@ import { DayDetailModal } from './components/DayDetailModal'
 import { CardPaymentBreakdown } from './components/CardPaymentBreakdown'
 import { ExpenseCategoryBreakdown } from './components/ExpenseCategoryBreakdown'
 import { useLedger } from './hooks/useLedger'
-import { parseLedgerCsv } from './lib/importCsv'
 import { rollupByDate } from './lib/dayTotals'
 import { cardBrandLabel } from './constants/cardBrands'
 import type { PaymentMethod, Transaction } from './types/transaction'
@@ -80,11 +79,8 @@ export default function LedgerApp() {
   const {
     transactions,
     add,
-    bulkAdd,
     update,
     remove,
-    replaceAll,
-    clear,
     syncState,
     userId,
     householdId,
@@ -122,7 +118,6 @@ export default function LedgerApp() {
   const [formInitial, setFormInitial] = useState<Transaction | null>(null)
   const [formDefaultDate, setFormDefaultDate] = useState<string | undefined>()
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const importRef = useRef<HTMLInputElement>(null)
   const settingsWrapRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -353,80 +348,6 @@ export default function LedgerApp() {
     }
   }
 
-  function exportData() {
-    const blob = new Blob([JSON.stringify(transactions, null, 2)], {
-      type: 'application/json',
-    })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `가계부-백업-${todayIso()}.json`
-    a.click()
-    URL.revokeObjectURL(a.href)
-  }
-
-  const importBundled2024Sample = useCallback(async () => {
-    if (
-      !confirm(
-        '2024년 1~3월 캡처에 나온 금액(5건)을 지금 기록에 이어 붙일까요?\n이미 넣었다면 중복될 수 있어요.',
-      )
-    ) {
-      return
-    }
-    try {
-      const url = `${import.meta.env.BASE_URL}seed-2024-jan-mar.csv`
-      const res = await fetch(url)
-      if (!res.ok) throw new Error(String(res.status))
-      const text = await res.text()
-      const r = parseLedgerCsv(text)
-      if (!r.ok) {
-        alert(r.message)
-        return
-      }
-      bulkAdd(r.rows)
-      alert(`${r.rows.length}건을 추가했어요. 달력에서 2024년 1~3월로 이동해 보세요.`)
-      setSettingsOpen(false)
-      setCursor({ y: 2024, m: 2 })
-    } catch {
-      alert('샘플 파일을 불러오지 못했어요. 개발 서버나 빌드된 앱에서 다시 시도해 주세요.')
-    }
-  }, [bulkAdd])
-
-  function onImportFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      const text = String(reader.result)
-      const name = file.name.toLowerCase()
-      const looksCsv = name.endsWith('.csv') || file.type === 'text/csv'
-
-      if (looksCsv) {
-        const r = parseLedgerCsv(text)
-        if (!r.ok) {
-          alert(r.message)
-        } else {
-          bulkAdd(r.rows)
-          alert(`${r.rows.length}건을 기존 기록에 추가했어요.`)
-          setSettingsOpen(false)
-        }
-        e.target.value = ''
-        return
-      }
-
-      try {
-        const data = JSON.parse(text) as unknown
-        if (!Array.isArray(data)) throw new Error('invalid')
-        replaceAll(data as Transaction[])
-        alert('백업 데이터로 교체했어요.')
-        setSettingsOpen(false)
-      } catch {
-        alert('JSON 배열 형식이 아니에요. 엑셀은 CSV로 저장해 가져오기 하세요.')
-      }
-      e.target.value = ''
-    }
-    reader.readAsText(file, 'UTF-8')
-  }
-
   return (
     <>
       {showHouseholdSetup && <HouseholdSetupModal />}
@@ -475,91 +396,42 @@ export default function LedgerApp() {
               </span>
             ) : null}
           </div>
-          <div ref={settingsWrapRef} className="relative flex items-center gap-2">
-            <Button
-              variant="darkOutlined"
-              className="!py-2 !text-sm"
-              type="button"
-              onClick={() => setSettingsOpen((v) => !v)}
-            >
-              데이터
-            </Button>
-            {settingsOpen ? (
-              <div className="absolute right-0 top-full z-50 mt-2 w-64 rounded-[var(--radius-card)] border border-black/[0.08] bg-white p-3 shadow-[var(--shadow-card)]">
-                <button
-                  type="button"
-                  className="block w-full rounded-lg px-3 py-2 text-left text-sm text-[rgba(0,0,0,0.87)] hover:bg-neutral-cool"
-                  onClick={() => {
-                    exportData()
-                    setSettingsOpen(false)
-                  }}
-                >
-                  내보내기 (JSON)
-                </button>
-                <button
-                  type="button"
-                  title="JSON: 백업 전체 복구(데이터 교체). CSV: 엑셀에서 만든 목록을 이어 붙임."
-                  className="mt-1 block w-full rounded-lg px-3 py-2 text-left text-sm text-[rgba(0,0,0,0.87)] hover:bg-neutral-cool"
-                  onClick={() => importRef.current?.click()}
-                >
-                  가져오기 (JSON·CSV)
-                </button>
-                <button
-                  type="button"
-                  className="mt-1 block w-full rounded-lg px-3 py-2 text-left text-sm text-[rgba(0,0,0,0.87)] hover:bg-neutral-cool"
-                  onClick={() => void importBundled2024Sample()}
-                >
-                  2024년 1~3월 샘플 반영
-                </button>
-                <p className="mt-1 px-1 text-[11px] leading-snug text-text-soft">
-                  CSV: 날짜·금액만 있어도 됩니다(그날 지출). 카드사 열 있으면 카드로
-                  반영. JSON은 전체 교체.
-                </p>
-                {householdCode && (
-                  <div className="mt-2 border-t border-black/[0.06] pt-2">
-                    <p className="px-3 py-1 text-xs font-medium text-text-soft">가족 코드</p>
-                    <div className="flex items-center gap-2 px-3 py-1">
-                      <span className="flex-1 rounded-lg bg-emerald-50 px-3 py-2 text-center text-base font-bold tracking-[0.25em] text-emerald-700">
-                        {householdCode}
-                      </span>
-                      <button
-                        type="button"
-                        className="rounded-lg border border-black/[0.08] px-3 py-2 text-xs text-text-soft hover:bg-neutral-cool"
-                        onClick={() => {
-                          void navigator.clipboard.writeText(householdCode)
-                          alert('코드를 복사했어요!')
-                        }}
-                      >
-                        복사
-                      </button>
-                    </div>
-                    <p className="px-3 pb-1 text-[11px] text-text-soft">
-                      가족에게 이 코드를 공유하세요.
-                    </p>
+          {householdCode && (
+            <div ref={settingsWrapRef} className="relative flex items-center gap-2">
+              <Button
+                variant="darkOutlined"
+                className="!py-2 !text-sm"
+                type="button"
+                onClick={() => setSettingsOpen((v) => !v)}
+              >
+                공유코드
+              </Button>
+              {settingsOpen ? (
+                <div className="absolute right-0 top-full z-50 mt-2 w-64 rounded-[var(--radius-card)] border border-black/[0.08] bg-white p-3 shadow-[var(--shadow-card)]">
+                  <p className="px-3 py-1 text-xs font-medium text-text-soft">가족 코드</p>
+                  <div className="flex items-center gap-2 px-3 py-1">
+                    <span className="flex-1 rounded-lg bg-emerald-50 px-3 py-2 text-center text-base font-bold tracking-[0.25em] text-emerald-700">
+                      {householdCode}
+                    </span>
+                    <button
+                      type="button"
+                      className="rounded-lg border border-black/[0.08] px-3 py-2 text-xs text-text-soft hover:bg-neutral-cool"
+                      onClick={() => {
+                        void navigator.clipboard.writeText(householdCode)
+                        alert('코드를 복사했어요!')
+                        setSettingsOpen(false)
+                      }}
+                    >
+                      복사
+                    </button>
                   </div>
-                )}
-                <button
-                  type="button"
-                  className="mt-1 block w-full rounded-lg px-3 py-2 text-left text-sm text-danger hover:bg-neutral-cool"
-                  onClick={() => {
-                    if (confirm('모든 기록을 지울까요? 이 작업은 되돌릴 수 없습니다.')) {
-                      clear()
-                      setSettingsOpen(false)
-                    }
-                  }}
-                >
-                  전체 삭제
-                </button>
-              </div>
-            ) : null}
-            <input
-              ref={importRef}
-              type="file"
-              accept="application/json,.json,text/csv,.csv"
-              className="hidden"
-              onChange={onImportFile}
-            />
-          </div>
+                  <p className="px-3 pb-1 text-[11px] text-text-soft">
+                    가족에게 이 코드를 공유하세요.
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          )}
         </div>
       </header>
 
@@ -883,8 +755,8 @@ export default function LedgerApp() {
           <p className="text-center text-sm text-text-on-dark-soft/80">
             {syncState.mode === 'cloud'
               ? syncState.cloudBackend === 'prisma'
-                ? '가계부 · 로컬 SQLite(Prisma)에 저장됩니다. API를 같이 띄운 기기·브라우저와 맞출 수 있어요. 백업은「데이터」메뉴도 활용하세요.'
-                : '가계부 · Supabase에 저장되어 같은 사이트 주소로 들어오면 함께 볼 수 있어요. 백업은「데이터」메뉴도 활용하세요.'
+                ? '가계부 · 로컬 SQLite(Prisma)에 저장됩니다. API를 같이 띄운 기기·브라우저와 맞출 수 있어요.'
+                : '가계부 · Supabase에 저장되어 같은 사이트 주소로 들어오면 함께 볼 수 있어요.'
               : (syncState as { hint?: string }).hint === 'login_required'
                 ? '가계부 · 지금은 이 기기에만 저장됩니다. 로그인하면 Supabase에 저장되어 어떤 기기에서든 볼 수 있어요.'
                 : '가계부 · 이 기기(localStorage)에만 저장됩니다. 같이 쓰려면 .env에서 Prisma API 또는 Supabase를 설정하고 배포하세요.'}

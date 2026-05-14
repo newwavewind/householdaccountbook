@@ -159,6 +159,8 @@ export function MonthInputSection({
         list[idx + 1]!.focus()
         return
       }
+      // End of row — auto-apply, then move to next row
+      onApplyMonth()
       const nextRow = allRows[rowIdx + 1]
       if (nextRow) {
         const nextList = collectRowFocusables(nextRow)
@@ -175,7 +177,7 @@ export function MonthInputSection({
         })
       })
     },
-    [onChangeRows],
+    [onChangeRows, onApplyMonth],
   )
 
   const handleFieldKeyDown = useCallback(
@@ -469,14 +471,6 @@ export function MonthInputSection({
           >
             행 추가
           </Button>
-          <Button
-            type="button"
-            variant="primary"
-            className="!py-2 !text-xs !px-3"
-            onClick={() => onApplyMonth()}
-          >
-            이 달 장부에 반영
-          </Button>
         </div>
         <div
           className={`mt-2 rounded-lg border px-3 py-2 text-xs leading-relaxed ${
@@ -492,13 +486,12 @@ export function MonthInputSection({
               {draftLedgerCompare.draftEligibleCount === 0 &&
               draftLedgerCompare.ledgerInMonthCount === 0
                 ? '해당 월에는 장부·입력 모두 반영된 거래가 없습니다 (집합 일치).'
-                : '해당 월 장부 거래와, 여기서 「반영 가능」한 입력 줄이 날짜·유형·금액·메모·카테고리·결제 기준으로 일치합니다.'}
+                : '해당 월 장부 거래와 입력 줄이 일치합니다.'}
             </p>
           ) : (
             <div className="space-y-1">
               <p className="font-medium">
-                장부와 입력 유효 줄이 일치하지 않습니다. 캘린더 등에서 넣은 거래가 있거나, 표를 고친 뒤 아직
-                「이 달 장부에 반영」으로 맞추지 않았을 수 있습니다.
+                장부와 입력 유효 줄이 일치하지 않습니다. 캘린더 등에서 넣은 거래가 있거나, 입력 후 아직 반영되지 않았을 수 있습니다.
               </p>
               <p>
                 건수: 장부 {draftLedgerCompare.ledgerInMonthCount}건 · 입력 반영 가능{' '}
@@ -517,20 +510,19 @@ export function MonthInputSection({
         </div>
         <p className="mt-3 text-xs text-text-soft">
           일 칸에는 1부터 {maxDay}까지 숫자만 넣습니다. 금액은 숫자만 입력하면 되고, 다른 칸으로
-          넘어가면 천 단위 콤마로 보입니다.
-          구분 선택은 방향키로 바꿀 수 있으며,{' '}
+          넘어가면 천 단위 콤마로 보입니다.{' '}
           <kbd className="rounded border border-black/15 bg-neutral-cool px-1 py-px text-[0.65rem]">
             Enter
           </kbd>
-          로 다음 칸,
-          <kbd className="ml-1 rounded border border-black/15 bg-neutral-cool px-1 py-px text-[0.65rem]">
+          로 다음 칸,{' '}
+          <kbd className="rounded border border-black/15 bg-neutral-cool px-1 py-px text-[0.65rem]">
             Shift+Enter
           </kbd>
-          로 이전 칸으로 이동합니다. 카테고리와 카드(지출·카드일 때)는 클릭하거나{' '}
+          로 이전 칸으로 이동합니다. 마지막 칸에서{' '}
           <kbd className="rounded border border-black/15 bg-neutral-cool px-1 py-px text-[0.65rem]">
             Enter
           </kbd>
-          ·방향키(↓↑)로 옆 패널을 연 뒤 항목을 고를 수 있습니다.
+          를 치면 장부에 자동 반영됩니다.
         </p>
       </Card>
     </details>
