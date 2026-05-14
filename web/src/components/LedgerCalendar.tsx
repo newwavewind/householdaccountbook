@@ -66,18 +66,20 @@ export const LedgerCalendar = memo(function LedgerCalendar({
   return (
     <div className="w-full">
       <div className="mb-2 grid grid-cols-7 gap-1 text-center text-sm font-medium text-text-soft md:text-base">
-        {WEEK.map((d) => (
-          <div key={d}>{d}</div>
+        {WEEK.map((d, i) => (
+          <div key={d} className={i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : ''}>{d}</div>
         ))}
       </div>
       <div className="grid grid-cols-7 gap-1">
-        {cells.map(({ iso, day, inMonth }) => {
+        {cells.map(({ iso, day, inMonth }, cellIdx) => {
           const hol = holidayLabel(iso)
           const r = rollups.get(iso)
           const hasTx = r && r.count > 0
           const memoLines = r?.memoLines ?? []
           const isToday = iso === todayIso
           const isSel = iso === selectedIso
+          const isSunday = cellIdx % 7 === 0
+          const isRedDay = (isSunday || !!hol) && inMonth
           /** 모든 날짜: 위(날짜·금액) / 아래(메모 칸) 고정 */
           const cellMinH = 'min-h-[6.25rem] md:min-h-[7.5rem]'
 
@@ -96,7 +98,7 @@ export const LedgerCalendar = memo(function LedgerCalendar({
                 inMonth
                   ? 'border-black/[0.08] bg-white'
                   : 'border-transparent bg-neutral-cool/50 text-text-soft/60',
-                hol && inMonth ? 'ring-1 ring-inset ring-gold/40' : '',
+                hol && inMonth ? 'ring-1 ring-inset ring-red-300/60' : '',
                 hasTx && inMonth
                   ? 'shadow-[0_0_0_1px_rgba(0,117,74,0.25)]'
                   : '',
@@ -113,8 +115,9 @@ export const LedgerCalendar = memo(function LedgerCalendar({
                   <span
                     className={[
                       'text-base font-semibold tabular-nums md:text-lg',
-                      inMonth ? 'text-[rgba(0,0,0,0.87)]' : '',
-                      hol && inMonth ? 'text-gold' : '',
+                      inMonth && !isRedDay ? 'text-[rgba(0,0,0,0.87)]' : '',
+                      isRedDay ? 'text-red-500' : '',
+                      !inMonth ? 'text-text-soft/60' : '',
                     ]
                       .filter(Boolean)
                       .join(' ')}
@@ -122,7 +125,7 @@ export const LedgerCalendar = memo(function LedgerCalendar({
                     {day}
                   </span>
                   {hol && inMonth ? (
-                    <span className="mt-0.5 block w-full line-clamp-1 text-left text-[0.65rem] font-medium leading-tight text-gold md:text-xs">
+                    <span className="mt-0.5 block w-full line-clamp-1 text-left text-[0.65rem] font-medium leading-tight text-red-400 md:text-xs">
                       {hol}
                     </span>
                   ) : null}

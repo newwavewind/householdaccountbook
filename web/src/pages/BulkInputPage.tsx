@@ -174,8 +174,8 @@ export default function BulkInputPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-4 pb-20 pt-6 md:px-6">
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+    <main className="mx-auto max-w-5xl px-3 pb-20 pt-4 sm:px-4 md:px-6">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3 sm:mb-6 sm:gap-4">
         <div>
           <h1 className="font-serif-display text-starbucks-green">입력</h1>
           <p className="mt-1 text-sm text-text-soft">
@@ -191,8 +191,8 @@ export default function BulkInputPage() {
         </Link>
       </div>
 
-      <div className="mb-6 rounded-[var(--radius-card)] border border-black/[0.08] bg-white px-4 py-3">
-        <div className="flex flex-col flex-wrap gap-y-3 sm:flex-row sm:items-center sm:gap-x-3 sm:gap-y-0">
+      <div className="mb-4 rounded-[var(--radius-card)] border border-black/[0.08] bg-white px-3 py-2.5 sm:mb-6 sm:px-4 sm:py-3">
+        <div className="flex flex-col flex-wrap gap-y-2 sm:flex-row sm:items-center sm:gap-x-3 sm:gap-y-0">
           <div className={BULK_MONTH_SUMMARY_GUTTER} aria-hidden />
           <div
             id="bulk-year-control"

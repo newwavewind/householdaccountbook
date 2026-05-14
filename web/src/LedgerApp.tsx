@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from './components/ui/Button'
-import { addMember, removeMember } from './lib/memberStorage'
 import { Card } from './components/ui/Card'
 import { Fab } from './components/ui/Fab'
 import { LedgerCalendar } from './components/LedgerCalendar'
@@ -463,8 +462,8 @@ export default function LedgerApp() {
                   e.preventDefault()
                   const trimmed = newMemberName.trim()
                   if (!trimmed) return
-                  const next = addMember(trimmed)  // localStorage도 업데이트
-                  setCloudMembers(next)             // Supabase에 저장
+                  if (cloudMembers.includes(trimmed)) return
+                  setCloudMembers([...cloudMembers, trimmed])
                   setNewMemberName('')
                 }}
               >
@@ -534,8 +533,8 @@ export default function LedgerApp() {
                 </div>
                 {incomeTotal === 0 && expenseTotal === 0 && (
                   <p className="mt-3 text-xs text-text-soft">
-                    아직 이 달에 {selectedMember} 이름으로 기록된 거래가 없습니다.
-                    거래 추가 시 구성원을 선택하면 여기서 확인할 수 있어요.
+                    이 달에 <strong>{selectedMember}</strong>로 기록된 거래가 없습니다.
+                    기존 거래를 클릭해 편집하거나, 새 거래 추가 시 구성원을 선택하면 여기 집계됩니다.
                   </p>
                 )}
               </div>
@@ -578,8 +577,7 @@ export default function LedgerApp() {
                       variant="primary"
                       className="flex-1 !bg-danger !border-danger"
                       onClick={() => {
-                        const next = removeMember(deleteConfirm.member)  // localStorage 업데이트
-                        setCloudMembers(next)                             // Supabase에 저장
+                        setCloudMembers(cloudMembers.filter(m => m !== deleteConfirm.member))
                         if (selectedMember === deleteConfirm.member) setSelectedMember(null)
                         setDeleteConfirm(null)
                       }}

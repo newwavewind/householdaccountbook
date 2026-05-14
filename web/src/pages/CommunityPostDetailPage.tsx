@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -9,6 +9,81 @@ import {
   sanitizeCommunityPostHtml,
 } from '../lib/communityPostHtml'
 import type { CommunityComment } from '../community/types'
+
+/** 이미지 라이트박스: 클릭된 src를 전달하면 전체화면 오버레이로 표시 */
+function ImageLightbox({ src, onClose }: { src: string; onClose: () => void }) {
+  const [scale, setScale] = useState(1)
+  const [pos, setPos] = useState({ x: 0, y: 0 })
+  const dragging = useRef(false)
+  const lastPos = useRef({ x: 0, y: 0 })
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault()
+    setScale((s) => Math.max(0.5, Math.min(5, s - e.deltaY * 0.001)))
+  }
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    dragging.current = true
+    lastPos.current = { x: e.clientX, y: e.clientY }
+  }
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!dragging.current) return
+    setPos((p) => ({ x: p.x + e.clientX - lastPos.current.x, y: p.y + e.clientY - lastPos.current.y }))
+    lastPos.current = { x: e.clientX, y: e.clientY }
+  }
+  const handleMouseUp = () => { dragging.current = false }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm"
+      onClick={onClose}
+      onWheel={handleWheel}
+    >
+      {/* 닫기 버튼 */}
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/30"
+        aria-label="닫기"
+      >
+        ✕
+      </button>
+      {/* 줌 컨트롤 */}
+      <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-white backdrop-blur-sm">
+        <button type="button" onClick={(e) => { e.stopPropagation(); setScale((s) => Math.max(0.5, s - 0.25)) }} className="text-lg leading-none px-1">−</button>
+        <span className="text-xs tabular-nums w-10 text-center">{Math.round(scale * 100)}%</span>
+        <button type="button" onClick={(e) => { e.stopPropagation(); setScale((s) => Math.min(5, s + 0.25)) }} className="text-lg leading-none px-1">+</button>
+        <button type="button" onClick={(e) => { e.stopPropagation(); setScale(1); setPos({ x: 0, y: 0 }) }} className="text-xs border border-white/30 rounded px-2 py-0.5 ml-1">초기화</button>
+      </div>
+      <img
+        src={src}
+        alt="확대 이미지"
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        draggable={false}
+        style={{
+          transform: `translate(${pos.x}px, ${pos.y}px) scale(${scale})`,
+          transition: dragging.current ? 'none' : 'transform 0.1s ease',
+          maxWidth: '90vw',
+          maxHeight: '90vh',
+          objectFit: 'contain',
+          cursor: dragging.current ? 'grabbing' : 'grab',
+          borderRadius: 8,
+          userSelect: 'none',
+        }}
+      />
+    </div>
+  )
+}
 
 function fmtDate(iso: string) {
   return new Intl.DateTimeFormat('ko-KR', {
@@ -37,6 +112,11 @@ export default function CommunityPostDetailPage() {
   const [liked, setLiked] = useState(false)
   const [likeCount, setLikeCount] = useState(0)
   const [likeBusy, setLikeBusy] = useState(false)
+  // 라이트박스
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
+  const postBodyRef = useRef<HTMLDivElement>(null)
+
+  const closeLightbox = useCallback(() => setLightboxSrc(null), [])
 
   const canEdit =
     auth.user && post && (post.authorId === auth.user.id || auth.role === 'admin')
@@ -119,6 +199,8 @@ export default function CommunityPostDetailPage() {
   }
 
   return (
+    <>
+    {lightboxSrc && <ImageLightbox src={lightboxSrc} onClose={closeLightbox} />}
     <main className="mx-auto max-w-3xl px-4 pb-16 pt-6 md:px-6">
       {busy ? (
         <p className="text-center text-sm text-text-soft">불러오는 중…</p>
@@ -186,8 +268,16 @@ export default function CommunityPostDetailPage() {
               <h1 className="mt-4 font-serif-display text-starbucks-green">{post.title}</h1>
               {isProbablyRichHtml(post.body) ? (
                 <div
+                  ref={postBodyRef}
                   className="community-post-body mt-6 text-base leading-relaxed text-[rgba(0,0,0,0.87)]"
                   dangerouslySetInnerHTML={{ __html: sanitizeCommunityPostHtml(post.body) }}
+                  onClick={(e) => {
+                    const target = e.target as HTMLElement
+                    if (target.tagName === 'IMG') {
+                      const src = (target as HTMLImageElement).src
+                      if (src) setLightboxSrc(src)
+                    }
+                  }}
                 />
               ) : (
                 <div className="mt-6 whitespace-pre-wrap text-base leading-relaxed text-[rgba(0,0,0,0.87)]">
@@ -282,5 +372,6 @@ export default function CommunityPostDetailPage() {
         </>
       )}
     </main>
+    </>
   )
 }
