@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from './components/ui/Button'
+import { loadMembers, addMember, removeMember } from './lib/memberStorage'
 import { Card } from './components/ui/Card'
 import { Fab } from './components/ui/Fab'
 import { LedgerCalendar } from './components/LedgerCalendar'
@@ -119,6 +120,9 @@ export default function LedgerApp() {
   const [formDefaultDate, setFormDefaultDate] = useState<string | undefined>()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const settingsWrapRef = useRef<HTMLDivElement>(null)
+  const [members, setMembers] = useState<string[]>(() => loadMembers())
+  const [selectedMember, setSelectedMember] = useState<string | null>(null)
+  const [newMemberName, setNewMemberName] = useState('')
 
   useEffect(() => {
     if (!settingsOpen) return
@@ -165,8 +169,12 @@ export default function LedgerApp() {
 
   const filtered = useMemo(
     () =>
-      transactions.filter((t) => isInMonth(t.date, cursor.y, cursor.m)),
-    [transactions, cursor.y, cursor.m],
+      transactions.filter(
+        (t) =>
+          isInMonth(t.date, cursor.y, cursor.m) &&
+          (selectedMember === null || t.memberName === selectedMember),
+      ),
+    [transactions, cursor.y, cursor.m, selectedMember],
   )
 
   const incomeTotal = useMemo(
@@ -319,6 +327,7 @@ export default function LedgerApp() {
     memo?: string
     paymentMethod?: PaymentMethod
     cardBrand?: string
+    memberName?: string
   }) {
     const common = {
       type: payload.type,
@@ -326,6 +335,7 @@ export default function LedgerApp() {
       date: payload.date,
       category: payload.category,
       memo: payload.memo,
+      memberName: payload.memberName,
     }
     const pay =
       payload.type === 'expense'
@@ -436,6 +446,107 @@ export default function LedgerApp() {
       </header>
 
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 md:px-6 lg:py-8">
+
+        {/* 가족 구성원 관리 + 필터 */}
+        <section aria-label="가족 구성원">
+          <Card>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="!m-0 !text-base font-semibold text-starbucks-green">가족 구성원</h2>
+              <form
+                className="flex gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  const trimmed = newMemberName.trim()
+                  if (!trimmed) return
+                  setMembers(addMember(trimmed))
+                  setNewMemberName('')
+                }}
+              >
+                <input
+                  value={newMemberName}
+                  onChange={(e) => setNewMemberName(e.target.value)}
+                  placeholder="이름 입력"
+                  maxLength={20}
+                  className="w-28 rounded-full border border-input-border px-3 py-1 text-sm outline-none focus:border-green-accent"
+                />
+                <Button type="submit" variant="outlined" className="!rounded-full !px-3 !py-1 !text-sm">
+                  추가
+                </Button>
+              </form>
+            </div>
+
+            {/* 구성원 탭 (필터) */}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedMember(null)}
+                className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${selectedMember === null ? 'border-starbucks-green bg-starbucks-green text-white' : 'border-black/20 text-text-soft hover:bg-neutral-cool'}`}
+              >
+                전체
+              </button>
+              {members.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setSelectedMember(selectedMember === m ? null : m)}
+                  className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${selectedMember === m ? 'border-starbucks-green bg-starbucks-green text-white' : 'border-black/20 text-[rgba(0,0,0,0.87)] hover:bg-neutral-cool'}`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+
+            {/* 선택된 구성원의 이달 수입/지출 요약 */}
+            {selectedMember !== null && (
+              <div className="mt-4 rounded-[var(--radius-card)] border border-black/[0.06] bg-ceramic/60 p-4">
+                <p className="mb-3 text-sm font-semibold text-[rgba(0,0,0,0.87)]">
+                  {selectedMember} · {formatMonthLabel(cursor.y, cursor.m)} 요약
+                </p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="rounded-lg bg-white px-3 py-3">
+                    <p className="text-xs text-text-soft">수입</p>
+                    <p className="mt-1 text-base font-semibold tabular-nums text-semantic-income">
+                      {fmtKrw.format(filtered.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0))}
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-white px-3 py-3">
+                    <p className="text-xs text-text-soft">지출</p>
+                    <p className="mt-1 text-base font-semibold tabular-nums text-semantic-expense">
+                      {fmtKrw.format(filtered.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0))}
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-white px-3 py-3">
+                    <p className="text-xs text-text-soft">순액</p>
+                    <p className={`mt-1 text-base font-semibold tabular-nums ${filtered.reduce((s, t) => s + (t.type === 'income' ? t.amount : -t.amount), 0) >= 0 ? 'text-semantic-income' : 'text-semantic-expense'}`}>
+                      {fmtKrw.format(filtered.reduce((s, t) => s + (t.type === 'income' ? t.amount : -t.amount), 0))}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 구성원 삭제 */}
+            {members.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1 border-t border-black/[0.06] pt-3">
+                <span className="mr-1 self-center text-xs text-text-soft">삭제:</span>
+                {members.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => {
+                      setMembers(removeMember(m))
+                      if (selectedMember === m) setSelectedMember(null)
+                    }}
+                    className="rounded-full border border-danger/30 px-2 py-0.5 text-xs text-danger hover:bg-red-50"
+                  >
+                    {m} ×
+                  </button>
+                ))}
+              </div>
+            )}
+          </Card>
+        </section>
+
         <section aria-label="달력">
           <Card>
             <div className="mb-4 flex flex-col gap-3 rounded-[var(--radius-card)] bg-ceramic/80 p-3 md:flex-row md:items-center md:justify-between md:p-4">

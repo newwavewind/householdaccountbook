@@ -6,6 +6,7 @@ import {
   INCOME_CATEGORIES,
 } from '../constants/categories'
 import type { PaymentMethod, Transaction } from '../types/transaction'
+import { loadMembers } from '../lib/memberStorage'
 
 function todayIso() {
   const n = new Date()
@@ -24,6 +25,7 @@ export interface TransactionFormModalProps {
     memo?: string
     paymentMethod?: PaymentMethod
     cardBrand?: string
+    memberName?: string
   }) => void
   initial?: Transaction | null
   defaultDate?: string
@@ -43,9 +45,12 @@ export function TransactionFormModal({
   const [memo, setMemo] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
   const [cardBrand, setCardBrand] = useState('')
+  const [memberName, setMemberName] = useState('')
+  const [members, setMembers] = useState<string[]>(() => loadMembers())
 
   useEffect(() => {
     if (!open) return
+    setMembers(loadMembers())
     queueMicrotask(() => {
       if (initial) {
         setType(initial.type)
@@ -55,6 +60,7 @@ export function TransactionFormModal({
         setMemo(initial.memo ?? '')
         setPaymentMethod(initial.paymentMethod ?? 'cash')
         setCardBrand(initial.cardBrand ?? '')
+        setMemberName(initial.memberName ?? '')
       } else {
         setType('expense')
         setAmount('')
@@ -63,6 +69,7 @@ export function TransactionFormModal({
         setMemo('')
         setPaymentMethod('cash')
         setCardBrand('')
+        setMemberName('')
       }
     })
   }, [open, initial, defaultDate])
@@ -88,6 +95,7 @@ export function TransactionFormModal({
       date,
       category: category || undefined,
       memo: memo.trim() || undefined,
+      memberName: memberName.trim() || undefined,
       ...(type === 'expense'
         ? {
             paymentMethod,
@@ -230,6 +238,31 @@ export function TransactionFormModal({
               ) : null}
             </>
           ) : null}
+
+          {members.length > 0 && (
+            <div className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-[rgba(0,0,0,0.87)]">구성원 (선택)</span>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMemberName('')}
+                  className={`rounded-full border px-3 py-1 text-sm transition-colors ${memberName === '' ? 'border-starbucks-green bg-starbucks-green text-white' : 'border-black/20 text-text-soft hover:bg-neutral-cool'}`}
+                >
+                  전체
+                </button>
+                {members.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setMemberName(m === memberName ? '' : m)}
+                    className={`rounded-full border px-3 py-1 text-sm transition-colors ${memberName === m ? 'border-starbucks-green bg-starbucks-green text-white' : 'border-black/20 text-text-soft hover:bg-neutral-cool'}`}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <label className="flex flex-col gap-1 text-sm font-medium text-[rgba(0, 0, 0, 0.87)]">
             메모 (선택)

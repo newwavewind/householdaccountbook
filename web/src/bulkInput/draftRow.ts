@@ -9,6 +9,7 @@ export type BulkDraftRow = {
   category: string
   paymentMethod: PaymentMethod
   cardBrand: string
+  memberName: string
 }
 
 export function emptyDraftRow(): BulkDraftRow {
@@ -21,5 +22,6 @@ export function emptyDraftRow(): BulkDraftRow {
     category: '',
     paymentMethod: 'card',
     cardBrand: '',
+    memberName: '',
   }
 }

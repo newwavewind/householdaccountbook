@@ -38,6 +38,7 @@ export function transactionToBulkDraftRow(tx: Transaction): BulkDraftRow {
     category: typeof tx.category === 'string' ? tx.category : '',
     paymentMethod: expensePm,
     cardBrand,
+    memberName: typeof tx.memberName === 'string' ? tx.memberName : '',
   }
 }
 

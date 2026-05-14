@@ -37,6 +37,7 @@ export function draftsToTransactions(
       date: mm,
       memo: r.memo.trim() ? r.memo.trim() : undefined,
       category: r.category.trim() ? r.category.trim() : undefined,
+      memberName: r.memberName.trim() ? r.memberName.trim() : undefined,
     }
     if (r.kind === 'expense') {
       tx.paymentMethod = r.paymentMethod

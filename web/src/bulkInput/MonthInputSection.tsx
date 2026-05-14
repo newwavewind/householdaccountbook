@@ -11,6 +11,7 @@ import { BulkCategoryPicker } from './BulkCategoryPicker'
 import { emptyDraftRow } from './draftRow'
 import { draftsToTransactions } from './buildFromDrafts'
 import { daysInMonth, monthLabel } from './monthUtils'
+import { loadMembers } from '../lib/memberStorage'
 import type { DraftLedgerComparison } from './compareMonthDraftLedger'
 import {
   BULK_MONTH_SUMMARY_AMT_L,
@@ -118,6 +119,7 @@ export function MonthInputSection({
     null,
   )
   const [cardOpenLocalKey, setCardOpenLocalKey] = useState<string | null>(null)
+  const members = loadMembers()
   const maxDay = daysInMonth(year, monthIndex)
   const title = monthLabel(monthIndex)
   const hasPriorLedgerMonth =
@@ -287,6 +289,7 @@ export function MonthInputSection({
                 <th className="py-2 pr-2 font-medium">메모</th>
                 <th className="py-2 pr-2 font-medium">결제</th>
                 <th className="py-2 pr-2 font-medium">카드</th>
+                {members.length > 0 && <th className="py-2 pr-2 font-medium">구성원</th>}
                 <th className="w-10 py-2 font-medium" />
               </tr>
             </thead>
@@ -441,6 +444,26 @@ export function MonthInputSection({
                       onNavigateAfterPick={focusNextField}
                     />
                   </td>
+                  {members.length > 0 && (
+                    <td className="py-2 pr-2">
+                      <select
+                        aria-label="구성원"
+                        className="rounded-lg border border-input-border px-2 py-1.5 text-sm outline-none focus:border-green-accent"
+                        value={r.memberName}
+                        onChange={(e) => {
+                          const next = [...rows]
+                          next[i] = { ...r, memberName: e.target.value }
+                          onChangeRows(next)
+                        }}
+                        onKeyDown={handleFieldKeyDown}
+                      >
+                        <option value="">—</option>
+                        {members.map((m) => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    </td>
+                  )}
                   <td className="py-2 text-right">
                     <button
                       type="button"

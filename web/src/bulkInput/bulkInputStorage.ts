@@ -38,6 +38,7 @@ export function normalizeDraftRow(raw: unknown): BulkDraftRow {
     category: typeof o.category === 'string' ? o.category : '',
     paymentMethod: pm as PaymentMethod,
     cardBrand: typeof o.cardBrand === 'string' ? o.cardBrand : '',
+    memberName: typeof o.memberName === 'string' ? o.memberName : '',
   }
 }
 

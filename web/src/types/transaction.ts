@@ -18,4 +18,6 @@ export interface Transaction {
    * @see ../constants/cardBrands
    */
   cardBrand?: string
+  /** 가족 구성원 이름 (선택). */
+  memberName?: string
 }
