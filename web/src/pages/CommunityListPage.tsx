@@ -73,6 +73,10 @@ export default function CommunityListPage() {
                   <p className="mt-2 line-clamp-2 text-sm text-text-soft">
                     {postBodyToPlainText(p.body)}
                   </p>
+                  <div className="mt-3 flex items-center gap-3 text-xs text-text-soft">
+                    <span>🤍 {p.likeCount}</span>
+                    <span>💬 {p.commentCount}</span>
+                  </div>
                   {p.hidden ? (
                     <span className="mt-3 inline-block rounded-full bg-black/[0.06] px-2 py-0.5 text-xs text-text-soft">
                       숨김(본인/관리자만 보임)

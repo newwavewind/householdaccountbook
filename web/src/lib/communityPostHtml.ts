@@ -2,24 +2,11 @@ import DOMPurify from 'dompurify'
 
 const SANITIZE_OPTS = {
   ALLOWED_TAGS: [
-    'p',
-    'br',
-    'strong',
-    'em',
-    's',
-    'strike',
-    'code',
-    'pre',
-    'h1',
-    'h2',
-    'h3',
-    'ul',
-    'ol',
-    'li',
-    'blockquote',
-    'a',
+    'p', 'br', 'strong', 'em', 's', 'strike', 'code', 'pre',
+    'h1', 'h2', 'h3', 'ul', 'ol', 'li', 'blockquote', 'a',
+    'img', 'video', 'source',
   ],
-  ALLOWED_ATTR: ['href', 'target', 'rel'],
+  ALLOWED_ATTR: ['href', 'target', 'rel', 'src', 'alt', 'style', 'controls', 'type'],
 }
 
 let linkHooksInstalled = false

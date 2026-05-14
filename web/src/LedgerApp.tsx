@@ -14,6 +14,9 @@ import { parseLedgerCsv } from './lib/importCsv'
 import { rollupByDate } from './lib/dayTotals'
 import { cardBrandLabel } from './constants/cardBrands'
 import type { PaymentMethod, Transaction } from './types/transaction'
+import HouseholdSetupModal from './components/HouseholdSetupModal'
+import { getSupabase } from './lib/supabaseClient'
+import { ledgerBackendMode } from './lib/ledgerBackend'
 
 type SortOrder = 'amount-desc' | 'amount-asc'
 
@@ -83,7 +86,21 @@ export default function LedgerApp() {
     replaceAll,
     clear,
     syncState,
+    userId,
+    householdId,
   } = useLedger()
+
+  const isSupabase = ledgerBackendMode() === 'supabase'
+  const showHouseholdSetup = isSupabase && !!userId && !householdId
+
+  const [householdCode, setHouseholdCode] = useState<string | null>(null)
+  useEffect(() => {
+    if (!householdId) { setHouseholdCode(null); return }
+    const sb = getSupabase()
+    if (!sb) return
+    void sb.from('households').select('code').eq('id', householdId).maybeSingle()
+      .then(({ data }) => { if (data) setHouseholdCode(data.code as string) })
+  }, [householdId])
   const now = useMemo(() => new Date(), [])
   const [cursor, setCursor] = useState({
     y: now.getFullYear(),
@@ -412,6 +429,7 @@ export default function LedgerApp() {
 
   return (
     <>
+      {showHouseholdSetup && <HouseholdSetupModal />}
       <div className="min-h-dvh bg-neutral-warm pb-28">
       {syncState.mode === 'cloud' && syncState.status === 'loading' ? (
         <div
@@ -497,6 +515,29 @@ export default function LedgerApp() {
                   CSV: 날짜·금액만 있어도 됩니다(그날 지출). 카드사 열 있으면 카드로
                   반영. JSON은 전체 교체.
                 </p>
+                {householdCode && (
+                  <div className="mt-2 border-t border-black/[0.06] pt-2">
+                    <p className="px-3 py-1 text-xs font-medium text-text-soft">가족 코드</p>
+                    <div className="flex items-center gap-2 px-3 py-1">
+                      <span className="flex-1 rounded-lg bg-emerald-50 px-3 py-2 text-center text-base font-bold tracking-[0.25em] text-emerald-700">
+                        {householdCode}
+                      </span>
+                      <button
+                        type="button"
+                        className="rounded-lg border border-black/[0.08] px-3 py-2 text-xs text-text-soft hover:bg-neutral-cool"
+                        onClick={() => {
+                          void navigator.clipboard.writeText(householdCode)
+                          alert('코드를 복사했어요!')
+                        }}
+                      >
+                        복사
+                      </button>
+                    </div>
+                    <p className="px-3 pb-1 text-[11px] text-text-soft">
+                      가족에게 이 코드를 공유하세요.
+                    </p>
+                  </div>
+                )}
                 <button
                   type="button"
                   className="mt-1 block w-full rounded-lg px-3 py-2 text-left text-sm text-danger hover:bg-neutral-cool"

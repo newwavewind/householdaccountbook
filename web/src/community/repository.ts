@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { CommunityPost } from './types'
+import type { CommunityPost, CommunityComment } from './types'
 import { communityBackendMode, type CommunityBackendMode } from '../lib/communityBackend'
 import { getCommunitySupabase } from '../lib/communitySupabaseClient'
 import { apiFetch, getPrismaApiToken } from '../lib/prismaApi'
@@ -27,6 +27,11 @@ export interface CommunityRepository {
   ): Promise<void>
   deletePost(id: string): Promise<void>
   setHidden(id: string, hidden: boolean): Promise<void>
+  listComments(postId: string): Promise<CommunityComment[]>
+  addComment(input: { postId: string; authorId: string; authorDisplayName: string; body: string }): Promise<CommunityComment>
+  deleteComment(id: string): Promise<void>
+  toggleLike(postId: string, userId: string): Promise<{ liked: boolean }>
+  isLiked(postId: string, userId: string): Promise<boolean>
 }
 
 function mapSupabaseRow(row: {
@@ -38,6 +43,8 @@ function mapSupabaseRow(row: {
   hidden: boolean
   created_at: string
   updated_at: string
+  like_count?: number
+  comment_count?: number
 }): CommunityPost {
   return {
     id: row.id,
@@ -48,6 +55,26 @@ function mapSupabaseRow(row: {
     hidden: row.hidden,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    likeCount: row.like_count ?? 0,
+    commentCount: row.comment_count ?? 0,
+  }
+}
+
+function mapCommentRow(row: {
+  id: string
+  post_id: string
+  author_id: string | null
+  author_display_name: string
+  body: string
+  created_at: string
+}): CommunityComment {
+  return {
+    id: row.id,
+    postId: row.post_id,
+    authorId: row.author_id,
+    authorDisplayName: row.author_display_name,
+    body: row.body,
+    createdAt: row.created_at,
   }
 }
 
@@ -109,6 +136,8 @@ class MockCommunityRepository implements CommunityRepository {
       hidden: false,
       createdAt: now,
       updatedAt: now,
+      likeCount: 0,
+      commentCount: 0,
     }
     writeMockPosts([post, ...list])
     return post
@@ -138,6 +167,14 @@ class MockCommunityRepository implements CommunityRepository {
     list[i] = { ...list[i], hidden, updatedAt: new Date().toISOString() }
     writeMockPosts(list)
   }
+
+  async listComments(_postId: string): Promise<CommunityComment[]> { return [] }
+  async addComment(input: { postId: string; authorId: string; authorDisplayName: string; body: string }): Promise<CommunityComment> {
+    return { id: crypto.randomUUID(), postId: input.postId, authorId: input.authorId, authorDisplayName: input.authorDisplayName, body: input.body, createdAt: new Date().toISOString() }
+  }
+  async deleteComment(_id: string): Promise<void> {}
+  async toggleLike(_postId: string, _userId: string): Promise<{ liked: boolean }> { return { liked: false } }
+  async isLiked(_postId: string, _userId: string): Promise<boolean> { return false }
 }
 
 class ApiCommunityRepository implements CommunityRepository {
@@ -198,6 +235,14 @@ class ApiCommunityRepository implements CommunityRepository {
       body: JSON.stringify({ hidden }),
     })
   }
+
+  async listComments(_postId: string): Promise<CommunityComment[]> { return [] }
+  async addComment(input: { postId: string; authorId: string; authorDisplayName: string; body: string }): Promise<CommunityComment> {
+    return { id: crypto.randomUUID(), postId: input.postId, authorId: input.authorId, authorDisplayName: input.authorDisplayName, body: input.body, createdAt: new Date().toISOString() }
+  }
+  async deleteComment(_id: string): Promise<void> {}
+  async toggleLike(_postId: string, _userId: string): Promise<{ liked: boolean }> { return { liked: false } }
+  async isLiked(_postId: string, _userId: string): Promise<boolean> { return false }
 }
 
 class SupabaseCommunityRepository implements CommunityRepository {
@@ -207,19 +252,17 @@ class SupabaseCommunityRepository implements CommunityRepository {
     this.client = client
   }
 
+  private static readonly POST_COLS = 'id, author_id, author_display_name, title, body, hidden, created_at, updated_at, like_count, comment_count'
+
   async listPosts(opts: ListPostsOptions): Promise<CommunityPost[]> {
     void opts
     const { data, error } = await this.client
       .from('posts')
-      .select(
-        'id, author_id, author_display_name, title, body, hidden, created_at, updated_at',
-      )
+      .select(SupabaseCommunityRepository.POST_COLS)
       .order('created_at', { ascending: false })
     if (error) throw new Error(error.message)
     return (data ?? []).map((row) =>
-      mapSupabaseRow(
-        row as Parameters<typeof mapSupabaseRow>[0],
-      ),
+      mapSupabaseRow(row as Parameters<typeof mapSupabaseRow>[0]),
     )
   }
 
@@ -230,9 +273,7 @@ class SupabaseCommunityRepository implements CommunityRepository {
     void opts
     const { data, error } = await this.client
       .from('posts')
-      .select(
-        'id, author_id, author_display_name, title, body, hidden, created_at, updated_at',
-      )
+      .select(SupabaseCommunityRepository.POST_COLS)
       .eq('id', id)
       .maybeSingle()
     if (error) throw new Error(error.message)
@@ -285,6 +326,62 @@ class SupabaseCommunityRepository implements CommunityRepository {
       .update({ hidden })
       .eq('id', id)
     if (error) throw new Error(translatePostError(error.message))
+  }
+
+  async listComments(postId: string): Promise<CommunityComment[]> {
+    const { data, error } = await this.client
+      .from('comments')
+      .select('id, post_id, author_id, author_display_name, body, created_at')
+      .eq('post_id', postId)
+      .order('created_at', { ascending: true })
+    if (error) throw new Error(error.message)
+    return (data ?? []).map((row) => mapCommentRow(row as Parameters<typeof mapCommentRow>[0]))
+  }
+
+  async addComment(input: { postId: string; authorId: string; authorDisplayName: string; body: string }): Promise<CommunityComment> {
+    const { data, error } = await this.client
+      .from('comments')
+      .insert({
+        post_id: input.postId,
+        author_id: input.authorId,
+        author_display_name: input.authorDisplayName,
+        body: input.body.trim(),
+      })
+      .select('id, post_id, author_id, author_display_name, body, created_at')
+      .single()
+    if (error) throw new Error(translatePostError(error.message))
+    return mapCommentRow(data as Parameters<typeof mapCommentRow>[0])
+  }
+
+  async deleteComment(id: string): Promise<void> {
+    const { error } = await this.client.from('comments').delete().eq('id', id)
+    if (error) throw new Error(translatePostError(error.message))
+  }
+
+  async toggleLike(postId: string, userId: string): Promise<{ liked: boolean }> {
+    const { data: existing } = await this.client
+      .from('likes')
+      .select('id')
+      .eq('post_id', postId)
+      .eq('user_id', userId)
+      .maybeSingle()
+    if (existing) {
+      await this.client.from('likes').delete().eq('id', existing.id)
+      return { liked: false }
+    } else {
+      await this.client.from('likes').insert({ post_id: postId, user_id: userId })
+      return { liked: true }
+    }
+  }
+
+  async isLiked(postId: string, userId: string): Promise<boolean> {
+    const { data } = await this.client
+      .from('likes')
+      .select('id')
+      .eq('post_id', postId)
+      .eq('user_id', userId)
+      .maybeSingle()
+    return !!data
   }
 }
 
@@ -343,6 +440,12 @@ class UnconfiguredSupabaseCommunityRepository implements CommunityRepository {
     void _hidden
     throw new Error(UnconfiguredSupabaseCommunityRepository.msg)
   }
+
+  async listComments(_postId: string): Promise<CommunityComment[]> { throw new Error(UnconfiguredSupabaseCommunityRepository.msg) }
+  async addComment(_input: { postId: string; authorId: string; authorDisplayName: string; body: string }): Promise<CommunityComment> { throw new Error(UnconfiguredSupabaseCommunityRepository.msg) }
+  async deleteComment(_id: string): Promise<void> { throw new Error(UnconfiguredSupabaseCommunityRepository.msg) }
+  async toggleLike(_postId: string, _userId: string): Promise<{ liked: boolean }> { throw new Error(UnconfiguredSupabaseCommunityRepository.msg) }
+  async isLiked(_postId: string, _userId: string): Promise<boolean> { throw new Error(UnconfiguredSupabaseCommunityRepository.msg) }
 }
 
 export function seedMockPostsIfEmpty() {

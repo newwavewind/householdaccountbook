@@ -13,6 +13,8 @@ const SEED_POSTS: CommunityPost[] = [
     hidden: false,
     createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
     updatedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+    likeCount: 0,
+    commentCount: 0,
   },
 ]
 

@@ -60,6 +60,12 @@ type LedgerContextValue = {
   replaceAll: (list: Transaction[]) => void
   clear: () => void
   syncState: LedgerSyncState
+  /** 로그인된 userId (supabase 모드) */
+  userId: string | null
+  /** 소속 가구 ID. null이면 가구 미설정 */
+  householdId: string | null
+  /** 가구 설정 완료 후 householdId를 갱신 */
+  setHouseholdId: (id: string | null) => void
 }
 
 const LedgerContext = createContext<LedgerContextValue | null>(null)
@@ -69,6 +75,8 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
 
   /** supabase 모드일 때 로그인한 사용자의 UID. null = 비로그인 */
   const [userId, setUserId] = useState<string | null>(null)
+  /** supabase 모드일 때 가구 ID (household_members에서 조회). null = 가구 미설정 */
+  const [householdId, setHouseholdId] = useState<string | null>(null)
   /** supabase 모드에서 auth 초기 확인이 끝났는지 */
   const [authReady, setAuthReady] = useState(backend !== 'supabase')
 
@@ -111,12 +119,34 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
 
     const { data: { subscription } } = sb.auth.onAuthStateChange((_evt, session) => {
       setUserId(session?.user?.id ?? null)
+      if (!session) setHouseholdId(null)
     })
 
     return () => subscription.unsubscribe()
   }, [backend])
 
-  // ── supabase 모드: userId 확정 후 DB 동기화 ────────────────────────────────
+  // ── supabase 모드: userId 확정 후 household_id 조회 ──────────────────────────
+  useEffect(() => {
+    if (backend !== 'supabase' || !authReady || !userId) {
+      if (!userId) setHouseholdId(null)
+      return
+    }
+    const sb = getSupabase()
+    if (!sb) return
+    let cancelled = false
+    void (async () => {
+      const { data } = await sb
+        .from('household_members')
+        .select('household_id')
+        .eq('user_id', userId)
+        .maybeSingle()
+      if (cancelled) return
+      setHouseholdId(data?.household_id ?? null)
+    })()
+    return () => { cancelled = true }
+  }, [backend, authReady, userId])
+
+  // ── supabase 모드: householdId 확정 후 DB 동기화 ────────────────────────────
   useEffect(() => {
     if (backend !== 'supabase' || !authReady) return
 
@@ -144,8 +174,14 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       return
     }
 
+    // 가구 ID 없으면 장부 동기화 보류 (HouseholdSetupModal이 설정 후 rerender)
+    if (!householdId) {
+      setSyncState({ mode: 'local', status: 'ready', hint: 'login_required' } as LedgerSyncState)
+      return
+    }
+
     let cancelled = false
-    const lid = userId
+    const lid = householdId
 
     setSyncState({ mode: 'cloud', cloudBackend: 'supabase', status: 'loading' })
 
@@ -231,7 +267,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       cancelled = true
       void sb.removeChannel(channel)
     }
-  }, [backend, authReady, userId])
+  }, [backend, authReady, userId, householdId])
 
   // ── prisma 모드: 폴링 동기화 (기존 로직 유지) ─────────────────────────────
   useEffect(() => {
@@ -334,7 +370,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     try { localStorage.setItem(STORAGE_KEY, j) } catch { /* quota */ }
 
     const cloudEnabled = backend === 'supabase'
-      ? (isCloudSyncEnabled() && userId !== null)
+      ? (isCloudSyncEnabled() && householdId !== null)
       : backend === 'prisma'
 
     if (!cloudEnabled) return
@@ -346,9 +382,9 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     if (backend === 'supabase') {
       pushTimerRef.current = setTimeout(async () => {
         const sb = getSupabase()
-        if (!sb || !userId) return
+        if (!sb || !householdId) return
         const { error } = await sb.from('household_ledgers').upsert(
-          { id: userId, payload: transactions, updated_at: new Date().toISOString() },
+          { id: householdId, payload: transactions, updated_at: new Date().toISOString() },
           { onConflict: 'id' },
         )
         if (error) {
@@ -380,7 +416,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     }
 
     return () => { if (pushTimerRef.current) clearTimeout(pushTimerRef.current) }
-  }, [transactions, backend, userId, syncState])
+  }, [transactions, backend, userId, householdId, syncState])
 
   const add = useCallback((tx: Omit<Transaction, 'id'> & { id?: string }) => {
     setTransactions((prev) => [{ ...tx, id: tx.id ?? crypto.randomUUID() }, ...prev])
@@ -422,8 +458,9 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     (): LedgerContextValue => ({
       transactions, add, bulkAdd, replaceCalendarMonth, update, remove, replaceAll, clear, syncState,
+      userId, householdId, setHouseholdId,
     }),
-    [transactions, add, bulkAdd, replaceCalendarMonth, update, remove, replaceAll, clear, syncState],
+    [transactions, add, bulkAdd, replaceCalendarMonth, update, remove, replaceAll, clear, syncState, userId, householdId],
   )
 
   return <LedgerContext.Provider value={value}>{children}</LedgerContext.Provider>
