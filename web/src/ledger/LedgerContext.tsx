@@ -460,7 +460,10 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
 
   const LS_MEMBERS_KEY = 'household-members-v1'
 
-  /** localStorage에서 구성원 로드 (폴백) */
+  const saveMembersToStorage = (members: string[]) => {
+    try { localStorage.setItem(LS_MEMBERS_KEY, JSON.stringify(members)) } catch { /* ignore */ }
+  }
+
   const loadMembersFromStorage = (): string[] => {
     try {
       const raw = localStorage.getItem(LS_MEMBERS_KEY)
@@ -470,12 +473,27 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     } catch { return [] }
   }
 
-  /** 가족 구성원 이름 목록 — localStorage에서 초기값 로드, Supabase로 크로스 디바이스 동기화 */
+  /** 가족 구성원 이름 목록 — localStorage 초기값, Supabase 유저 메타·가구 동기화 */
   const [cloudMembers, setCloudMembersState] = useState<string[]>(loadMembersFromStorage)
 
-  // householdId가 설정되면 Supabase에서 members 로드 (Supabase > localStorage)
+  // userId 확정 후 Supabase 유저 메타데이터에서 구성원 로드
   useEffect(() => {
-    if (!householdId) return  // householdId 없어도 localStorage 값 유지
+    if (!userId) return
+    const sb = getSupabase()
+    if (!sb) return
+    void sb.auth.getUser().then(({ data: { user } }) => {
+      const meta = user?.user_metadata?.family_members
+      if (Array.isArray(meta) && meta.length > 0) {
+        const members = meta as string[]
+        setCloudMembersState(members)
+        saveMembersToStorage(members)
+      }
+    })
+  }, [userId])
+
+  // householdId 확정 후 Supabase households.members 로드 (가족 공유용, 우선순위 높음)
+  useEffect(() => {
+    if (!householdId) return
     const sb = getSupabase()
     if (!sb) return
     void sb
@@ -487,22 +505,25 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
         if (data && Array.isArray(data.members) && data.members.length > 0) {
           const members = data.members as string[]
           setCloudMembersState(members)
-          try { localStorage.setItem(LS_MEMBERS_KEY, JSON.stringify(members)) } catch { /* ignore */ }
+          saveMembersToStorage(members)
         }
       })
   }, [householdId])
 
   const setCloudMembers = useCallback((members: string[]) => {
     setCloudMembersState(members)
-    // 항상 localStorage에 저장 (오프라인·가구 미설정 폴백)
-    try { localStorage.setItem(LS_MEMBERS_KEY, JSON.stringify(members)) } catch { /* ignore */ }
-    // 가구 ID 있으면 Supabase에도 동기화
+    saveMembersToStorage(members)
     const sb = getSupabase()
-    if (!sb || !householdId) return
-    void sb.rpc('set_household_members', {
-      p_household_id: householdId,
-      p_members: members,
-    })
+    if (!sb) return
+    // 로그인 상태면 유저 메타데이터에 저장 (단일 기기 크로스 디바이스)
+    void sb.auth.updateUser({ data: { family_members: members } })
+    // 가구 ID 있으면 household에도 저장 (가족 간 공유)
+    if (householdId) {
+      void sb.rpc('set_household_members', {
+        p_household_id: householdId,
+        p_members: members,
+      })
+    }
   }, [householdId])
 
   const value = useMemo(

@@ -187,13 +187,24 @@ export function MonthInputSection({
       if (e.nativeEvent.isComposing) return
       const tbody = tbodyRef.current
       if (!tbody) return
+
       if (e.key === 'Enter') {
-        // select 요소에서는 Enter가 옵션 확정 역할이므로 행 이동 건너뜀
+        // select 요소에서 Enter는 드롭다운 확정 역할이므로 행 이동 건너뜀
         if (e.currentTarget.tagName === 'SELECT') return
         e.preventDefault()
         if (e.shiftKey) {
           focusPrevInTable(e.currentTarget, tbody)
         } else {
+          focusNextField(e.currentTarget)
+        }
+      } else if (e.key === 'Tab' && !e.shiftKey) {
+        // Tab이 마지막 포커스 필드에서 눌리면 applyMonth 포함 행 이동 처리
+        const tr = e.currentTarget.closest('tr')
+        if (!(tr instanceof HTMLTableRowElement)) return
+        const list = collectRowFocusables(tr)
+        const idx = list.indexOf(e.currentTarget)
+        if (idx === list.length - 1) {
+          e.preventDefault()
           focusNextField(e.currentTarget)
         }
       }
