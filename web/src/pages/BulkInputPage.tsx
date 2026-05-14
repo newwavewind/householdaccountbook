@@ -70,7 +70,7 @@ const YEAR_NAV_MAX = 9999
 export default function BulkInputPage() {
   const now = useMemo(() => new Date(), [])
   const nowYear = now.getFullYear()
-  const { replaceCalendarMonth, syncState, transactions } = useLedger()
+  const { replaceCalendarMonth, syncState, transactions, cloudMembers } = useLedger()
 
   const [st, setSt] = useState<InputPageState>(() => hydrateState(nowYear))
   const { year } = st
@@ -361,6 +361,7 @@ export default function BulkInputPage() {
             defaultOpen={monthIndex === now.getMonth()}
             rows={draftsMatrix[monthIndex] ?? [emptyDraftRow()]}
             draftLedgerCompare={monthDraftLedgerCmp[monthIndex]}
+            members={cloudMembers}
             onChangeRows={(payload) =>
               setSt((prev) => {
                 const base = [...(prev.years[prev.year] ?? initialMonths())]

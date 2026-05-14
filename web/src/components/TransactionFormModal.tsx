@@ -6,7 +6,6 @@ import {
   INCOME_CATEGORIES,
 } from '../constants/categories'
 import type { PaymentMethod, Transaction } from '../types/transaction'
-import { loadMembers } from '../lib/memberStorage'
 
 function todayIso() {
   const n = new Date()
@@ -29,6 +28,7 @@ export interface TransactionFormModalProps {
   }) => void
   initial?: Transaction | null
   defaultDate?: string
+  members?: string[]
 }
 
 export function TransactionFormModal({
@@ -37,6 +37,7 @@ export function TransactionFormModal({
   onSubmit,
   initial,
   defaultDate,
+  members = [],
 }: TransactionFormModalProps) {
   const [type, setType] = useState<'income' | 'expense'>('expense')
   const [amount, setAmount] = useState('')
@@ -46,11 +47,9 @@ export function TransactionFormModal({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
   const [cardBrand, setCardBrand] = useState('')
   const [memberName, setMemberName] = useState('')
-  const [members, setMembers] = useState<string[]>(() => loadMembers())
 
   useEffect(() => {
     if (!open) return
-    setMembers(loadMembers())
     queueMicrotask(() => {
       if (initial) {
         setType(initial.type)

@@ -32,6 +32,16 @@ export function isProbablyRichHtml(body: string): boolean {
   return t.startsWith('<') && /<\/[a-z][\s>]|<br\s*\/?>/i.test(t)
 }
 
+/** 본문 HTML에서 첫 번째 이미지 src 추출 (목록 썸네일용) */
+export function extractFirstImageSrc(body: string): string | null {
+  const raw = (body ?? '').trim()
+  if (!raw || typeof document === 'undefined') return null
+  const el = document.createElement('div')
+  el.innerHTML = sanitizeCommunityPostHtml(raw)
+  const img = el.querySelector('img')
+  return img?.getAttribute('src') ?? null
+}
+
 /** 목록 미리보기 등용 평문 (스크립트는 sanitize 후 추출) */
 export function postBodyToPlainText(body: string): string {
   const raw = (body ?? '').trim()

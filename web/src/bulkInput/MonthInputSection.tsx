@@ -11,7 +11,6 @@ import { BulkCategoryPicker } from './BulkCategoryPicker'
 import { emptyDraftRow } from './draftRow'
 import { draftsToTransactions } from './buildFromDrafts'
 import { daysInMonth, monthLabel } from './monthUtils'
-import { loadMembers } from '../lib/memberStorage'
 import type { DraftLedgerComparison } from './compareMonthDraftLedger'
 import {
   BULK_MONTH_SUMMARY_AMT_L,
@@ -98,6 +97,7 @@ type Props = {
   /** 직전 연도 동일 월 장부 수입·지출 (없으면 null) */
   priorYearMonthLedgerTotals: { income: number; expense: number } | null
   priorCalendarYear: number | null
+  members?: string[]
 }
 
 export function MonthInputSection({
@@ -110,6 +110,7 @@ export function MonthInputSection({
   draftLedgerCompare,
   priorYearMonthLedgerTotals,
   priorCalendarYear,
+  members = [],
 }: Props) {
   const tbodyRef = useRef<HTMLTableSectionElement | null>(null)
   const [amountFocusLocalKey, setAmountFocusLocalKey] = useState<string | null>(
@@ -119,7 +120,6 @@ export function MonthInputSection({
     null,
   )
   const [cardOpenLocalKey, setCardOpenLocalKey] = useState<string | null>(null)
-  const members = loadMembers()
   const maxDay = daysInMonth(year, monthIndex)
   const title = monthLabel(monthIndex)
   const hasPriorLedgerMonth =

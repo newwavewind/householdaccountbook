@@ -4,7 +4,7 @@ import { Card } from '../components/ui/Card'
 import { useCommunityAuth } from '../community/CommunityAuthContext'
 import { useCommunityPosts } from '../community/useCommunityPosts'
 import { communityBackendMode } from '../lib/communityBackend'
-import { postBodyToPlainText } from '../lib/communityPostHtml'
+import { postBodyToPlainText, extractFirstImageSrc } from '../lib/communityPostHtml'
 
 function fmtDate(iso: string) {
   return new Intl.DateTimeFormat('ko-KR', {
@@ -63,25 +63,39 @@ export default function CommunityListPage() {
           {posts.map((p) => (
             <li key={p.id}>
               <Card className="border border-black/[0.06] bg-white transition-shadow hover:shadow-md">
-                <Link to={`/community/${p.id}`} className="block p-4 no-underline text-inherit">
-                  <span className="text-xs font-medium uppercase tracking-wide text-text-soft">
-                    {p.authorDisplayName} · {fmtDate(p.createdAt)}
-                  </span>
-                  <h2 className="mt-2 text-lg font-semibold text-[rgba(0,0,0,0.87)]">
-                    {p.title}
-                  </h2>
-                  <p className="mt-2 line-clamp-2 text-sm text-text-soft">
-                    {postBodyToPlainText(p.body)}
-                  </p>
-                  <div className="mt-3 flex items-center gap-3 text-xs text-text-soft">
-                    <span>🤍 {p.likeCount}</span>
-                    <span>💬 {p.commentCount}</span>
-                  </div>
-                  {p.hidden ? (
-                    <span className="mt-3 inline-block rounded-full bg-black/[0.06] px-2 py-0.5 text-xs text-text-soft">
-                      숨김(본인/관리자만 보임)
+                <Link to={`/community/${p.id}`} className="flex gap-4 p-4 no-underline text-inherit">
+                  {/* 썸네일 */}
+                  {(() => {
+                    const src = extractFirstImageSrc(p.body)
+                    return src ? (
+                      <img
+                        src={src}
+                        alt=""
+                        className="h-20 w-20 shrink-0 rounded-lg object-cover"
+                        loading="lazy"
+                      />
+                    ) : null
+                  })()}
+                  <div className="min-w-0 flex-1">
+                    <span className="text-xs font-medium uppercase tracking-wide text-text-soft">
+                      {p.authorDisplayName} · {fmtDate(p.createdAt)}
                     </span>
-                  ) : null}
+                    <h2 className="mt-1 text-lg font-semibold text-[rgba(0,0,0,0.87)]">
+                      {p.title}
+                    </h2>
+                    <p className="mt-1 line-clamp-2 text-sm text-text-soft">
+                      {postBodyToPlainText(p.body)}
+                    </p>
+                    <div className="mt-2 flex items-center gap-3 text-xs text-text-soft">
+                      <span>🤍 {p.likeCount}</span>
+                      <span>💬 {p.commentCount}</span>
+                    </div>
+                    {p.hidden ? (
+                      <span className="mt-2 inline-block rounded-full bg-black/[0.06] px-2 py-0.5 text-xs text-text-soft">
+                        숨김(본인/관리자만 보임)
+                      </span>
+                    ) : null}
+                  </div>
                 </Link>
               </Card>
             </li>

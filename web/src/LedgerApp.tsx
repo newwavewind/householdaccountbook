@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from './components/ui/Button'
-import { loadMembers, addMember, removeMember } from './lib/memberStorage'
+import { addMember, removeMember } from './lib/memberStorage'
 import { Card } from './components/ui/Card'
 import { Fab } from './components/ui/Fab'
 import { LedgerCalendar } from './components/LedgerCalendar'
@@ -85,6 +85,8 @@ export default function LedgerApp() {
     syncState,
     userId,
     householdId,
+    cloudMembers,
+    setCloudMembers,
   } = useLedger()
 
   const isSupabase = ledgerBackendMode() === 'supabase'
@@ -120,7 +122,6 @@ export default function LedgerApp() {
   const [formDefaultDate, setFormDefaultDate] = useState<string | undefined>()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const settingsWrapRef = useRef<HTMLDivElement>(null)
-  const [members, setMembers] = useState<string[]>(() => loadMembers())
   const [selectedMember, setSelectedMember] = useState<string | null>(null)
   const [newMemberName, setNewMemberName] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState<{ member: string; step: 1 | 2 } | null>(null)
@@ -462,7 +463,8 @@ export default function LedgerApp() {
                   e.preventDefault()
                   const trimmed = newMemberName.trim()
                   if (!trimmed) return
-                  setMembers(addMember(trimmed))
+                  const next = addMember(trimmed)  // localStorage도 업데이트
+                  setCloudMembers(next)             // Supabase에 저장
                   setNewMemberName('')
                 }}
               >
@@ -488,7 +490,7 @@ export default function LedgerApp() {
               >
                 전체
               </button>
-              {members.map((m) => (
+              {cloudMembers.map((m) => (
                 <button
                   key={m}
                   type="button"
@@ -576,7 +578,8 @@ export default function LedgerApp() {
                       variant="primary"
                       className="flex-1 !bg-danger !border-danger"
                       onClick={() => {
-                        setMembers(removeMember(deleteConfirm.member))
+                        const next = removeMember(deleteConfirm.member)  // localStorage 업데이트
+                        setCloudMembers(next)                             // Supabase에 저장
                         if (selectedMember === deleteConfirm.member) setSelectedMember(null)
                         setDeleteConfirm(null)
                       }}
@@ -957,6 +960,7 @@ export default function LedgerApp() {
             open={formOpen}
             initial={formInitial}
             defaultDate={formDefaultDate}
+            members={cloudMembers}
             onClose={() => {
               setFormOpen(false)
               setFormInitial(null)

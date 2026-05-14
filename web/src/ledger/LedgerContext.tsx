@@ -66,6 +66,9 @@ type LedgerContextValue = {
   householdId: string | null
   /** 가구 설정 완료 후 householdId를 갱신 */
   setHouseholdId: (id: string | null) => void
+  /** 가족 구성원 이름 목록 (Supabase에 저장, 크로스 디바이스 동기화) */
+  cloudMembers: string[]
+  setCloudMembers: (members: string[]) => void
 }
 
 const LedgerContext = createContext<LedgerContextValue | null>(null)
@@ -455,12 +458,42 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
 
   const clear = useCallback(() => { setTransactions([]) }, [])
 
+  /** Supabase households.members 에 저장되는 가족 구성원 이름 목록 */
+  const [cloudMembers, setCloudMembersState] = useState<string[]>([])
+
+  // householdId가 설정되면 Supabase에서 members 로드
+  useEffect(() => {
+    if (!householdId) { setCloudMembersState([]); return }
+    const sb = getSupabase()
+    if (!sb) return
+    void sb
+      .from('households')
+      .select('members')
+      .eq('id', householdId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data && Array.isArray(data.members)) {
+          setCloudMembersState(data.members as string[])
+        }
+      })
+  }, [householdId])
+
+  const setCloudMembers = useCallback((members: string[]) => {
+    setCloudMembersState(members)
+    const sb = getSupabase()
+    if (!sb || !householdId) return
+    void sb.rpc('set_household_members', {
+      p_household_id: householdId,
+      p_members: members,
+    })
+  }, [householdId])
+
   const value = useMemo(
     (): LedgerContextValue => ({
       transactions, add, bulkAdd, replaceCalendarMonth, update, remove, replaceAll, clear, syncState,
-      userId, householdId, setHouseholdId,
+      userId, householdId, setHouseholdId, cloudMembers, setCloudMembers,
     }),
-    [transactions, add, bulkAdd, replaceCalendarMonth, update, remove, replaceAll, clear, syncState, userId, householdId],
+    [transactions, add, bulkAdd, replaceCalendarMonth, update, remove, replaceAll, clear, syncState, userId, householdId, cloudMembers, setCloudMembers],
   )
 
   return <LedgerContext.Provider value={value}>{children}</LedgerContext.Provider>
