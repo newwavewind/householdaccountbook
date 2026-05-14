@@ -189,22 +189,28 @@ export function MonthInputSection({
       if (!tbody) return
 
       if (e.key === 'Enter') {
-        // select 요소에서 Enter는 드롭다운 확정 역할이므로 행 이동 건너뜀
-        if (e.currentTarget.tagName === 'SELECT') return
+        if (e.currentTarget.tagName === 'SELECT') {
+          // select에서 Enter: onChange가 먼저 실행되므로 rAF로 상태 커밋 후 이동
+          const el = e.currentTarget
+          const tr = el.closest('tr')
+          if (!(tr instanceof HTMLTableRowElement)) return
+          const list = collectRowFocusables(tr)
+          const idx = list.indexOf(el)
+          if (e.shiftKey) {
+            requestAnimationFrame(() => focusPrevInTable(el, tbody))
+          } else if (idx < list.length - 1) {
+            // 중간 select: 다음 필드로만 이동
+            requestAnimationFrame(() => list[idx + 1]?.focus())
+          } else {
+            // 마지막 select: applyMonth 포함 행 이동
+            requestAnimationFrame(() => focusNextField(el))
+          }
+          return
+        }
         e.preventDefault()
         if (e.shiftKey) {
           focusPrevInTable(e.currentTarget, tbody)
         } else {
-          focusNextField(e.currentTarget)
-        }
-      } else if (e.key === 'Tab' && !e.shiftKey) {
-        // Tab이 마지막 포커스 필드에서 눌리면 applyMonth 포함 행 이동 처리
-        const tr = e.currentTarget.closest('tr')
-        if (!(tr instanceof HTMLTableRowElement)) return
-        const list = collectRowFocusables(tr)
-        const idx = list.indexOf(e.currentTarget)
-        if (idx === list.length - 1) {
-          e.preventDefault()
           focusNextField(e.currentTarget)
         }
       }
