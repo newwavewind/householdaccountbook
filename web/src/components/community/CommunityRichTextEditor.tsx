@@ -1,10 +1,30 @@
+import Image from '@tiptap/extension-image'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
-import { EditorContent, useEditor } from '@tiptap/react'
+import { EditorContent, Node, mergeAttributes, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '../ui/Button'
 import { getCommunitySupabase } from '../../lib/communitySupabaseClient'
+
+const VideoNode = Node.create({
+  name: 'video',
+  group: 'block',
+  atom: true,
+  addAttributes() {
+    return {
+      src: { default: null },
+      controls: { default: true },
+      style: { default: 'max-width:100%;border-radius:8px;' },
+    }
+  },
+  parseHTML() {
+    return [{ tag: 'video' }]
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ['video', mergeAttributes(HTMLAttributes)]
+  },
+})
 
 type Props = {
   initialHtml: string
@@ -32,6 +52,12 @@ export function CommunityRichTextEditor({
       Placeholder.configure({
         placeholder: '내용을 입력하세요…',
       }),
+      Image.configure({
+        inline: false,
+        allowBase64: false,
+        HTMLAttributes: { style: 'max-width:100%;border-radius:8px;' },
+      }),
+      VideoNode,
     ],
     content: initialHtml || '',
     editable: !disabled,
@@ -64,13 +90,12 @@ export function CommunityRichTextEditor({
       const publicUrl = urlData.publicUrl
 
       if (file.type.startsWith('video/')) {
-        editor.chain().focus().insertContent(
-          `<p><video src="${publicUrl}" controls style="max-width:100%;border-radius:8px;"></video></p>`
-        ).run()
+        editor.chain().focus().insertContent({
+          type: 'video',
+          attrs: { src: publicUrl, controls: true },
+        }).run()
       } else {
-        editor.chain().focus().insertContent(
-          `<p><img src="${publicUrl}" alt="업로드 이미지" style="max-width:100%;border-radius:8px;" /></p>`
-        ).run()
+        editor.chain().focus().setImage({ src: publicUrl, alt: '업로드 이미지' }).run()
       }
       onHtmlChange(editor.getHTML())
     } catch (err) {
