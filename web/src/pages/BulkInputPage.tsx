@@ -1,5 +1,4 @@
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useLedger } from '../hooks/useLedger'
 import type { BulkDraftRow } from '../bulkInput/draftRow'
 import { emptyDraftRow } from '../bulkInput/draftRow'
@@ -9,7 +8,6 @@ import {
   loadBulkInputBundle,
   saveBulkInputBundle,
 } from '../bulkInput/bulkInputStorage'
-import { BULK_MONTH_SUMMARY_GUTTER } from '../bulkInput/bulkMonthSummaryLayout'
 import {
   compareDraftMultisetToLedgerMonth,
   ledgerMonthIncomeExpenseSums,
@@ -24,24 +22,6 @@ import type { Transaction } from '../types/transaction'
 
 function won(n: number): string {
   return `${Math.round(n).toLocaleString('ko-KR')}원`
-}
-
-/** 캘린더 장부 `date`(yyyy-mm-dd) 기준 연도 합계 */
-function sumLedgerCalendarYear(
-  txs: Transaction[],
-  y: number,
-): { income: number; expense: number } {
-  let income = 0
-  let expense = 0
-  for (const t of txs) {
-    const d = t.date
-    if (typeof d !== 'string' || d.length < 4) continue
-    const yr = Number(d.slice(0, 4))
-    if (!Number.isFinite(yr) || yr !== y) continue
-    if (t.type === 'income') income += t.amount
-    else if (t.type === 'expense') expense += t.amount
-  }
-  return { income, expense }
 }
 
 function initialMonths(): BulkDraftRow[][] {
@@ -97,16 +77,6 @@ export default function BulkInputPage() {
   const canGoNewer = year < YEAR_NAV_MAX
   const priorYear = year - 1
   const hasPriorYear = priorYear >= YEAR_NAV_MIN
-
-  const ledgerYearCompare = useMemo(() => {
-    const cur = sumLedgerCalendarYear(transactions, year)
-    const prv = hasPriorYear
-      ? sumLedgerCalendarYear(transactions, priorYear)
-      : null
-    return { current: cur, prior: prv }
-  }, [transactions, year, priorYear, hasPriorYear])
-
-  const priorLedger = ledgerYearCompare.prior
 
   const draftsMatrix = useMemo(
     () => st.years[year] ?? initialMonths(),
@@ -200,144 +170,44 @@ export default function BulkInputPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-3 pb-20 pt-4 sm:px-4 md:px-6">
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3 sm:mb-6 sm:gap-4">
-        <div>
-          <h1 className="font-serif-display text-starbucks-green">입력</h1>
-          <p className="mt-1 text-sm text-text-soft">
-            내용을 입력하고 <strong className="font-semibold text-starbucks-green">확인</strong> 버튼을 누르면 장부에 반영됩니다.
-            Enter로 칸 이동, 구성원까지 입력 후 확인 버튼을 누르거나 클릭하세요.
-            캘린더 장부에서 거래를 추가·수정·삭제하면 해당 달 표도 자동으로 맞춰집니다.
-          </p>
-        </div>
-        <Link
-          to="/"
-          className="text-sm font-semibold text-green-accent underline decoration-green-accent/30 underline-offset-2"
-        >
-          캘린더 장부로
-        </Link>
-      </div>
-
-      <div className="mb-4 rounded-[var(--radius-card)] border border-black/[0.08] bg-white px-3 py-2.5 sm:mb-6 sm:px-4 sm:py-3">
-        <div className="flex flex-col flex-wrap gap-y-2 sm:flex-row sm:items-center sm:gap-x-3 sm:gap-y-0">
-          <div className={BULK_MONTH_SUMMARY_GUTTER} aria-hidden />
-          <div
-            id="bulk-year-control"
-            className="flex min-w-0 w-full flex-[1_1_0%] flex-wrap items-stretch gap-2 sm:w-0 sm:flex-nowrap sm:items-center"
-            role="group"
-            aria-label="연도 선택"
+      <div
+        className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-black/[0.06] pb-3"
+        role="group"
+        aria-label="연도 선택"
+        id="bulk-year-control"
+      >
+        <div className="flex min-w-0 items-center gap-2">
+          <button
+            type="button"
+            disabled={!canGoOlder}
+            aria-label={`한 해 이전(${year - 1}년)`}
+            title="한 해 이전"
+            className="inline-flex h-10 w-9 shrink-0 items-center justify-center rounded-lg border border-input-border bg-white text-lg leading-none text-starbucks-green outline-none transition-colors hover:bg-neutral-cool/50 disabled:pointer-events-none disabled:opacity-35"
+            onClick={() => applyYearChoice(year - 1)}
           >
-            <button
-              type="button"
-              disabled={!canGoOlder}
-              aria-label={`한 해 이전(${year - 1}년)`}
-              title="한 해 이전"
-              className="inline-flex h-11 w-10 shrink-0 items-center justify-center rounded-lg border border-input-border bg-white text-xl leading-none text-starbucks-green outline-none transition-colors hover:bg-neutral-cool/50 disabled:pointer-events-none disabled:opacity-35"
-              onClick={() => applyYearChoice(year - 1)}
-            >
-              ‹
-            </button>
-
-            <div className="flex min-w-0 flex-[1_1_0%] overflow-hidden rounded-lg border border-black/[0.12] bg-[rgba(0,0,0,0.02)] shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
-              <section
-                className="flex min-w-0 flex-[1_1_0%] flex-col gap-2 px-3 py-3 text-center tabular-nums sm:px-4 sm:py-3.5"
-                aria-label={`${year}년 장부 연간 합계`}
-              >
-                <p className="text-lg font-semibold tracking-tight text-starbucks-green sm:text-xl">
-                  {year}년
-                </p>
-                <dl className="grid grid-cols-2 gap-x-3 gap-y-2 border-t border-black/[0.06] pt-2.5 text-center sm:gap-x-4">
-                  <div className="flex flex-col items-center gap-0.5">
-                    <dt className="text-xs font-bold uppercase tracking-[0.04em] text-text-soft">
-                      수입
-                    </dt>
-                    <dd className="text-[0.8125rem] font-bold text-[rgba(0,0,0,0.82)]">
-                      {won(ledgerYearCompare.current.income)}
-                    </dd>
-                  </div>
-                  <div className="flex flex-col items-center gap-0.5">
-                    <dt className="text-xs font-bold uppercase tracking-[0.04em] text-text-soft">
-                      지출
-                    </dt>
-                    <dd className="text-[0.8125rem] font-bold text-[rgba(0,0,0,0.82)]">
-                      {won(ledgerYearCompare.current.expense)}
-                    </dd>
-                  </div>
-                </dl>
-              </section>
-              <div className="w-px shrink-0 bg-black/[0.08]" aria-hidden />
-              <button
-                type="button"
-                disabled={!hasPriorYear}
-                onClick={() => hasPriorYear && applyYearChoice(priorYear)}
-                aria-label={`직전 연도 ${priorYear}년 표로 바꿈`}
-                title={hasPriorYear ? `${priorYear}년 표 보기` : undefined}
-                className="flex min-w-0 flex-[1_1_0%] flex-col gap-2 px-3 py-3 text-center tabular-nums outline-none transition-colors hover:bg-black/[0.03] disabled:pointer-events-none disabled:opacity-40 sm:px-4 sm:py-3.5"
-              >
-                <p className="text-lg font-medium tracking-tight text-[rgba(0,0,0,0.45)] sm:text-xl">
-                  {hasPriorYear ? `${priorYear}년` : '—'}
-                </p>
-                {hasPriorYear && priorLedger ? (
-                  <dl
-                    className="grid grid-cols-2 gap-x-3 gap-y-2 border-t border-black/[0.06] pt-2.5 text-center sm:gap-x-4"
-                    aria-label={`${priorYear}년 장부 연간 합계(비교용)`}
-                  >
-                    <div className="flex flex-col items-center gap-0.5">
-                      <dt className="text-xs font-bold uppercase tracking-[0.04em] text-text-soft">
-                        수입
-                      </dt>
-                      <dd className="text-[0.8125rem] font-semibold text-[rgba(0,0,0,0.72)]">
-                        {won(priorLedger.income)}
-                      </dd>
-                    </div>
-                    <div className="flex flex-col items-center gap-0.5">
-                      <dt className="text-xs font-bold uppercase tracking-[0.04em] text-text-soft">
-                        지출
-                      </dt>
-                      <dd className="text-[0.8125rem] font-semibold text-[rgba(0,0,0,0.72)]">
-                        {won(priorLedger.expense)}
-                      </dd>
-                    </div>
-                  </dl>
-                ) : (
-                  <div
-                    className="border-t border-black/[0.06] pt-2.5 text-left text-[0.7rem] leading-snug text-text-soft"
-                    aria-hidden
-                  >
-                    비교할 이전 해가 없습니다.
-                  </div>
-                )}
-              </button>
-            </div>
-
-            <button
-              type="button"
-              disabled={!canGoNewer}
-              aria-label={`한 해 다음(${year + 1}년)`}
-              title="한 해 다음"
-              className="inline-flex h-11 w-10 shrink-0 items-center justify-center rounded-lg border border-input-border bg-white text-xl leading-none text-starbucks-green outline-none transition-colors hover:bg-neutral-cool/50 disabled:pointer-events-none disabled:opacity-35"
-              onClick={() => applyYearChoice(year + 1)}
-            >
-              ›
-            </button>
-          </div>
-          <div className={BULK_MONTH_SUMMARY_GUTTER} aria-hidden />
-
-          {syncState.mode === 'cloud' && syncState.status === 'ready' ? (
-            <span className="w-full basis-full text-center text-xs text-text-soft">
-              {syncState.cloudBackend === 'prisma'
-                ? '장부는 로컬 DB API와 동기화됩니다.'
-                : '장부는 Supabase와 동기화됩니다.'}
-            </span>
-          ) : null}
+            ‹
+          </button>
+          <span className="min-w-[4.5rem] text-center text-lg font-semibold tabular-nums text-starbucks-green">
+            {year}년
+          </span>
+          <button
+            type="button"
+            disabled={!canGoNewer}
+            aria-label={`한 해 다음(${year + 1}년)`}
+            title="한 해 다음"
+            className="inline-flex h-10 w-9 shrink-0 items-center justify-center rounded-lg border border-input-border bg-white text-lg leading-none text-starbucks-green outline-none transition-colors hover:bg-neutral-cool/50 disabled:pointer-events-none disabled:opacity-35"
+            onClick={() => applyYearChoice(year + 1)}
+          >
+            ›
+          </button>
         </div>
-        <p className="mt-3 border-t border-black/[0.06] pt-3 text-[0.7rem] leading-relaxed text-text-soft">
-          위 연간 합계는{' '}
-          <strong className="font-medium text-[rgba(0,0,0,0.5)]">
-            캘린더 장부
-          </strong>
-          의 거래 <strong className="font-medium text-[rgba(0,0,0,0.5)]">일자 연도</strong>로
-          더한 값입니다. 입력 탭 표만 수정한 내용은 반영 전까지 합계에 포함되지 않습니다.
-        </p>
+        {syncState.mode === 'cloud' && syncState.status === 'ready' ? (
+          <span className="text-xs text-text-soft">
+            {syncState.cloudBackend === 'prisma'
+              ? '로컬 DB API와 동기화'
+              : 'Supabase와 동기화'}
+          </span>
+        ) : null}
       </div>
 
       <section aria-label="월별 입력" className="flex flex-col gap-4">
