@@ -90,8 +90,10 @@ export function reconcileYearsFromLedger<
     year: number
     years: Partial<Record<number, BulkDraftRow[][]>>
   },
->(prev: T, txs: Transaction[]): T {
-  if (!txs.length) return prev
+>(prev: T, txs: Transaction[], syncReady = false): T {
+  // syncReady=true(Supabase 로딩 완료): 빈 장부도 반영 (삭제 반영)
+  // syncReady=false(초기 로딩 중): 빈 장부면 초안 보호
+  if (!txs.length && !syncReady) return prev
 
   const years = [...collectConcernedYears(prev, txs)]
   let nextYears: Partial<Record<number, BulkDraftRow[][]>> = { ...prev.years }

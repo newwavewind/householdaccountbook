@@ -120,11 +120,16 @@ export default function BulkInputPage() {
     return () => clearTimeout(t)
   }, [st])
 
+  const syncReady =
+    syncState.mode !== 'cloud' || syncState.status === 'ready'
+
   useEffect(() => {
+    // Supabase 로딩 중에는 동기화 생략 (미확인 초안 보호)
+    if (syncState.mode === 'cloud' && syncState.status === 'loading') return
     startTransition(() => {
-      setSt((prev) => reconcileYearsFromLedger(prev, transactions))
+      setSt((prev) => reconcileYearsFromLedger(prev, transactions, syncReady))
     })
-  }, [transactions])
+  }, [transactions, syncReady])
 
   const monthDraftLedgerCmp = useMemo(
     () =>
