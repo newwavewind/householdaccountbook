@@ -380,7 +380,6 @@ export default function BulkInputPage() {
                     {monthLabel(monthIndex)}
                   </div>
                   <div className="mt-1 text-[0.65rem] leading-tight text-text-soft">
-                    표{' '}
                     <span className="tabular-nums text-[rgba(0,0,0,0.75)]">
                       {won(dTotals.income)}
                     </span>
