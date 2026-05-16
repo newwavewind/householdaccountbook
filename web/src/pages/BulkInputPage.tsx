@@ -171,7 +171,7 @@ export default function BulkInputPage() {
   return (
     <main className="mx-auto max-w-5xl px-3 pb-20 pt-4 sm:px-4 md:px-6">
       <div
-        className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-black/[0.06] pb-3"
+        className="mb-4 flex items-center gap-2 border-b border-black/[0.06] pb-3"
         role="group"
         aria-label="연도 선택"
         id="bulk-year-control"
@@ -201,24 +201,10 @@ export default function BulkInputPage() {
             ›
           </button>
         </div>
-        {syncState.mode === 'cloud' && syncState.status === 'ready' ? (
-          <span className="text-xs text-text-soft">
-            {syncState.cloudBackend === 'prisma'
-              ? '로컬 DB API와 동기화'
-              : 'Supabase와 동기화'}
-          </span>
-        ) : null}
       </div>
 
       <section aria-label="월별 입력" className="flex flex-col gap-4">
         <div>
-          <p className="mb-2 text-sm font-medium text-starbucks-green">
-            월 선택
-          </p>
-          <p className="mb-3 text-xs text-text-soft">
-            월을 누르면 아래에 해당 달 입력 표가 열립니다. 표의 수입·지출은 유효한 입력 줄만 반영한
-            합계입니다.
-          </p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
             {Array.from({ length: 12 }, (_, monthIndex) => {
               const rowsM = draftsMatrix[monthIndex] ?? [emptyDraftRow()]
