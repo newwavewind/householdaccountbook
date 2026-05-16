@@ -75,5 +75,10 @@ export function useCommunityPost(id: string | undefined) {
     void refresh()
   }, [refresh])
 
+  useEffect(() => {
+    if (!id) return
+    void repo.recordView(id)
+  }, [repo, id])
+
   return { post, busy, error, refresh, repo }
 }

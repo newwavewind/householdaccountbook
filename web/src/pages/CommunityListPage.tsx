@@ -89,6 +89,7 @@ export default function CommunityListPage() {
                     <div className="mt-2 flex items-center gap-3 text-xs text-text-soft">
                       <span>🤍 {p.likeCount}</span>
                       <span>💬 {p.commentCount}</span>
+                      <span>👁 오늘 {p.todayViewCount} · 전체 {p.viewCount}</span>
                     </div>
                     {p.hidden ? (
                       <span className="mt-2 inline-block rounded-full bg-black/[0.06] px-2 py-0.5 text-xs text-text-soft">

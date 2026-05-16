@@ -11,6 +11,8 @@ export type CommunityPost = {
   updatedAt: string
   likeCount: number
   commentCount: number
+  viewCount: number
+  todayViewCount: number
 }
 
 export type CommunityComment = {

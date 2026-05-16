@@ -32,6 +32,7 @@ export interface CommunityRepository {
   deleteComment(id: string): Promise<void>
   toggleLike(postId: string, userId: string): Promise<{ liked: boolean }>
   isLiked(postId: string, userId: string): Promise<boolean>
+  recordView(postId: string): Promise<void>
 }
 
 function mapSupabaseRow(row: {
@@ -45,6 +46,8 @@ function mapSupabaseRow(row: {
   updated_at: string
   like_count?: number
   comment_count?: number
+  view_count?: number
+  today_view_count?: number
 }): CommunityPost {
   return {
     id: row.id,
@@ -57,6 +60,8 @@ function mapSupabaseRow(row: {
     updatedAt: row.updated_at,
     likeCount: row.like_count ?? 0,
     commentCount: row.comment_count ?? 0,
+    viewCount: row.view_count ?? 0,
+    todayViewCount: row.today_view_count ?? 0,
   }
 }
 
@@ -138,6 +143,8 @@ class MockCommunityRepository implements CommunityRepository {
       updatedAt: now,
       likeCount: 0,
       commentCount: 0,
+      viewCount: 0,
+      todayViewCount: 0,
     }
     writeMockPosts([post, ...list])
     return post
@@ -175,6 +182,7 @@ class MockCommunityRepository implements CommunityRepository {
   async deleteComment(_id: string): Promise<void> {}
   async toggleLike(_postId: string, _userId: string): Promise<{ liked: boolean }> { return { liked: false } }
   async isLiked(_postId: string, _userId: string): Promise<boolean> { return false }
+  async recordView(_postId: string): Promise<void> {}
 }
 
 class ApiCommunityRepository implements CommunityRepository {
@@ -243,6 +251,7 @@ class ApiCommunityRepository implements CommunityRepository {
   async deleteComment(_id: string): Promise<void> {}
   async toggleLike(_postId: string, _userId: string): Promise<{ liked: boolean }> { return { liked: false } }
   async isLiked(_postId: string, _userId: string): Promise<boolean> { return false }
+  async recordView(_postId: string): Promise<void> {}
 }
 
 class SupabaseCommunityRepository implements CommunityRepository {
@@ -252,7 +261,7 @@ class SupabaseCommunityRepository implements CommunityRepository {
     this.client = client
   }
 
-  private static readonly POST_COLS = 'id, author_id, author_display_name, title, body, hidden, created_at, updated_at, like_count, comment_count'
+  private static readonly POST_COLS = 'id, author_id, author_display_name, title, body, hidden, created_at, updated_at, like_count, comment_count, view_count'
 
   async listPosts(opts: ListPostsOptions): Promise<CommunityPost[]> {
     void opts
@@ -261,9 +270,22 @@ class SupabaseCommunityRepository implements CommunityRepository {
       .select(SupabaseCommunityRepository.POST_COLS)
       .order('created_at', { ascending: false })
     if (error) throw new Error(error.message)
-    return (data ?? []).map((row) =>
-      mapSupabaseRow(row as Parameters<typeof mapSupabaseRow>[0]),
-    )
+
+    const today = new Date().toISOString().split('T')[0]
+    const { data: dailyData } = await this.client
+      .from('post_daily_views')
+      .select('post_id, view_count')
+      .eq('view_date', today)
+    const dailyMap: Record<string, number> = {}
+    for (const d of dailyData ?? []) {
+      dailyMap[(d as { post_id: string; view_count: number }).post_id] =
+        (d as { post_id: string; view_count: number }).view_count
+    }
+
+    return (data ?? []).map((row) => {
+      const r = row as Parameters<typeof mapSupabaseRow>[0]
+      return mapSupabaseRow({ ...r, today_view_count: dailyMap[r.id] ?? 0 })
+    })
   }
 
   async getPost(
@@ -383,6 +405,10 @@ class SupabaseCommunityRepository implements CommunityRepository {
       .maybeSingle()
     return !!data
   }
+
+  async recordView(postId: string): Promise<void> {
+    await this.client.rpc('record_post_view', { p_post_id: postId })
+  }
 }
 
 function translatePostError(msg: string): string {
@@ -446,6 +472,7 @@ class UnconfiguredSupabaseCommunityRepository implements CommunityRepository {
   async deleteComment(_id: string): Promise<void> { throw new Error(UnconfiguredSupabaseCommunityRepository.msg) }
   async toggleLike(_postId: string, _userId: string): Promise<{ liked: boolean }> { throw new Error(UnconfiguredSupabaseCommunityRepository.msg) }
   async isLiked(_postId: string, _userId: string): Promise<boolean> { throw new Error(UnconfiguredSupabaseCommunityRepository.msg) }
+  async recordView(_postId: string): Promise<void> {}
 }
 
 export function seedMockPostsIfEmpty() {
