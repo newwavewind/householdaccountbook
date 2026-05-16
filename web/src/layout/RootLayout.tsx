@@ -24,6 +24,9 @@ export default function RootLayout() {
               가계부
             </NavLink>
             <nav className="flex flex-wrap gap-1" aria-label="주 메뉴">
+              <NavLink className={navCls} to="/calendar">
+                일정
+              </NavLink>
               <NavLink className={navCls} to="/input">
                 입력
               </NavLink>

@@ -23,6 +23,7 @@
     "@vitejs/plugin-react": "^6.0.1",
     "date-holidays": "^3.28.0",
     "dompurify": "^3.4.3",
+    "korean-lunar-calendar": "^0.3.6",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-router-dom": "^7.15.0",
