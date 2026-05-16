@@ -9,19 +9,9 @@ import type { BulkDraftRow } from './draftRow'
 import { BulkCardPicker } from './BulkCardPicker'
 import { BulkCategoryPicker } from './BulkCategoryPicker'
 import { emptyDraftRow } from './draftRow'
-import { draftsToTransactions } from './buildFromDrafts'
 import { daysInMonth, monthLabel } from './monthUtils'
 import type { DraftLedgerComparison } from './compareMonthDraftLedger'
-import {
-  BULK_MONTH_SUMMARY_AMT_L,
-  BULK_MONTH_SUMMARY_AMT_R,
-  BULK_MONTH_SUMMARY_AMT_R_MUTED,
-  BULK_MONTH_SUMMARY_EXPAND,
-  BULK_MONTH_SUMMARY_GRID,
-  BULK_MONTH_SUMMARY_HALF,
-  BULK_MONTH_SUMMARY_MONTH_TITLE,
-  BULK_MONTH_SUMMARY_TWIN_SHELL,
-} from './bulkMonthSummaryLayout'
+import { draftMonthTotalsForDisplay } from './draftMonthTotals'
 
 function won(n: number): string {
   return `${n.toLocaleString('ko-KR')}원`
@@ -94,7 +84,6 @@ export type BulkRowsUpdater =
 type Props = {
   year: number
   monthIndex: number
-  defaultOpen?: boolean
   rows: BulkDraftRow[]
   onChangeRows: (payload: BulkRowsUpdater) => void
   /** rows는 최신 행 데이터를 항상 넘겨주므로 stale closure 없음 */
@@ -110,7 +99,6 @@ type Props = {
 export function MonthInputSection({
   year,
   monthIndex,
-  defaultOpen,
   rows,
   onChangeRows,
   onApplyMonth,
@@ -139,25 +127,10 @@ export function MonthInputSection({
   const hasPriorLedgerMonth =
     priorYearMonthLedgerTotals != null && priorCalendarYear != null
 
-  const draftMonthTotals = useMemo(() => {
-    const { ok } = draftsToTransactions(year, monthIndex, rows)
-    const today = new Date()
-    const isThisCalendarMonth =
-      today.getFullYear() === year && today.getMonth() === monthIndex
-    const list = isThisCalendarMonth
-      ? ok.filter((tx) => {
-          const dd = Number(tx.date.split('-')[2])
-          return Number.isFinite(dd) && dd <= today.getDate()
-        })
-      : ok
-    let income = 0
-    let expense = 0
-    for (const t of list) {
-      if (t.type === 'income') income += t.amount
-      else expense += t.amount
-    }
-    return { income, expense, isThisCalendarMonth }
-  }, [year, monthIndex, rows])
+  const draftMonthTotals = useMemo(
+    () => draftMonthTotalsForDisplay(year, monthIndex, rows),
+    [year, monthIndex, rows],
+  )
 
   useEffect(
     () => () => {
@@ -296,85 +269,32 @@ export function MonthInputSection({
   )
 
   return (
-    <details
-      open={defaultOpen}
-      className="group rounded-[var(--radius-card)] border border-black/[0.08] bg-white"
-    >
-      <summary className="cursor-pointer list-none px-4 py-3 font-semibold text-starbucks-green marker:content-none [&::-webkit-details-marker]:hidden">
-        <span className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-          <span className="flex min-w-0 w-full flex-1 flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-1.5">
-            <span className={BULK_MONTH_SUMMARY_MONTH_TITLE}>{title}</span>
-            <div
-              className="min-w-0 w-full flex-1 sm:w-0"
-              role="group"
-              aria-label={`${year}년 ${monthIndex + 1}월 요약·직전 연도 동월 장부 비교`}
-            >
-              <div className={BULK_MONTH_SUMMARY_TWIN_SHELL}>
-                <section
-                  className={BULK_MONTH_SUMMARY_HALF}
-                  aria-label={`${year}년 ${monthIndex + 1}월 입력 표(유효 줄) 합계`}
-                >
-                  <div className={BULK_MONTH_SUMMARY_GRID}>
-                    <p className={BULK_MONTH_SUMMARY_AMT_L} aria-label={`당해 표 수입 ${won(draftMonthTotals.income)}`}>
-                      {won(draftMonthTotals.income)}
-                    </p>
-                    <p className={BULK_MONTH_SUMMARY_AMT_L} aria-label={`당해 표 지출 ${won(draftMonthTotals.expense)}`}>
-                      {won(draftMonthTotals.expense)}
-                    </p>
-                  </div>
-                </section>
-                <div className="w-px shrink-0 bg-black/[0.08]" aria-hidden />
-                <section
-                  className={BULK_MONTH_SUMMARY_HALF}
-                  aria-label={
-                    hasPriorLedgerMonth && priorCalendarYear != null
-                      ? `${priorCalendarYear}년 ${monthIndex + 1}월 장부 합계(비교)`
-                      : `${monthIndex + 1}월 직전 연도 장부 비교 없음`
-                  }
-                >
-                  <div className={BULK_MONTH_SUMMARY_GRID}>
-                    <p
-                      className={
-                        hasPriorLedgerMonth
-                          ? BULK_MONTH_SUMMARY_AMT_R
-                          : BULK_MONTH_SUMMARY_AMT_R_MUTED
-                      }
-                      aria-label={
-                        hasPriorLedgerMonth && priorYearMonthLedgerTotals
-                          ? `직전 연도 장부 수입 ${won(priorYearMonthLedgerTotals.income)}`
-                          : '직전 연도 장부 수입 해당 없음'
-                      }
-                    >
-                      {hasPriorLedgerMonth && priorYearMonthLedgerTotals
-                        ? won(priorYearMonthLedgerTotals.income)
-                        : '—'}
-                    </p>
-                    <p
-                      className={
-                        hasPriorLedgerMonth
-                          ? BULK_MONTH_SUMMARY_AMT_R
-                          : BULK_MONTH_SUMMARY_AMT_R_MUTED
-                      }
-                      aria-label={
-                        hasPriorLedgerMonth && priorYearMonthLedgerTotals
-                          ? `직전 연도 장부 지출 ${won(priorYearMonthLedgerTotals.expense)}`
-                          : '직전 연도 장부 지출 해당 없음'
-                      }
-                    >
-                      {hasPriorLedgerMonth && priorYearMonthLedgerTotals
-                        ? won(priorYearMonthLedgerTotals.expense)
-                        : '—'}
-                    </p>
-                  </div>
-                </section>
-              </div>
-            </div>
-          </span>
-          <span className={BULK_MONTH_SUMMARY_EXPAND}>펼치기</span>
-        </span>
-      </summary>
-      <Card className="border-0 border-t border-black/[0.06] bg-transparent px-4 pb-4 pt-2 shadow-none">
-        <div className="mb-2 overflow-x-auto">
+    <Card className="rounded-[var(--radius-card)] border border-black/[0.08] bg-white p-4 shadow-[var(--shadow-card)] md:p-6">
+      <div className="mb-3 flex flex-col gap-2 border-b border-black/[0.06] pb-3 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
+        <h2 className="text-lg font-semibold tabular-nums text-starbucks-green">
+          {year}년 {title}
+        </h2>
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5 text-xs text-text-soft sm:items-end">
+          <p className="tabular-nums">
+            <span className="font-semibold text-[rgba(0,0,0,0.5)]">입력 표</span>{' '}
+            <span className="font-semibold text-[rgba(0,0,0,0.82)]">
+              수입 {won(draftMonthTotals.income)}
+            </span>
+            <span className="mx-1 text-black/20">·</span>
+            <span className="font-semibold text-[rgba(0,0,0,0.82)]">
+              지출 {won(draftMonthTotals.expense)}
+            </span>
+          </p>
+          {hasPriorLedgerMonth && priorYearMonthLedgerTotals ? (
+            <p className="tabular-nums text-[0.65rem] opacity-85">
+              {priorCalendarYear}년 동월 장부 수입{' '}
+              {won(priorYearMonthLedgerTotals.income)} · 지출{' '}
+              {won(priorYearMonthLedgerTotals.expense)}
+            </p>
+          ) : null}
+        </div>
+      </div>
+      <div className="mb-2 overflow-x-auto">
           <table className="w-full min-w-[520px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-black/[0.08] text-left text-xs uppercase text-text-soft">
@@ -682,6 +602,5 @@ export function MonthInputSection({
           <span className="font-medium text-starbucks-green">확인</span> 버튼을 누르면 해당 달 전체가 장부에 반영됩니다.
         </p>
       </Card>
-    </details>
   )
 }

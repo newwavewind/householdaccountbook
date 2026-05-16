@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useEffect, useMemo, useState } from 'react'
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLedger } from '../hooks/useLedger'
 import type { BulkDraftRow } from '../bulkInput/draftRow'
@@ -9,17 +9,13 @@ import {
   loadBulkInputBundle,
   saveBulkInputBundle,
 } from '../bulkInput/bulkInputStorage'
-import {
-  BULK_MONTH_SUMMARY_GRID,
-  BULK_MONTH_SUMMARY_GUTTER,
-  BULK_MONTH_SUMMARY_HALF,
-  BULK_MONTH_SUMMARY_LABEL,
-  BULK_MONTH_SUMMARY_TWIN_SHELL,
-} from '../bulkInput/bulkMonthSummaryLayout'
+import { BULK_MONTH_SUMMARY_GUTTER } from '../bulkInput/bulkMonthSummaryLayout'
 import {
   compareDraftMultisetToLedgerMonth,
   ledgerMonthIncomeExpenseSums,
 } from '../bulkInput/compareMonthDraftLedger'
+import { draftMonthTotalsForDisplay } from '../bulkInput/draftMonthTotals'
+import { monthLabel } from '../bulkInput/monthUtils'
 import {
   reconcileYearsFromLedger,
   transactionToBulkDraftRow,
@@ -70,10 +66,17 @@ const YEAR_NAV_MAX = 9999
 export default function BulkInputPage() {
   const now = useMemo(() => new Date(), [])
   const nowYear = now.getFullYear()
+  const nowMonth = now.getMonth()
   const { replaceCalendarMonth, syncState, transactions, cloudMembers } = useLedger()
 
   const [st, setSt] = useState<InputPageState>(() => hydrateState(nowYear))
   const { year } = st
+
+  const inputPanelRef = useRef<HTMLDivElement | null>(null)
+  const [activeMonthIndex, setActiveMonthIndex] = useState<number>(() => {
+    const initial = hydrateState(nowYear)
+    return initial.year === nowYear ? nowMonth : 0
+  })
 
   const applyYearChoice = useCallback((y: number) => {
     if (!Number.isFinite(y)) return
@@ -130,6 +133,10 @@ export default function BulkInputPage() {
       setSt((prev) => reconcileYearsFromLedger(prev, transactions, syncReady))
     })
   }, [transactions, syncReady])
+
+  useEffect(() => {
+    setActiveMonthIndex(year === nowYear ? nowMonth : 0)
+  }, [year, nowYear, nowMonth])
 
   const monthDraftLedgerCmp = useMemo(
     () =>
@@ -333,71 +340,104 @@ export default function BulkInputPage() {
         </p>
       </div>
 
-      <section aria-label="월별 입력" className="flex flex-col gap-3">
-        <p className="sr-only">
-          월별 요약 줄: 왼쪽 절반은 해당 연도 입력 표 합계, 오른쪽 절반은 직전 연도
-          같은 달 장부 합계입니다. 각 절반의 열 순서는 모두 수입, 지출입니다.
-        </p>
-        <div
-          className="-mt-1 mb-1 flex flex-col gap-2 px-4 sm:flex-row sm:items-stretch sm:gap-x-3 sm:gap-y-0 sm:leading-none"
-          aria-hidden
-        >
-          <div className={BULK_MONTH_SUMMARY_GUTTER} />
-          <div className="min-w-0 w-full flex-1 sm:w-0">
-            <div className={BULK_MONTH_SUMMARY_TWIN_SHELL}>
-              <div className={BULK_MONTH_SUMMARY_HALF}>
-                <div className={BULK_MONTH_SUMMARY_GRID}>
-                  <span className={BULK_MONTH_SUMMARY_LABEL}>수입</span>
-                  <span className={BULK_MONTH_SUMMARY_LABEL}>지출</span>
-                </div>
-              </div>
-              <div className="w-px shrink-0 bg-black/[0.08]" aria-hidden />
-              <div className={BULK_MONTH_SUMMARY_HALF}>
-                <div className={BULK_MONTH_SUMMARY_GRID}>
-                  <span className={BULK_MONTH_SUMMARY_LABEL}>수입</span>
-                  <span className={BULK_MONTH_SUMMARY_LABEL}>지출</span>
-                </div>
-              </div>
-            </div>
+      <section aria-label="월별 입력" className="flex flex-col gap-4">
+        <div>
+          <p className="mb-2 text-sm font-medium text-starbucks-green">
+            월 선택
+          </p>
+          <p className="mb-3 text-xs text-text-soft">
+            월을 누르면 아래에 해당 달 입력 표가 열립니다. 표의 수입·지출은 유효한 입력 줄만 반영한
+            합계입니다.
+          </p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+            {Array.from({ length: 12 }, (_, monthIndex) => {
+              const rowsM = draftsMatrix[monthIndex] ?? [emptyDraftRow()]
+              const dTotals = draftMonthTotalsForDisplay(year, monthIndex, rowsM)
+              const cmp = monthDraftLedgerCmp[monthIndex]
+              const selected = activeMonthIndex === monthIndex
+              return (
+                <button
+                  key={monthIndex}
+                  type="button"
+                  aria-current={selected ? 'true' : undefined}
+                  aria-label={`${year}년 ${monthLabel(monthIndex)} 입력`}
+                  className={`rounded-[var(--radius-card)] border px-3 py-2.5 text-left transition-colors ${
+                    selected
+                      ? 'border-starbucks-green bg-green-light/50 ring-2 ring-starbucks-green/35'
+                      : 'border-black/[0.08] bg-white hover:border-black/[0.12] hover:bg-neutral-cool/30'
+                  }`}
+                  onClick={() => {
+                    setActiveMonthIndex(monthIndex)
+                    requestAnimationFrame(() => {
+                      inputPanelRef.current?.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start',
+                      })
+                    })
+                  }}
+                >
+                  <div className="font-semibold tabular-nums text-starbucks-green">
+                    {monthLabel(monthIndex)}
+                  </div>
+                  <div className="mt-1 text-[0.65rem] leading-tight text-text-soft">
+                    표{' '}
+                    <span className="tabular-nums text-[rgba(0,0,0,0.75)]">
+                      {won(dTotals.income)}
+                    </span>
+                    <span className="mx-0.5 text-black/25">/</span>
+                    <span className="tabular-nums text-[rgba(0,0,0,0.75)]">
+                      {won(dTotals.expense)}
+                    </span>
+                  </div>
+                  {!cmp.multisetMatch ? (
+                    <div className="mt-1 text-[0.6rem] font-medium text-amber-800/90">
+                      장부와 차이
+                    </div>
+                  ) : null}
+                </button>
+              )
+            })}
           </div>
-          <div className={BULK_MONTH_SUMMARY_GUTTER} />
         </div>
-        {Array.from({ length: 12 }, (_, monthIndex) => (
+
+        <div ref={inputPanelRef} id="bulk-input-active-month">
           <MonthInputSection
-            key={monthIndex}
             year={year}
-            monthIndex={monthIndex}
+            monthIndex={activeMonthIndex}
+            rows={draftsMatrix[activeMonthIndex] ?? [emptyDraftRow()]}
+            draftLedgerCompare={monthDraftLedgerCmp[activeMonthIndex]}
             priorYearMonthLedgerTotals={
               hasPriorYear
                 ? ledgerMonthIncomeExpenseSums(
                     transactions,
                     priorYear,
-                    monthIndex,
+                    activeMonthIndex,
                   )
                 : null
             }
             priorCalendarYear={hasPriorYear ? priorYear : null}
-            defaultOpen={monthIndex === now.getMonth()}
-            rows={draftsMatrix[monthIndex] ?? [emptyDraftRow()]}
-            draftLedgerCompare={monthDraftLedgerCmp[monthIndex]}
             members={cloudMembers}
             onChangeRows={(payload) =>
               setSt((prev) => {
                 const base = [...(prev.years[prev.year] ?? initialMonths())]
-                const prevMonth = [...(base[monthIndex] ?? [emptyDraftRow()])]
+                const prevMonth = [
+                  ...(base[activeMonthIndex] ?? [emptyDraftRow()]),
+                ]
                 const nextMonth =
                   typeof payload === 'function' ? payload(prevMonth) : payload
                 const next12 = [...base]
-                next12[monthIndex] = nextMonth
+                next12[activeMonthIndex] = nextMonth
                 return {
                   year: prev.year,
                   years: { ...prev.years, [prev.year]: next12 },
                 }
               })
             }
-            onApplyMonth={(latestRows) => applyMonth(latestRows, monthIndex, true)}
+            onApplyMonth={(latestRows) =>
+              applyMonth(latestRows, activeMonthIndex, true)
+            }
           />
-        ))}
+        </div>
       </section>
     </main>
   )
