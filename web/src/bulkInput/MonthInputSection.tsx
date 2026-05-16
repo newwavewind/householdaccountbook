@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import {
@@ -130,6 +130,10 @@ export function MonthInputSection({
     null,
   )
   const [cardOpenLocalKey, setCardOpenLocalKey] = useState<string | null>(null)
+  const [confirmFlashLocalKey, setConfirmFlashLocalKey] = useState<string | null>(
+    null,
+  )
+  const confirmFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const maxDay = daysInMonth(year, monthIndex)
   const title = monthLabel(monthIndex)
   const hasPriorLedgerMonth =
@@ -154,6 +158,56 @@ export function MonthInputSection({
     }
     return { income, expense, isThisCalendarMonth }
   }, [year, monthIndex, rows])
+
+  useEffect(
+    () => () => {
+      if (confirmFlashTimerRef.current) {
+        clearTimeout(confirmFlashTimerRef.current)
+        confirmFlashTimerRef.current = null
+      }
+    },
+    [],
+  )
+
+  /** 확인 클릭/Enter: 짧은 피드백 후 장부 반영·다음 행 첫 칸 포커스(마지막 행이면 행 추가) */
+  const confirmApplyAndAdvanceToNextRow = useCallback(
+    (currentTr: HTMLTableRowElement, rowLocalKey: string) => {
+      const tbody = tbodyRef.current
+      if (!tbody) return
+
+      if (confirmFlashTimerRef.current) {
+        clearTimeout(confirmFlashTimerRef.current)
+        confirmFlashTimerRef.current = null
+      }
+      setConfirmFlashLocalKey(rowLocalKey)
+      confirmFlashTimerRef.current = setTimeout(() => {
+        setConfirmFlashLocalKey(null)
+        confirmFlashTimerRef.current = null
+      }, 480)
+
+      onApplyMonth(rowsRef.current)
+
+      const allRows = [
+        ...tbody.querySelectorAll<HTMLTableRowElement>(':scope > tr'),
+      ]
+      const rowIdx = allRows.indexOf(currentTr)
+      const nextRow = allRows[rowIdx + 1]
+      if (nextRow) {
+        collectRowFocusables(nextRow)[0]?.focus()
+        return
+      }
+      onChangeRows((prev) => [...prev, emptyDraftRow()])
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const lastTr = tbody.querySelector('tr:last-child')
+          if (lastTr instanceof HTMLTableRowElement) {
+            collectRowFocusables(lastTr)[0]?.focus()
+          }
+        })
+      })
+    },
+    [onApplyMonth, onChangeRows],
+  )
 
   const focusNextField = useCallback(
     (current: HTMLElement) => {
@@ -209,10 +263,23 @@ export function MonthInputSection({
           if (e.shiftKey) {
             requestAnimationFrame(() => focusPrevInTable(el, tbody))
           } else if (idx < list.length - 1) {
-            // 중간 select: 다음 필드로만 이동
+            // 중간 select: 다음 필드(구성원 → 확인 등)
             requestAnimationFrame(() => list[idx + 1]?.focus())
           } else {
-            // 마지막 select: applyMonth 포함 행 이동
+            // 마지막 포커스 칸이 확인 버튼만 남은 경우: 확인과 동일
+            const last = list[list.length - 1]
+            if (
+              last instanceof HTMLButtonElement &&
+              last.hasAttribute('data-confirm-row')
+            ) {
+              e.preventDefault()
+              const rowKey =
+                tr.getAttribute('data-bulk-row')?.trim() ?? ''
+              requestAnimationFrame(() =>
+                confirmApplyAndAdvanceToNextRow(tr, rowKey),
+              )
+              return
+            }
             requestAnimationFrame(() => focusNextField(el))
           }
           return
@@ -225,7 +292,7 @@ export function MonthInputSection({
         }
       }
     },
-    [focusNextField],
+    [focusNextField, confirmApplyAndAdvanceToNextRow],
   )
 
   return (
@@ -325,7 +392,7 @@ export function MonthInputSection({
             </thead>
             <tbody ref={tbodyRef}>
               {rows.map((r, i) => (
-                <tr key={r.localKey} className="border-b border-black/[0.05] align-middle">
+                <tr key={r.localKey} data-bulk-row={r.localKey} className="border-b border-black/[0.05] align-middle">
                   <td className="py-2 pr-2">
                     <input
                       aria-label={`${monthIndex + 1}월 일`}
@@ -499,18 +566,24 @@ export function MonthInputSection({
                     <button
                       type="button"
                       data-confirm-row="true"
-                      className="rounded-md bg-starbucks-green px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-starbucks-green/80 focus:outline-none focus:ring-2 focus:ring-starbucks-green/50"
+                      className={`rounded-md bg-starbucks-green px-2.5 py-1 text-xs font-medium text-white outline-none transition-all duration-200 hover:bg-starbucks-green/80 focus:outline-none focus:ring-2 focus:ring-starbucks-green/50 active:scale-95 ${
+                        confirmFlashLocalKey === r.localKey
+                          ? 'scale-95 ring-4 ring-amber-200/95 shadow-md brightness-110'
+                          : ''
+                      }`}
                       onClick={(e) => {
-                        onApplyMonth(rowsRef.current)
-                        // 다음 행 첫 번째 입력으로 포커스 이동
-                        const tr = (e.currentTarget as HTMLElement).closest('tr')
+                        const tr = e.currentTarget.closest('tr')
                         if (tr instanceof HTMLTableRowElement) {
-                          const allRows = [
-                            ...tr.parentElement!.querySelectorAll<HTMLTableRowElement>(':scope > tr'),
-                          ]
-                          const nextTr = allRows[allRows.indexOf(tr) + 1]
-                          if (nextTr) {
-                            collectRowFocusables(nextTr)[0]?.focus()
+                          confirmApplyAndAdvanceToNextRow(tr, r.localKey)
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.nativeEvent.isComposing) return
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault()
+                          const tr = e.currentTarget.closest('tr')
+                          if (tr instanceof HTMLTableRowElement) {
+                            confirmApplyAndAdvanceToNextRow(tr, r.localKey)
                           }
                         }
                       }}
