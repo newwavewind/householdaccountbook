@@ -527,6 +527,8 @@ export function MonthInputSection({
                         setCardOpenLocalKey(null)
                         const rest = rows.filter((_, j) => j !== i)
                         onChangeRows(rest.length > 0 ? rest : [emptyDraftRow()])
+                        // 삭제 후 즉시 반영 (rest가 빈 배열이면 해당 달 전체 삭제)
+                        onApplyMonth(rest)
                       }}
                     >
                       삭제

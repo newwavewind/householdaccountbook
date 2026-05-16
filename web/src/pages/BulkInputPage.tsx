@@ -146,7 +146,19 @@ export default function BulkInputPage() {
       monthIndex,
       latestRows,
     )
-    if (ok.length === 0) return
+    // latestRows가 빈 배열(삭제 액션)이면 해당 달을 비운다
+    if (ok.length === 0) {
+      if (latestRows.length === 0) {
+        replaceCalendarMonth(year, monthIndex, [])
+        setSt((prev) => {
+          const base = [...(prev.years[prev.year] ?? initialMonths())]
+          const nm = [...base]
+          nm[monthIndex] = [emptyDraftRow()]
+          return { year: prev.year, years: { ...prev.years, [prev.year]: nm } }
+        })
+      }
+      return
+    }
     const replacement: Transaction[] = ok.map((tx) => ({
       ...tx,
       id: crypto.randomUUID(),
