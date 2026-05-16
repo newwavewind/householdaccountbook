@@ -308,7 +308,7 @@ export function MonthInputSection({
       </summary>
       <Card className="border-0 border-t border-black/[0.06] bg-transparent px-4 pb-4 pt-2 shadow-none">
         <div className="mb-2 overflow-x-auto">
-          <table className="w-full min-w-[640px] border-collapse text-sm">
+          <table className="w-full min-w-[520px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-black/[0.08] text-left text-xs uppercase text-text-soft">
                 <th className="py-2 pr-2 font-medium">일</th>
@@ -373,7 +373,7 @@ export function MonthInputSection({
                       aria-label="금액"
                       inputMode="numeric"
                       placeholder="0"
-                      className="min-w-[6rem] rounded-lg border border-input-border px-2 py-1.5 tabular-nums outline-none focus:border-green-accent"
+                      className="w-14 min-w-0 rounded-lg border border-input-border px-2 py-1.5 tabular-nums outline-none focus:border-green-accent"
                       value={
                         amountFocusLocalKey === r.localKey
                           ? amountDigitsOnly(r.amount)
@@ -418,7 +418,7 @@ export function MonthInputSection({
                   <td className="py-2 pr-2">
                     <input
                       aria-label="메모"
-                      className="w-full max-w-[10rem] rounded-lg border border-input-border px-2 py-1.5 outline-none focus:border-green-accent"
+                      className="w-full min-w-[8rem] rounded-lg border border-input-border px-2 py-1.5 outline-none focus:border-green-accent"
                       value={r.memo}
                       onChange={(e) => {
                         const next = [...rows]
@@ -547,6 +547,14 @@ export function MonthInputSection({
             }
           >
             행 추가
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            className="!py-2 !text-xs !px-3"
+            onClick={() => onApplyMonth(rowsRef.current)}
+          >
+            이 달 전체 반영
           </Button>
         </div>
         <div

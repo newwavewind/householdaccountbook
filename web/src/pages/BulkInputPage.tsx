@@ -221,20 +221,20 @@ export default function BulkInputPage() {
                 <p className="text-lg font-semibold tracking-tight text-starbucks-green sm:text-xl">
                   {year}년
                 </p>
-                <dl className="grid grid-cols-2 gap-x-3 gap-y-2 border-t border-black/[0.06] pt-2.5 text-left sm:gap-x-4">
-                  <div>
-                    <dt className="text-[0.6rem] font-semibold uppercase tracking-[0.05em] text-text-soft">
+                <dl className="grid grid-cols-2 gap-x-3 gap-y-2 border-t border-black/[0.06] pt-2.5 text-center sm:gap-x-4">
+                  <div className="flex flex-col items-center gap-0.5">
+                    <dt className="text-xs font-bold uppercase tracking-[0.04em] text-text-soft">
                       수입
                     </dt>
-                    <dd className="text-[0.8125rem] font-semibold text-[rgba(0,0,0,0.82)]">
+                    <dd className="text-[0.8125rem] font-bold text-[rgba(0,0,0,0.82)]">
                       {won(ledgerYearCompare.current.income)}
                     </dd>
                   </div>
-                  <div>
-                    <dt className="text-[0.6rem] font-semibold uppercase tracking-[0.05em] text-text-soft">
+                  <div className="flex flex-col items-center gap-0.5">
+                    <dt className="text-xs font-bold uppercase tracking-[0.04em] text-text-soft">
                       지출
                     </dt>
-                    <dd className="text-[0.8125rem] font-semibold text-[rgba(0,0,0,0.82)]">
+                    <dd className="text-[0.8125rem] font-bold text-[rgba(0,0,0,0.82)]">
                       {won(ledgerYearCompare.current.expense)}
                     </dd>
                   </div>
@@ -254,19 +254,19 @@ export default function BulkInputPage() {
                 </p>
                 {hasPriorYear && priorLedger ? (
                   <dl
-                    className="grid grid-cols-2 gap-x-3 gap-y-2 border-t border-black/[0.06] pt-2.5 text-left sm:gap-x-4"
+                    className="grid grid-cols-2 gap-x-3 gap-y-2 border-t border-black/[0.06] pt-2.5 text-center sm:gap-x-4"
                     aria-label={`${priorYear}년 장부 연간 합계(비교용)`}
                   >
-                    <div>
-                      <dt className="text-[0.6rem] font-semibold uppercase tracking-[0.05em] text-text-soft">
+                    <div className="flex flex-col items-center gap-0.5">
+                      <dt className="text-xs font-bold uppercase tracking-[0.04em] text-text-soft">
                         수입
                       </dt>
                       <dd className="text-[0.8125rem] font-semibold text-[rgba(0,0,0,0.72)]">
                         {won(priorLedger.income)}
                       </dd>
                     </div>
-                    <div>
-                      <dt className="text-[0.6rem] font-semibold uppercase tracking-[0.05em] text-text-soft">
+                    <div className="flex flex-col items-center gap-0.5">
+                      <dt className="text-xs font-bold uppercase tracking-[0.04em] text-text-soft">
                         지출
                       </dt>
                       <dd className="text-[0.8125rem] font-semibold text-[rgba(0,0,0,0.72)]">

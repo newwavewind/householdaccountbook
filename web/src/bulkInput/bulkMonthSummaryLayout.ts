@@ -10,7 +10,7 @@ export const BULK_MONTH_SUMMARY_GRID =
   'grid w-full min-w-0 grid-cols-2 gap-x-3 sm:gap-x-4'
 
 export const BULK_MONTH_SUMMARY_LABEL =
-  'min-w-0 text-center text-[0.65rem] font-semibold uppercase tracking-[0.05em] text-text-soft tabular-nums leading-none'
+  'min-w-0 text-center text-xs font-bold uppercase tracking-[0.04em] text-text-soft tabular-nums leading-none'
 
 export const BULK_MONTH_SUMMARY_AMT_L =
   'min-w-0 text-center text-[0.8125rem] font-semibold tabular-nums leading-tight text-[rgba(0,0,0,0.82)]'
