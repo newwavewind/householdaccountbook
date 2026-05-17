@@ -12,6 +12,7 @@ export const EXPENSE_CATEGORIES = [
   '배달음식',
   '교통',
   '주유비',
+  '자동차할부',
   '쇼핑',
   '구독',
   '의료',
