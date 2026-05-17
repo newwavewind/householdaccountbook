@@ -80,6 +80,8 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
   const [userId, setUserId] = useState<string | null>(null)
   /** supabase 모드일 때 가구 ID (household_members에서 조회). null = 가구 미설정 */
   const [householdId, setHouseholdId] = useState<string | null>(null)
+  const householdIdRef = useRef<string | null>(null)
+  householdIdRef.current = householdId
   /** supabase 모드에서 auth 초기 확인이 끝났는지 */
   const [authReady, setAuthReady] = useState(backend !== 'supabase')
 
@@ -476,42 +478,57 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
   /** 가족 구성원 이름 목록 — localStorage 초기값, Supabase 유저 메타·가구 동기화 */
   const [cloudMembers, setCloudMembersState] = useState<string[]>(loadMembersFromStorage)
 
-  // userId 확정 후 user_family_members 테이블에서 구성원 로드 (크로스 디바이스)
+  // user_family_members — 가구 미가입 때만 사용. 가구가 있으면 households.members가 정본이므로
+  // 이 fetch가 나중에 도착하면 짧거나 오래된 user 행으로 덮어쓰는 레이스를 막음.
   useEffect(() => {
     if (!userId) return
+    if (householdId) return
     const sb = getSupabase()
     if (!sb) return
+    let cancelled = false
     void sb
       .from('user_family_members')
       .select('members')
       .eq('user_id', userId)
       .maybeSingle()
       .then(({ data }) => {
+        if (cancelled) return
+        if (householdIdRef.current) return
         if (data && Array.isArray(data.members) && data.members.length > 0) {
           const members = data.members as string[]
           setCloudMembersState(members)
           saveMembersToStorage(members)
         }
       })
-  }, [userId])
+    return () => {
+      cancelled = true
+    }
+  }, [userId, householdId])
 
   // householdId 확정 후 Supabase households.members 로드 (가족 공유용, 우선순위 높음)
   useEffect(() => {
     if (!householdId) return
     const sb = getSupabase()
     if (!sb) return
+    const hid = householdId
+    let cancelled = false
     void sb
       .from('households')
       .select('members')
-      .eq('id', householdId)
+      .eq('id', hid)
       .maybeSingle()
       .then(({ data }) => {
+        if (cancelled) return
+        if (householdIdRef.current !== hid) return
         if (data && Array.isArray(data.members) && data.members.length > 0) {
           const members = data.members as string[]
           setCloudMembersState(members)
           saveMembersToStorage(members)
         }
       })
+    return () => {
+      cancelled = true
+    }
   }, [householdId])
 
   const setCloudMembers = useCallback((members: string[]) => {
