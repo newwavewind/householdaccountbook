@@ -609,7 +609,11 @@ export default function CalendarPage() {
                   type="button"
                   onClick={() => onPickDay(iso)}
                   aria-pressed={isSel}
-                  aria-label={`${iso} 메모·일정`}
+                  aria-label={
+                    starImportant
+                      ? `${iso} 메모·일정, 중요 일정 있음`
+                      : `${iso} 메모·일정`
+                  }
                   className={[
                     'relative flex min-h-[4.5rem] w-full cursor-pointer flex-col overflow-hidden rounded-lg border px-1 py-1.5 text-left transition-colors active:scale-[0.98] md:min-h-[6rem] md:px-1.5 md:py-2',
                     inMonth
@@ -627,10 +631,18 @@ export default function CalendarPage() {
                     .filter(Boolean)
                     .join(' ')}
                 >
+                  {starImportant ? (
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute left-1/2 top-[42%] z-0 -translate-x-1/2 -translate-y-1/2 select-none text-[3.75rem] font-normal leading-none text-amber-500/[0.32] drop-shadow-[0_0_10px_rgba(245,158,11,0.45)] md:top-[44%] md:text-[4.5rem]"
+                    >
+                      ★
+                    </span>
+                  ) : null}
                   <span
                     aria-hidden
                     className={[
-                      'pointer-events-none absolute left-1/2 top-[42%] -translate-x-1/2 -translate-y-1/2 select-none text-[2.6rem] font-semibold leading-none tabular-nums md:top-[44%] md:text-[3.1rem]',
+                      'pointer-events-none absolute left-1/2 top-[42%] z-[1] -translate-x-1/2 -translate-y-1/2 select-none text-[2.6rem] font-semibold leading-none tabular-nums md:top-[44%] md:text-[3.1rem]',
                       inMonth && isRedDay
                         ? 'text-red-500/[0.11]'
                         : inMonth
@@ -643,15 +655,6 @@ export default function CalendarPage() {
 
                   <div className="relative z-[1] flex min-h-0 flex-1 flex-col gap-0.5">
                     <div className="flex shrink-0 justify-end gap-0.5">
-                      {starImportant ? (
-                        <span
-                          className="text-[0.65rem] leading-none text-amber-500 md:text-xs"
-                          aria-label="중요 메모"
-                          title="중요"
-                        >
-                          ★
-                        </span>
-                      ) : null}
                       {hasLedger ? (
                         <span
                           className="rounded bg-green-accent/15 px-1 text-[0.625rem] font-semibold tabular-nums text-green-accent md:text-[0.6875rem]"
@@ -679,9 +682,6 @@ export default function CalendarPage() {
                               key={e.id}
                               className={`truncate pl-0.5 ${calendarEventInkTextClass(e.ink)}`}
                             >
-                              {e.important ? (
-                                <span className="text-amber-500">★ </span>
-                              ) : null}
                               {main}
                             </li>
                           )
