@@ -194,7 +194,7 @@ export function TransactionFormModal({
                 <legend className="text-sm font-medium text-[rgba(0, 0, 0, 0.87)]">
                   지불 수단
                 </legend>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   <Button
                     type="button"
                     variant={paymentMethod === 'cash' ? 'primary' : 'outlined'}
@@ -205,6 +205,17 @@ export function TransactionFormModal({
                     }}
                   >
                     현금
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={paymentMethod === 'ieum' ? 'primary' : 'outlined'}
+                    className="flex-1"
+                    onClick={() => {
+                      setPaymentMethod('ieum')
+                      setCardBrand('')
+                    }}
+                  >
+                    이음카드
                   </Button>
                   <Button
                     type="button"

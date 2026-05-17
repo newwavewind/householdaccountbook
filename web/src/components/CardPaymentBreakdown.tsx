@@ -56,6 +56,7 @@ function cardSlices(
 
 export interface CardPaymentBreakdownProps {
   cash: number
+  ieum: number
   legacy: number
   cardRows: readonly { id: string; label: string; sum: number }[]
   /** 전 장부(카드별 연간·전체 집계용) */
@@ -71,6 +72,7 @@ export interface CardPaymentBreakdownProps {
 
 export function CardPaymentBreakdown({
   cash,
+  ieum,
   legacy,
   cardRows,
   transactions,
@@ -98,6 +100,15 @@ export function CardPaymentBreakdown({
         </span>
         <span className="text-base font-semibold tabular-nums text-semantic-expense">
           {fmt.format(cash)}
+        </span>
+      </li>
+
+      <li className="flex items-center justify-between gap-3 py-3">
+        <span className="text-sm font-medium text-[rgba(0,0,0,0.87)]">
+          이음카드
+        </span>
+        <span className="text-base font-semibold tabular-nums text-semantic-expense">
+          {fmt.format(ieum)}
         </span>
       </li>
 

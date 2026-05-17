@@ -12,6 +12,7 @@ import { emptyDraftRow } from './draftRow'
 import { daysInMonth, monthLabel } from './monthUtils'
 import type { DraftLedgerComparison } from './compareMonthDraftLedger'
 import { draftMonthTotalsForDisplay } from './draftMonthTotals'
+import type { PaymentMethod } from '../types/transaction'
 
 function won(n: number): string {
   return `${n.toLocaleString('ko-KR')}원`
@@ -422,19 +423,24 @@ export function MonthInputSection({
                       className="rounded-lg border border-input-border px-2 py-1.5 outline-none focus:border-green-accent disabled:opacity-40"
                       value={r.paymentMethod}
                       onChange={(e) => {
-                        const pm = e.target.value === 'card' ? 'card' : 'cash'
-                        if (pm === 'cash') setCardOpenLocalKey(null)
+                        const v = e.target.value
+                        const pm: PaymentMethod =
+                          v === 'cash' ? 'cash' : v === 'ieum' ? 'ieum' : 'card'
+                        if (pm === 'cash' || pm === 'ieum') setCardOpenLocalKey(null)
                         const next = [...rows]
                         next[i] = {
                           ...r,
                           paymentMethod: pm,
-                          ...(pm === 'cash' ? { cardBrand: '' } : {}),
+                          ...(pm === 'cash' || pm === 'ieum'
+                            ? { cardBrand: '' }
+                            : {}),
                         }
                         onChangeRows(next)
                       }}
                       onKeyDown={handleFieldKeyDown}
                     >
                       <option value="card">카드</option>
+                      <option value="ieum">이음카드</option>
                       <option value="cash">현금</option>
                     </select>
                   </td>
@@ -542,14 +548,6 @@ export function MonthInputSection({
             }
           >
             행 추가
-          </Button>
-          <Button
-            type="button"
-            variant="primary"
-            className="!py-2 !text-xs !px-3"
-            onClick={() => onApplyMonth(rowsRef.current)}
-          >
-            이 달 전체 반영
           </Button>
         </div>
         <div

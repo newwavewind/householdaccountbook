@@ -228,11 +228,13 @@ export default function LedgerApp() {
 
   const expensePaymentBreakdown = useMemo(() => {
     let cash = 0
+    let ieum = 0
     let legacy = 0
     const cardMap = new Map<string, number>()
     for (const t of filtered) {
       if (t.type !== 'expense') continue
       if (t.paymentMethod === 'cash') cash += t.amount
+      else if (t.paymentMethod === 'ieum') ieum += t.amount
       else if (t.paymentMethod === 'card') {
         if (t.cardBrand) {
           cardMap.set(
@@ -254,7 +256,7 @@ export default function LedgerApp() {
       }))
       .filter((r) => r.sum > 0)
       .sort((a, b) => b.sum - a.sum)
-    return { cash, legacy, cardRows }
+    return { cash, ieum, legacy, cardRows }
   }, [filtered])
 
   const resolvedExpandedCardBrandId = useMemo(() => {
@@ -665,6 +667,7 @@ export default function LedgerApp() {
             ) : (
               <CardPaymentBreakdown
                 cash={expensePaymentBreakdown.cash}
+                ieum={expensePaymentBreakdown.ieum}
                 legacy={expensePaymentBreakdown.legacy}
                 cardRows={expensePaymentBreakdown.cardRows}
                 transactions={transactions}
@@ -823,6 +826,8 @@ export default function LedgerApp() {
                         <span className="text-xs text-text-soft">
                           {t.paymentMethod === 'cash'
                             ? '현금'
+                            : t.paymentMethod === 'ieum'
+                              ? '이음카드'
                             : t.paymentMethod === 'card'
                               ? '카드'
                               : '미입력'}

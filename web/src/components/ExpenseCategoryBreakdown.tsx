@@ -23,6 +23,7 @@ function shortLedgerDate(iso: string): string {
 
 function paymentCaption(t: Transaction): string | null {
   if (t.paymentMethod === 'cash') return '현금'
+  if (t.paymentMethod === 'ieum') return '이음카드'
   if (t.paymentMethod === 'card')
     return cardBrandLabel(t.cardBrand) ?? '카드'
   return null

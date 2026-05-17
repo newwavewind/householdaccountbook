@@ -112,6 +112,8 @@ export function DayDetailModal({
                         <span className="rounded-full bg-neutral-cool px-2 py-0.5 text-xs font-medium text-[rgba(0,0,0,0.87)]">
                           {t.paymentMethod === 'cash'
                             ? '현금'
+                            : t.paymentMethod === 'ieum'
+                              ? '이음카드'
                             : t.paymentMethod === 'card'
                               ? cardBrandLabel(t.cardBrand) ?? '카드'
                               : '미입력'}

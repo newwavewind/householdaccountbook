@@ -156,6 +156,7 @@ function parsePaymentMethod(raw: string): PaymentMethod | undefined {
   if (!t) return undefined
   if (t === 'cash' || t === '현금') return 'cash'
   if (t === 'card' || t === '카드') return 'card'
+  if (t === 'ieum' || t === '이음' || t === '이음카드') return 'ieum'
   return undefined
 }
 

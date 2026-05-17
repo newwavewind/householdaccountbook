@@ -128,10 +128,12 @@ export default function BulkInputPage() {
       monthIndex,
       latestRows,
     )
-    // latestRows가 빈 배열(삭제 액션)이면 해당 달을 비운다
+    // 반영 가능한 줄이 없으면 해당 달 장부를 비운다.
+    // (삭제 후 빈 칸·placeholder만 남은 경우 ok는 0이지만 latestRows는 비어 있지 않을 수 있음 — 이때도 장부를 갱신해야
+    // reconcile가 옛 거래로 표를 되살리지 않음)
     if (ok.length === 0) {
+      replaceCalendarMonth(year, monthIndex, [])
       if (latestRows.length === 0) {
-        replaceCalendarMonth(year, monthIndex, [])
         setSt((prev) => {
           const base = [...(prev.years[prev.year] ?? initialMonths())]
           const nm = [...base]

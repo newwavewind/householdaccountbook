@@ -10,7 +10,8 @@ export function isValidTx(x: unknown): x is Transaction {
   if (
     t.paymentMethod !== undefined &&
     t.paymentMethod !== 'cash' &&
-    t.paymentMethod !== 'card'
+    t.paymentMethod !== 'card' &&
+    t.paymentMethod !== 'ieum'
   ) {
     return false
   }

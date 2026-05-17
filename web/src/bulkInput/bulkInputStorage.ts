@@ -22,7 +22,10 @@ export function normalizeDraftRow(raw: unknown): BulkDraftRow {
       : crypto.randomUUID()
 
   const kind = o.kind === 'income' ? 'income' : 'expense'
-  const pm = o.paymentMethod === 'cash' ? 'cash' : 'card'
+  const pmRaw = o.paymentMethod
+  let pm: PaymentMethod = 'card'
+  if (pmRaw === 'cash') pm = 'cash'
+  else if (pmRaw === 'ieum') pm = 'ieum'
 
   let amount = ''
   if (typeof o.amount === 'string') amount = o.amount

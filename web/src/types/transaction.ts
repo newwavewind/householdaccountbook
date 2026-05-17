@@ -1,6 +1,6 @@
 export type TransactionType = 'income' | 'expense'
 
-export type PaymentMethod = 'cash' | 'card'
+export type PaymentMethod = 'cash' | 'card' | 'ieum'
 
 /** Ledger line — 브라우저 localStorage에 저장됩니다. */
 export interface Transaction {
