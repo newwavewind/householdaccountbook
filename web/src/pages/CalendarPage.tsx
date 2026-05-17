@@ -17,6 +17,10 @@ import { useLedger } from '../hooks/useLedger'
 import { holidayLabel } from '../lib/holidays'
 import { isCloudSyncEnabled } from '../lib/supabaseClient'
 import { ledgerBackendMode } from '../lib/ledgerBackend'
+import {
+  CALENDAR_EVENT_INK_SWATCHES,
+  calendarEventInkTextClass,
+} from '../calendar/calendarEventInk'
 
 const WEEK = ['일', '월', '화', '수', '목', '금', '토'] as const
 
@@ -146,7 +150,9 @@ function DayMemoPanel({
             {summaryLines.length > 0 ? (
               summaryLines.map((e) => (
                 <li key={e.id}>
-                  <span className="font-medium text-starbucks-green">
+                  <span
+                    className={`font-medium ${calendarEventInkTextClass(e.ink)}`}
+                  >
                     {e.label.trim() || '일정'}
                   </span>
                   {e.time?.trim() ? (
@@ -156,7 +162,9 @@ function DayMemoPanel({
                     </span>
                   ) : null}
                   {e.note?.trim() ? (
-                    <span className="block text-xs text-text-soft">
+                    <span
+                      className={`block text-xs ${calendarEventInkTextClass(e.ink)}`}
+                    >
                       {e.note.trim()}
                     </span>
                   ) : null}
@@ -217,6 +225,45 @@ function DayMemoPanel({
                   중요
                 </label>
               </div>
+              <div className="mt-1" role="group" aria-label="글자 색">
+                <p className="text-xs font-medium text-text-soft">글자 색</p>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {CALENDAR_EVENT_INK_SWATCHES.map((s) => {
+                    const current = ev.ink ?? 'default'
+                    const selected = current === s.id
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        title={s.label}
+                        aria-label={s.label}
+                        aria-pressed={selected}
+                        onClick={() => {
+                          setEvents((prev) => {
+                            const next = [...prev]
+                            next[i] = {
+                              ...ev,
+                              ink: s.id === 'default' ? undefined : s.id,
+                            }
+                            return next
+                          })
+                        }}
+                        className={[
+                          'flex h-8 w-8 items-center justify-center rounded-full border bg-white p-1 transition-shadow',
+                          selected
+                            ? `ring-2 ring-offset-2 ring-offset-white ${s.ring}`
+                            : 'border-black/10 hover:border-black/25',
+                        ].join(' ')}
+                      >
+                        <span
+                          className={`block h-5 w-5 rounded-full ${s.dot}`}
+                          aria-hidden
+                        />
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
               <label className="block text-sm font-medium text-text-soft">
                 제목
                 <input
@@ -232,7 +279,7 @@ function DayMemoPanel({
                   }}
                   placeholder="예: 조동친구, 장보기"
                   maxLength={200}
-                  className="mt-1 w-full rounded-lg border border-black/[0.12] bg-white px-3 py-2 text-base text-[rgba(0,0,0,0.87)] outline-none ring-green-accent/30 focus:ring-2"
+                  className={`mt-1 w-full rounded-lg border border-black/[0.12] bg-white px-3 py-2 text-base outline-none ring-green-accent/30 focus:ring-2 ${calendarEventInkTextClass(ev.ink)}`}
                 />
               </label>
               <label className="mt-2 block text-sm font-medium text-text-soft">
@@ -248,7 +295,7 @@ function DayMemoPanel({
                       return next
                     })
                   }}
-                  className="mt-1 max-w-[10rem] rounded-lg border border-black/[0.12] bg-white px-2 py-1.5 text-sm text-[rgba(0,0,0,0.87)] outline-none ring-green-accent/30 focus:ring-2"
+                  className={`mt-1 max-w-[10rem] rounded-lg border border-black/[0.12] bg-white px-2 py-1.5 text-sm outline-none ring-green-accent/30 focus:ring-2 ${calendarEventInkTextClass(ev.ink)}`}
                 />
               </label>
               <label className="mt-2 block text-sm font-medium text-text-soft">
@@ -266,7 +313,7 @@ function DayMemoPanel({
                   placeholder="메모"
                   maxLength={2000}
                   rows={2}
-                  className="mt-1 w-full resize-y rounded-lg border border-black/[0.12] bg-white px-3 py-2 text-sm text-[rgba(0,0,0,0.87)] outline-none ring-green-accent/30 focus:ring-2"
+                  className={`mt-1 w-full resize-y rounded-lg border border-black/[0.12] bg-white px-3 py-2 text-sm outline-none ring-green-accent/30 focus:ring-2 ${calendarEventInkTextClass(ev.ink)}`}
                 />
               </label>
               <div className="mt-2 flex justify-end">
@@ -620,7 +667,7 @@ export default function CalendarPage() {
                       </span>
                     ) : null}
                     {hasMemo ? (
-                      <ul className="line-clamp-3 w-full space-y-0.5 text-left text-[0.65rem] leading-snug text-[rgba(0,0,0,0.78)] md:text-[0.7rem]">
+                      <ul className="line-clamp-3 w-full space-y-0.5 text-left text-[0.65rem] leading-snug md:text-[0.7rem]">
                         {getDayEvents(memo).map((e) => {
                           const main =
                             e.label.trim() ||
@@ -628,7 +675,10 @@ export default function CalendarPage() {
                             (e.time ? formatTimeKo(e.time) : '')
                           if (!main) return null
                           return (
-                            <li key={e.id} className="truncate pl-0.5">
+                            <li
+                              key={e.id}
+                              className={`truncate pl-0.5 ${calendarEventInkTextClass(e.ink)}`}
+                            >
                               {e.important ? (
                                 <span className="text-amber-500">★ </span>
                               ) : null}

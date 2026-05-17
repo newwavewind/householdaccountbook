@@ -11,6 +11,11 @@ function isLegacyPriority(v: unknown): v is LegacyPriority {
   )
 }
 
+import {
+  normalizeCalendarEventInk,
+  type CalendarEventInkId,
+} from './calendarEventInk'
+
 /** 하루에 여러 개 둘 수 있는 일정·메모 한 줄 */
 export type CalendarDayEvent = {
   id: string
@@ -21,6 +26,8 @@ export type CalendarDayEvent = {
   /** HH:mm (선택) */
   time?: string
   important?: boolean
+  /** 제목·메모 글자색 (미지정이면 검정 계열) */
+  ink?: CalendarEventInkId
 }
 
 export type CalendarDayMemo = {
@@ -72,13 +79,16 @@ export function parseMemoMapPayload(raw: unknown): MemoMap {
         const note = typeof r.note === 'string' ? r.note : undefined
         const evTime = typeof r.time === 'string' ? r.time : undefined
         const evImportant = r.important === true
-        parsed.push({
+        const evInk = normalizeCalendarEventInk(r.ink)
+        const ev: CalendarDayEvent = {
           id,
           label,
           note,
           time: evTime,
           important: evImportant,
-        })
+        }
+        if (evInk && evInk !== 'default') ev.ink = evInk
+        parsed.push(ev)
       }
       if (parsed.length > 0) rec.events = parsed
     }
@@ -203,19 +213,24 @@ export function getDayEvents(
 ): CalendarDayEvent[] {
   if (!memo) return []
   if (Array.isArray(memo.events) && memo.events.length > 0) {
-    return memo.events.map((e) => ({
-      id: typeof e.id === 'string' && e.id.trim() ? e.id : crypto.randomUUID(),
-      label: typeof e.label === 'string' ? e.label : '',
-      note:
-        typeof e.note === 'string' && e.note.trim()
-          ? e.note.trim()
-          : undefined,
-      time:
-        typeof e.time === 'string' && e.time.trim()
-          ? e.time.trim()
-          : undefined,
-      important: e.important === true,
-    }))
+    return memo.events.map((e) => {
+      const ink = normalizeCalendarEventInk(e.ink)
+      const base: CalendarDayEvent = {
+        id: typeof e.id === 'string' && e.id.trim() ? e.id : crypto.randomUUID(),
+        label: typeof e.label === 'string' ? e.label : '',
+        note:
+          typeof e.note === 'string' && e.note.trim()
+            ? e.note.trim()
+            : undefined,
+        time:
+          typeof e.time === 'string' && e.time.trim()
+            ? e.time.trim()
+            : undefined,
+        important: e.important === true,
+      }
+      if (ink && ink !== 'default') base.ink = ink
+      return base
+    })
   }
   return migrateLegacyToEvents(memo)
 }
@@ -227,13 +242,18 @@ export function setCalendarDayEvents(
   events: CalendarDayEvent[],
 ): MemoMap {
   const cleaned = events
-    .map((e) => ({
-      id: e.id?.trim() ? e.id.trim() : crypto.randomUUID(),
-      label: (e.label ?? '').trim(),
-      note: e.note?.trim() || undefined,
-      time: e.time?.trim() || undefined,
-      important: e.important === true,
-    }))
+    .map((e) => {
+      const ink = normalizeCalendarEventInk(e.ink)
+      const row: CalendarDayEvent = {
+        id: e.id?.trim() ? e.id.trim() : crypto.randomUUID(),
+        label: (e.label ?? '').trim(),
+        note: e.note?.trim() || undefined,
+        time: e.time?.trim() || undefined,
+        important: e.important === true,
+      }
+      if (ink && ink !== 'default') row.ink = ink
+      return row
+    })
     .filter((e) => e.label || e.note || e.time)
 
   const next = { ...map }
