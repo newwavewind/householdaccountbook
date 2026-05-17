@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -21,6 +22,13 @@ import {
   CALENDAR_EVENT_INK_SWATCHES,
   calendarEventInkTextClass,
 } from '../calendar/calendarEventInk'
+import { CalendarEventRichField } from '../calendar/CalendarEventRichField'
+import {
+  htmlToPlain,
+  htmlToPlainLine,
+  sanitizeCalendarEventHtml,
+} from '../calendar/calendarHtmlSanitize'
+import type { DdayEvent } from '../dday/ddayTypes'
 
 const WEEK = ['일', '월', '화', '수', '목', '금', '토'] as const
 
@@ -80,6 +88,25 @@ function formatTimeKo(hhmm: string): string {
   return `${m[1]}:${m[2]}`
 }
 
+function eventHasListingContent(e: CalendarDayEvent): boolean {
+  return !!(
+    e.label.trim() ||
+    htmlToPlain(e.labelHtml) ||
+    e.note?.trim() ||
+    htmlToPlain(e.noteHtml) ||
+    e.time?.trim()
+  )
+}
+
+function calendarCellPreviewLine(e: CalendarDayEvent): string {
+  const title =
+    e.label.trim() || htmlToPlainLine(e.labelHtml) || ''
+  const note = e.note?.trim() || htmlToPlainLine(e.noteHtml) || ''
+  const main =
+    title || note || (e.time ? formatTimeKo(e.time) : '')
+  return main
+}
+
 type DayMemoPanelProps = {
   iso: string
   initial: CalendarDayMemo | undefined
@@ -109,9 +136,7 @@ function DayMemoPanel({
   const hol = holidayLabel(iso)
   const lunar = lunarCellInfo(iso, hol)
 
-  const summaryLines = events.filter(
-    (e) => e.label.trim() || e.note?.trim() || e.time?.trim(),
-  )
+  const summaryLines = events.filter(eventHasListingContent)
 
   return (
     <Card
@@ -150,23 +175,41 @@ function DayMemoPanel({
             {summaryLines.length > 0 ? (
               summaryLines.map((e) => (
                 <li key={e.id}>
-                  <span
-                    className={`font-medium ${calendarEventInkTextClass(e.ink)}`}
-                  >
-                    {e.label.trim() || '일정'}
-                  </span>
+                  <div className={`font-medium ${calendarEventInkTextClass(e.ink)}`}>
+                    {e.labelHtml?.trim() ? (
+                      <span
+                        className="inline-block [&_*]:leading-snug [&_strong]:font-semibold"
+                        // eslint-disable-next-line react/no-danger
+                        dangerouslySetInnerHTML={{
+                          __html: sanitizeCalendarEventHtml(e.labelHtml ?? ''),
+                        }}
+                      />
+                    ) : (
+                      <span>{e.label.trim() || '일정'}</span>
+                    )}
+                  </div>
                   {e.time?.trim() ? (
                     <span className="text-text-soft">
                       {' '}
                       · {formatTimeKo(e.time.trim())}
                     </span>
                   ) : null}
-                  {e.note?.trim() ? (
-                    <span
-                      className={`block text-xs ${calendarEventInkTextClass(e.ink)}`}
+                  {(e.note?.trim() || htmlToPlain(e.noteHtml)) ? (
+                    <div
+                      className={`mt-0.5 text-xs [&_*]:leading-snug ${calendarEventInkTextClass(e.ink)}`}
                     >
-                      {e.note.trim()}
-                    </span>
+                      {e.noteHtml?.trim() ? (
+                        <span
+                          className="inline-block [&_strong]:font-semibold"
+                          // eslint-disable-next-line react/no-danger
+                          dangerouslySetInnerHTML={{
+                            __html: sanitizeCalendarEventHtml(e.noteHtml ?? ''),
+                          }}
+                        />
+                      ) : (
+                        <span>{e.note?.trim()}</span>
+                      )}
+                    </div>
                   ) : null}
                 </li>
               ))
@@ -264,24 +307,34 @@ function DayMemoPanel({
                   })}
                 </div>
               </div>
-              <label className="block text-sm font-medium text-text-soft">
-                제목
-                <input
-                  type="text"
-                  value={ev.label}
-                  onChange={(e) => {
-                    const v = e.target.value
-                    setEvents((prev) => {
-                      const next = [...prev]
-                      next[i] = { ...ev, label: v }
-                      return next
-                    })
-                  }}
-                  placeholder="예: 조동친구, 장보기"
-                  maxLength={200}
-                  className={`mt-1 w-full rounded-lg border border-black/[0.12] bg-white px-3 py-2 text-base outline-none ring-green-accent/30 focus:ring-2 ${calendarEventInkTextClass(ev.ink)}`}
-                />
-              </label>
+              <div className="mt-2">
+                <p className="text-sm font-medium text-text-soft">제목</p>
+                <div
+                  className={`mt-1 ${calendarEventInkTextClass(ev.ink)} [&_.ProseMirror]:text-base`}
+                >
+                  <CalendarEventRichField
+                    aria-label={`일정 ${i + 1} 제목`}
+                    placeholder="예: 조동친구, 장보기"
+                    key={`${ev.id}-label`}
+                    html={ev.labelHtml}
+                    plain={ev.label}
+                    minHeightClass="min-h-[3.25rem]"
+                    onChange={({ html, plain }) => {
+                      setEvents((prev) => {
+                        const next = [...prev]
+                        next[i] = {
+                          ...ev,
+                          label: plain,
+                          labelHtml: html.trim()
+                            ? html
+                            : undefined,
+                        }
+                        return next
+                      })
+                    }}
+                  />
+                </div>
+              </div>
               <label className="mt-2 block text-sm font-medium text-text-soft">
                 시간
                 <input
@@ -298,24 +351,32 @@ function DayMemoPanel({
                   className={`mt-1 max-w-[10rem] rounded-lg border border-black/[0.12] bg-white px-2 py-1.5 text-sm outline-none ring-green-accent/30 focus:ring-2 ${calendarEventInkTextClass(ev.ink)}`}
                 />
               </label>
-              <label className="mt-2 block text-sm font-medium text-text-soft">
-                메모
-                <textarea
-                  value={ev.note ?? ''}
-                  onChange={(e) => {
-                    const v = e.target.value
-                    setEvents((prev) => {
-                      const next = [...prev]
-                      next[i] = { ...ev, note: v }
-                      return next
-                    })
-                  }}
-                  placeholder="메모"
-                  maxLength={2000}
-                  rows={2}
-                  className={`mt-1 w-full resize-y rounded-lg border border-black/[0.12] bg-white px-3 py-2 text-sm outline-none ring-green-accent/30 focus:ring-2 ${calendarEventInkTextClass(ev.ink)}`}
-                />
-              </label>
+              <div className="mt-2">
+                <p className="text-sm font-medium text-text-soft">메모</p>
+                <div className={`mt-1 ${calendarEventInkTextClass(ev.ink)}`}>
+                  <CalendarEventRichField
+                    aria-label={`일정 ${i + 1} 메모`}
+                    placeholder="메모"
+                    key={`${ev.id}-note`}
+                    html={ev.noteHtml}
+                    plain={ev.note ?? ''}
+                    minHeightClass="min-h-[5rem]"
+                    onChange={({ html, plain }) => {
+                      setEvents((prev) => {
+                        const next = [...prev]
+                        next[i] = {
+                          ...ev,
+                          note: plain || undefined,
+                          noteHtml: html.trim()
+                            ? html
+                            : undefined,
+                        }
+                        return next
+                      })
+                    }}
+                  />
+                </div>
+              </div>
               <div className="mt-2 flex justify-end">
                 <button
                   type="button"
@@ -359,6 +420,167 @@ function DayMemoPanel({
   )
 }
 
+function CalendarDayPeekSheet({
+  iso,
+  memo,
+  ledgerTxCount,
+  ddaysThisDay,
+  onClose,
+}: {
+  iso: string
+  memo: CalendarDayMemo | undefined
+  ledgerTxCount: number
+  ddaysThisDay: DdayEvent[]
+  onClose: () => void
+}) {
+  const hol = holidayLabel(iso)
+  const lunar = lunarCellInfo(iso, hol)
+  const events = getDayEvents(memo)
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4"
+      role="presentation"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="calendar-peek-heading"
+        className="max-h-[min(88vh,36rem)] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-black/[0.12] bg-ceramic/95 shadow-2xl sm:max-h-[min(82vh,32rem)] sm:rounded-2xl"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="sticky top-0 z-[1] border-b border-black/[0.08] bg-ceramic/95 px-4 py-3 backdrop-blur-[6px]">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p
+                id="calendar-peek-heading"
+                className="font-serif-display text-lg font-semibold text-starbucks-green"
+              >
+                {formatSelectedHeading(iso)}
+              </p>
+              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm text-text-soft">
+                {hol ? (
+                  <span className="font-medium text-gold">{hol}</span>
+                ) : null}
+                {lunar ? (
+                  <span
+                    className={
+                      lunar.emphasize ? 'font-semibold text-starbucks-green' : ''
+                    }
+                  >
+                    음력 {lunar.label}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+            <button
+              type="button"
+              aria-label="닫기"
+              className="shrink-0 rounded-full border border-black/[0.1] bg-white px-3 py-1.5 text-xs font-semibold text-[rgba(0,0,0,0.75)] hover:bg-green-light/50"
+              onClick={onClose}
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-4 px-4 py-4 text-sm">
+          <section aria-label="이 날 일정">
+            <p className="text-xs font-semibold uppercase tracking-wide text-text-soft">
+              일정
+            </p>
+            {events.length > 0 ? (
+              <ul className="mt-2 space-y-3">
+                {events.map((e) => (
+                  <li
+                    key={e.id}
+                    className="rounded-lg border border-black/[0.08] bg-white px-3 py-2"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      {e.time?.trim() ? (
+                        <span className="rounded bg-green-accent/12 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-green-accent">
+                          {formatTimeKo(e.time.trim())}
+                        </span>
+                      ) : null}
+                      {e.important === true ? (
+                        <span className="text-xs font-semibold text-amber-600">
+                          중요
+                        </span>
+                      ) : null}
+                    </div>
+                    <div
+                      className={`mt-1 text-[0.95rem] [&_*]:leading-snug [&_strong]:font-semibold ${calendarEventInkTextClass(e.ink)}`}
+                    >
+                      {e.labelHtml?.trim() ? (
+                        <span
+                          // eslint-disable-next-line react/no-danger
+                          dangerouslySetInnerHTML={{
+                            __html: sanitizeCalendarEventHtml(e.labelHtml),
+                          }}
+                        />
+                      ) : (
+                        <span className="font-medium">
+                          {e.label.trim() || '제목 없음'}
+                        </span>
+                      )}
+                    </div>
+                    {(e.note?.trim() || htmlToPlain(e.noteHtml)) ? (
+                      <div
+                        className={`mt-1.5 border-t border-black/[0.06] pt-2 text-xs [&_*]:leading-snug [&_strong]:font-semibold ${calendarEventInkTextClass(e.ink)}`}
+                      >
+                        {e.noteHtml?.trim() ? (
+                          <span
+                            // eslint-disable-next-line react/no-danger
+                            dangerouslySetInnerHTML={{
+                              __html: sanitizeCalendarEventHtml(e.noteHtml),
+                            }}
+                          />
+                        ) : (
+                          <span>{e.note?.trim()}</span>
+                        )}
+                      </div>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-text-soft">등록된 일정이 없어요.</p>
+            )}
+          </section>
+
+          {ddaysThisDay.length > 0 ? (
+            <section aria-label="이 날 디데이">
+              <p className="text-xs font-semibold uppercase tracking-wide text-text-soft">
+                디데이
+              </p>
+              <ul className="mt-2 space-y-1 rounded-lg border border-amber-200/70 bg-amber-50/50 px-3 py-2 text-xs font-semibold text-gold md:text-sm">
+                {ddaysThisDay.map((d) => (
+                  <li key={d.id}>{d.title}</li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          <section>
+            <p className="text-xs font-semibold uppercase tracking-wide text-text-soft">
+              장부
+            </p>
+            <p className="mt-1 text-[rgba(0,0,0,0.87)]">
+              이 날 거래 <span className="font-semibold tabular-nums">{ledgerTxCount}</span>건
+            </p>
+            <p className="mt-3 text-xs text-text-soft">
+              아래 &quot;이 날 요약&quot; 영역에서 편집·저장할 수 있어요.
+            </p>
+          </section>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function CalendarPage() {
   const now = useMemo(() => new Date(), [])
   const nav = useNavigate()
@@ -366,6 +588,7 @@ export default function CalendarPage() {
   const [cursorY, setCursorY] = useState(now.getFullYear())
   const [cursorM, setCursorM] = useState(now.getMonth())
   const [selectedIso, setSelectedIso] = useState<string>(() => todayIso())
+  const [peekIso, setPeekIso] = useState<string | null>(null)
 
   const { transactions, userId, householdId } = useLedger()
   const { memos, patchMemos, cloudStatus, cloudMessage } =
@@ -395,7 +618,17 @@ export default function CalendarPage() {
 
   const today = todayIso()
 
+  useEffect(() => {
+    if (!peekIso) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPeekIso(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [peekIso])
+
   const goPrevMonth = useCallback(() => {
+    setPeekIso(null)
     setCursorM((m) => {
       if (m <= 0) {
         setCursorY((y) => y - 1)
@@ -406,6 +639,7 @@ export default function CalendarPage() {
   }, [])
 
   const goNextMonth = useCallback(() => {
+    setPeekIso(null)
     setCursorM((m) => {
       if (m >= 11) {
         setCursorY((y) => y + 1)
@@ -425,6 +659,7 @@ export default function CalendarPage() {
   }, [])
 
   const goThisMonth = useCallback(() => {
+    setPeekIso(null)
     const n = new Date()
     setCursorY(n.getFullYear())
     setCursorM(n.getMonth())
@@ -434,10 +669,12 @@ export default function CalendarPage() {
 
   const onPickDay = useCallback(
     (iso: string) => {
+      const m = memos[iso]
       setSelectedIso(iso)
+      setPeekIso(memoHasContent(m) ? iso : null)
       scrollDetailIntoView()
     },
-    [scrollDetailIntoView],
+    [scrollDetailIntoView, memos],
   )
 
   const persistMemo = useCallback(
@@ -672,10 +909,7 @@ export default function CalendarPage() {
                     {hasMemo ? (
                       <ul className="line-clamp-3 w-full space-y-0.5 text-left text-[0.65rem] leading-snug md:text-[0.7rem]">
                         {getDayEvents(memo).map((e) => {
-                          const main =
-                            e.label.trim() ||
-                            e.note?.trim() ||
-                            (e.time ? formatTimeKo(e.time) : '')
+                          const main = calendarCellPreviewLine(e)
                           if (!main) return null
                           return (
                             <li
@@ -715,6 +949,19 @@ export default function CalendarPage() {
           />
         </div>
       </div>
+
+      {peekIso
+        ? createPortal(
+            <CalendarDayPeekSheet
+              iso={peekIso}
+              memo={memos[peekIso]}
+              ledgerTxCount={txCountByDate.get(peekIso) ?? 0}
+              ddaysThisDay={eventsOnCalendarDay(peekIso, ddayEvents)}
+              onClose={() => setPeekIso(null)}
+            />,
+            document.body,
+          )
+        : null}
     </main>
   )
 }

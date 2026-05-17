@@ -1,3 +1,6 @@
+import { normalizeCalendarEventInk, type CalendarEventInkId } from './calendarEventInk'
+import { htmlToPlain, sanitizeCalendarEventHtml } from './calendarHtmlSanitize'
+
 export const CALENDAR_MEMO_STORAGE_KEY = 'gaegyeobu-calendar-v1'
 
 /** 구버전 데이터 파싱용 (priority → important) */
@@ -11,11 +14,6 @@ function isLegacyPriority(v: unknown): v is LegacyPriority {
   )
 }
 
-import {
-  normalizeCalendarEventInk,
-  type CalendarEventInkId,
-} from './calendarEventInk'
-
 /** 하루에 여러 개 둘 수 있는 일정·메모 한 줄 */
 export type CalendarDayEvent = {
   id: string
@@ -23,6 +21,9 @@ export type CalendarDayEvent = {
   label: string
   /** 추가 메모(선택) */
   note?: string
+  /** 표시용 리치 텍스트 HTML(선택) */
+  labelHtml?: string
+  noteHtml?: string
   /** HH:mm (선택) */
   time?: string
   important?: boolean
@@ -77,6 +78,8 @@ export function parseMemoMapPayload(raw: unknown): MemoMap {
           typeof r.id === 'string' && r.id.trim() ? r.id : crypto.randomUUID()
         const label = typeof r.label === 'string' ? r.label : ''
         const note = typeof r.note === 'string' ? r.note : undefined
+        const labelHtmlRaw = typeof r.labelHtml === 'string' ? r.labelHtml : ''
+        const noteHtmlRaw = typeof r.noteHtml === 'string' ? r.noteHtml : ''
         const evTime = typeof r.time === 'string' ? r.time : undefined
         const evImportant = r.important === true
         const evInk = normalizeCalendarEventInk(r.ink)
@@ -88,6 +91,12 @@ export function parseMemoMapPayload(raw: unknown): MemoMap {
           important: evImportant,
         }
         if (evInk && evInk !== 'default') ev.ink = evInk
+        if (labelHtmlRaw.trim()) {
+          ev.labelHtml = sanitizeCalendarEventHtml(labelHtmlRaw)
+        }
+        if (noteHtmlRaw.trim()) {
+          ev.noteHtml = sanitizeCalendarEventHtml(noteHtmlRaw)
+        }
         parsed.push(ev)
       }
       if (parsed.length > 0) rec.events = parsed
@@ -228,6 +237,12 @@ export function getDayEvents(
             : undefined,
         important: e.important === true,
       }
+      if (typeof e.labelHtml === 'string' && e.labelHtml.trim()) {
+        base.labelHtml = e.labelHtml
+      }
+      if (typeof e.noteHtml === 'string' && e.noteHtml.trim()) {
+        base.noteHtml = e.noteHtml
+      }
       if (ink && ink !== 'default') base.ink = ink
       return base
     })
@@ -244,6 +259,12 @@ export function setCalendarDayEvents(
   const cleaned = events
     .map((e) => {
       const ink = normalizeCalendarEventInk(e.ink)
+      const labelHtml = e.labelHtml?.trim()
+        ? sanitizeCalendarEventHtml(e.labelHtml)
+        : undefined
+      const noteHtml = e.noteHtml?.trim()
+        ? sanitizeCalendarEventHtml(e.noteHtml)
+        : undefined
       const row: CalendarDayEvent = {
         id: e.id?.trim() ? e.id.trim() : crypto.randomUUID(),
         label: (e.label ?? '').trim(),
@@ -251,10 +272,21 @@ export function setCalendarDayEvents(
         time: e.time?.trim() || undefined,
         important: e.important === true,
       }
+      if (labelHtml) row.labelHtml = labelHtml
+      if (noteHtml) row.noteHtml = noteHtml
       if (ink && ink !== 'default') row.ink = ink
       return row
     })
-    .filter((e) => e.label || e.note || e.time)
+    .filter(
+      (row) =>
+        !!(
+          row.label ||
+          row.note ||
+          row.time ||
+          htmlToPlain(row.labelHtml) ||
+          htmlToPlain(row.noteHtml)
+        ),
+    )
 
   const next = { ...map }
   if (cleaned.length === 0) {

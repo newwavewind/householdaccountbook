@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { EXPENSE_CATEGORIES } from '../constants/categories'
 import { cardBrandLabel } from '../constants/cardBrands'
 import type { Transaction } from '../types/transaction'
@@ -55,7 +55,18 @@ export function ExpenseCategoryBreakdown({
     return { totals, totalSum, orderedKeys, keyIndex }
   }, [expenses])
 
+  const visibleKeys = useMemo(
+    () => orderedKeys.filter((k) => (totals.get(k) ?? 0) > 0),
+    [orderedKeys, totals],
+  )
+
   const [selected, setSelected] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (selected && !visibleKeys.includes(selected)) {
+      setSelected(null)
+    }
+  }, [selected, visibleKeys])
 
   const detailsForCategory = (cat: string): Transaction[] => {
     return expenses
@@ -75,7 +86,7 @@ export function ExpenseCategoryBreakdown({
   return (
     <div className="mt-4">
       <ul className="flex flex-col gap-1.5">
-        {orderedKeys.map((key) => {
+        {visibleKeys.map((key) => {
           const sum = totals.get(key) ?? 0
           const barPct = totalSum > 0 ? (sum / totalSum) * 100 : 0
           const isOn = selected === key

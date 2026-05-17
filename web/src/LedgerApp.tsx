@@ -463,7 +463,10 @@ export default function LedgerApp() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="!m-0 !text-base font-semibold text-starbucks-green">가족 구성원</h2>
-                <p className="mt-0.5 text-xs text-text-soft">이름을 클릭하면 해당 구성원만 필터. 우클릭하면 삭제.</p>
+                <p className="mt-0.5 text-xs text-text-soft">
+                  이름을 클릭하면 해당 구성원만 필터 · 우클릭하면 삭제. 아래는 선택한 해
+                  연 누적 요약이에요.
+                </p>
               </div>
               <form
                 className="flex gap-2"
@@ -514,6 +517,46 @@ export default function LedgerApp() {
               ))}
             </div>
 
+            <div className="mt-4 rounded-[var(--radius-card)] border border-gold/30 bg-gold-lightest/50 px-3 py-3 md:px-4 md:py-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-text-soft">
+                {cursor.y}년 누적 · 전체{' '}
+                <span className="font-semibold tabular-nums text-[rgba(0,0,0,0.82)]">
+                  {yearTxCount}건
+                </span>
+              </p>
+              <div className="mt-3 grid grid-cols-3 gap-2 sm:gap-3">
+                <div className="min-w-0 rounded-lg border border-black/[0.06] bg-white px-2 py-2 sm:px-3 sm:py-2.5">
+                  <p className="text-[0.65rem] font-medium text-text-soft sm:text-xs">
+                    연 수입
+                  </p>
+                  <p className="mt-1 truncate text-sm font-semibold tabular-nums text-semantic-income sm:text-base md:text-lg">
+                    {fmtKrw.format(yearIncomeTotal)}
+                  </p>
+                </div>
+                <div className="min-w-0 rounded-lg border border-black/[0.06] bg-white px-2 py-2 sm:px-3 sm:py-2.5">
+                  <p className="text-[0.65rem] font-medium text-text-soft sm:text-xs">
+                    연 지출
+                  </p>
+                  <p className="mt-1 truncate text-sm font-semibold tabular-nums text-semantic-expense sm:text-base md:text-lg">
+                    {fmtKrw.format(yearExpenseTotal)}
+                  </p>
+                </div>
+                <div className="min-w-0 rounded-lg border border-black/[0.06] bg-white px-2 py-2 sm:px-3 sm:py-2.5">
+                  <p className="text-[0.65rem] font-medium text-text-soft sm:text-xs">
+                    연 순액
+                  </p>
+                  <p
+                    className={`mt-1 truncate text-sm font-semibold tabular-nums sm:text-base md:text-lg ${
+                      yearIncomeTotal - yearExpenseTotal >= 0
+                        ? 'text-semantic-income'
+                        : 'text-semantic-expense'
+                    }`}
+                  >
+                    {fmtKrw.format(yearIncomeTotal - yearExpenseTotal)}
+                  </p>
+                </div>
+              </div>
+            </div>
           </Card>
         </section>
 
@@ -701,10 +744,7 @@ export default function LedgerApp() {
           </Card>
         </section>
 
-        <section
-          className="grid gap-4 lg:grid-cols-2"
-          aria-label="월별 내역"
-        >
+        <section className="flex flex-col gap-4" aria-label="월별 내역">
           <Card>
             <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -841,46 +881,6 @@ export default function LedgerApp() {
                 ))}
               </ul>
             )}
-          </Card>
-        </section>
-
-        <section aria-label="연간 합계">
-          <Card className="border border-gold/25 bg-gold-lightest/50">
-            <h2 className="!m-0 !text-lg font-semibold text-starbucks-green">
-              {cursor.y}년 누적 합계
-            </h2>
-            <p className="mt-1 text-sm text-text-soft">
-              위에서 고른 달이 속한 연도(1~12월) 기준이에요. 총{' '}
-              <span className="font-medium text-[rgba(0,0,0,0.87)]">
-                {yearTxCount}건
-              </span>
-            </p>
-            <div className="mt-4 grid gap-4 md:grid-cols-3">
-              <div className="rounded-[var(--radius-card)] border border-black/[0.06] bg-white px-4 py-4">
-                <p className="text-sm font-medium text-text-soft">연 수입</p>
-                <p className="mt-2 text-xl font-semibold text-semantic-income md:text-2xl">
-                  {fmtKrw.format(yearIncomeTotal)}
-                </p>
-              </div>
-              <div className="rounded-[var(--radius-card)] border border-black/[0.06] bg-white px-4 py-4">
-                <p className="text-sm font-medium text-text-soft">연 지출</p>
-                <p className="mt-2 text-xl font-semibold text-semantic-expense md:text-2xl">
-                  {fmtKrw.format(yearExpenseTotal)}
-                </p>
-              </div>
-              <div className="rounded-[var(--radius-card)] border border-black/[0.08] bg-white px-4 py-4">
-                <p className="text-sm font-medium text-text-soft">연 순액</p>
-                <p
-                  className={`mt-2 text-xl font-semibold md:text-2xl ${
-                    yearIncomeTotal - yearExpenseTotal >= 0
-                      ? 'text-semantic-income'
-                      : 'text-semantic-expense'
-                  }`}
-                >
-                  {fmtKrw.format(yearIncomeTotal - yearExpenseTotal)}
-                </p>
-              </div>
-            </div>
           </Card>
         </section>
 
