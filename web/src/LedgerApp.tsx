@@ -7,7 +7,6 @@ import { LedgerCalendar } from './components/LedgerCalendar'
 import { CalendarHoverTooltip } from './components/CalendarHoverTooltip'
 import { TransactionFormModal } from './components/TransactionFormModal'
 import { DayDetailModal } from './components/DayDetailModal'
-import { CardPaymentBreakdown } from './components/CardPaymentBreakdown'
 import { ExpenseCategoryBreakdown } from './components/ExpenseCategoryBreakdown'
 import { useLedger } from './hooks/useLedger'
 import { rollupByDate } from './lib/dayTotals'
@@ -17,7 +16,121 @@ import HouseholdSetupModal from './components/HouseholdSetupModal'
 import { getSupabase } from './lib/supabaseClient'
 import { ledgerBackendMode } from './lib/ledgerBackend'
 
-type SortOrder = 'amount-desc' | 'amount-asc'
+type TxListSort = {
+  /** 현재 사용자가 선택한 우선 정렬 기준 */
+  primary: 'amount' | 'date'
+  amountDir: 'desc' | 'asc'
+  dateDir: 'desc' | 'asc'
+}
+
+function compareTransactions(a: Transaction, b: Transaction, cfg: TxListSort) {
+  const amtCmp =
+    cfg.amountDir === 'desc'
+      ? b.amount - a.amount
+      : a.amount - b.amount
+  const dateCmp =
+    cfg.dateDir === 'desc'
+      ? b.date.localeCompare(a.date)
+      : a.date.localeCompare(b.date)
+  if (cfg.primary === 'amount') {
+    if (amtCmp !== 0) return amtCmp
+    return dateCmp
+  }
+  if (dateCmp !== 0) return dateCmp
+  return amtCmp
+}
+
+const LEGACY_CARD_BRAND_SENTINEL = '__legacy_card__'
+type ExpensePayFilter = 'all' | 'cash' | 'ieum' | 'card'
+
+function SortToggleRow({
+  value,
+  onToggleAmount,
+  onToggleDate,
+}: {
+  value: TxListSort
+  onToggleAmount: () => void
+  onToggleDate: () => void
+}) {
+  const amountSubs =
+    value.amountDir === 'desc' ? '높은순' : '낮은순'
+  const dateSubs =
+    value.dateDir === 'desc' ? '내림차순' : '오름차순'
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-xs text-text-soft">정렬</span>
+      <Button
+        type="button"
+        aria-pressed={value.primary === 'amount'}
+        variant={value.primary === 'amount' ? 'primary' : 'outlined'}
+        className="!px-3 !py-1 !text-xs"
+        onClick={onToggleAmount}
+      >
+        금액순{' '}
+        <span className="tabular-nums">{amountSubs}</span>
+      </Button>
+      <Button
+        type="button"
+        aria-pressed={value.primary === 'date'}
+        variant={value.primary === 'date' ? 'primary' : 'outlined'}
+        className="!px-3 !py-1 !text-xs"
+        onClick={onToggleDate}
+      >
+        날짜순{' '}
+        <span className="tabular-nums">{dateSubs}</span>
+      </Button>
+    </div>
+  )
+}
+
+function TransactionListSummaryBanner({
+  count,
+  formattedSum,
+  variant,
+}: {
+  count: number
+  formattedSum: string
+  variant: 'income' | 'expense'
+}) {
+  const sumClass =
+    variant === 'income' ? 'text-semantic-income' : 'text-semantic-expense'
+  const sign = variant === 'income' ? '+' : '−'
+
+  return (
+    <div
+      className="mt-2 flex flex-col gap-1.5 rounded-lg bg-ceramic/50 px-3 py-2 sm:flex-row sm:flex-wrap sm:items-stretch sm:gap-3 md:px-3 md:py-2.5"
+      aria-label={`거래 ${count}건, 합계 ${formattedSum}`}
+    >
+      <div className="flex min-w-[5.75rem] flex-1 flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-2 md:min-w-0 md:flex-none">
+        <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-text-soft">
+          건수
+        </span>
+        <span className="flex items-baseline gap-1 tabular-nums">
+          <span className="text-xl font-semibold tracking-tight text-[rgba(0,0,0,0.88)] sm:text-[1.3rem]">
+            {count}
+          </span>
+          <span className="text-xs font-medium text-text-soft">건</span>
+        </span>
+      </div>
+      <div
+        className="hidden w-px shrink-0 bg-black/[0.08] sm:block sm:self-stretch sm:mx-0.5"
+        aria-hidden
+      />
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-2 md:flex-none md:justify-end">
+        <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-text-soft">
+          합계
+        </span>
+        <span
+          className={`text-lg font-semibold tabular-nums tracking-tight sm:text-xl ${sumClass}`}
+        >
+          {sign}
+          {formattedSum}
+        </span>
+      </div>
+    </div>
+  )
+}
 
 function formatMonthLabel(year: number, monthIndex: number) {
   return new Intl.DateTimeFormat('ko-KR', {
@@ -41,38 +154,6 @@ function isInYear(dateIso: string, year: number) {
 function todayIso() {
   const n = new Date()
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`
-}
-
-function SortPair({
-  value,
-  onChange,
-  label,
-}: {
-  value: SortOrder
-  onChange: (v: SortOrder) => void
-  label: string
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="text-xs text-text-soft">{label}</span>
-      <Button
-        type="button"
-        variant={value === 'amount-desc' ? 'primary' : 'outlined'}
-        className="!px-3 !py-1 !text-xs"
-        onClick={() => onChange('amount-desc')}
-      >
-        금액 높은순
-      </Button>
-      <Button
-        type="button"
-        variant={value === 'amount-asc' ? 'primary' : 'outlined'}
-        className="!px-3 !py-1 !text-xs"
-        onClick={() => onChange('amount-asc')}
-      >
-        금액 낮은순
-      </Button>
-    </div>
-  )
 }
 
 export default function LedgerApp() {
@@ -104,8 +185,16 @@ export default function LedgerApp() {
     y: now.getFullYear(),
     m: now.getMonth(),
   })
-  const [incomeSort, setIncomeSort] = useState<SortOrder>('amount-desc')
-  const [expenseSort, setExpenseSort] = useState<SortOrder>('amount-desc')
+  const [incomeSort, setIncomeSort] = useState<TxListSort>({
+    primary: 'amount',
+    amountDir: 'desc',
+    dateDir: 'desc',
+  })
+  const [expenseSort, setExpenseSort] = useState<TxListSort>({
+    primary: 'amount',
+    amountDir: 'desc',
+    dateDir: 'desc',
+  })
   const [selectedIso, setSelectedIso] = useState<string | null>(null)
   const [hover, setHover] = useState<{
     iso: string
@@ -113,9 +202,11 @@ export default function LedgerApp() {
     clientY: number
   } | null>(null)
   const [dayModalIso, setDayModalIso] = useState<string | null>(null)
-  const [expandedCardBrandId, setExpandedCardBrandId] = useState<string | null>(
-    null,
-  )
+  const [expensePayFilter, setExpensePayFilter] =
+    useState<ExpensePayFilter>('all')
+  const [expenseCardBrandFilter, setExpenseCardBrandFilter] = useState<
+    string | null
+  >(null)
   const [formOpen, setFormOpen] = useState(false)
   const [formInitial, setFormInitial] = useState<Transaction | null>(null)
   const [formDefaultDate, setFormDefaultDate] = useState<string | undefined>()
@@ -206,25 +297,78 @@ export default function LedgerApp() {
     [filtered],
   )
 
+  const toggleIncomeAmount = useCallback(() => {
+    setIncomeSort((prev) => ({
+      ...prev,
+      primary: 'amount',
+      amountDir: prev.amountDir === 'desc' ? 'asc' : 'desc',
+    }))
+  }, [])
+
+  const toggleIncomeDate = useCallback(() => {
+    setIncomeSort((prev) => ({
+      ...prev,
+      primary: 'date',
+      dateDir: prev.dateDir === 'desc' ? 'asc' : 'desc',
+    }))
+  }, [])
+
+  const toggleExpenseAmount = useCallback(() => {
+    setExpenseSort((prev) => ({
+      ...prev,
+      primary: 'amount',
+      amountDir: prev.amountDir === 'desc' ? 'asc' : 'desc',
+    }))
+  }, [])
+
+  const toggleExpenseDate = useCallback(() => {
+    setExpenseSort((prev) => ({
+      ...prev,
+      primary: 'date',
+      dateDir: prev.dateDir === 'desc' ? 'asc' : 'desc',
+    }))
+  }, [])
+
   const incomesSorted = useMemo(() => {
     const list = filtered.filter((t) => t.type === 'income')
-    list.sort((a, b) =>
-      incomeSort === 'amount-desc'
-        ? b.amount - a.amount
-        : a.amount - b.amount,
-    )
+    list.sort((a, b) => compareTransactions(a, b, incomeSort))
     return list
   }, [filtered, incomeSort])
 
-  const expensesSorted = useMemo(() => {
-    const list = filtered.filter((t) => t.type === 'expense')
-    list.sort((a, b) =>
-      expenseSort === 'amount-desc'
-        ? b.amount - a.amount
-        : a.amount - b.amount,
-    )
-    return list
-  }, [filtered, expenseSort])
+  const expensesFilteredSorted = useMemo(() => {
+    const base = filtered.filter((t) => t.type === 'expense')
+    let list: Transaction[]
+    if (expensePayFilter === 'all') {
+      list = base
+    } else if (expensePayFilter === 'cash') {
+      list = base.filter((t) => t.paymentMethod === 'cash')
+    } else if (expensePayFilter === 'ieum') {
+      list = base.filter((t) => t.paymentMethod === 'ieum')
+    } else {
+      list = base.filter((t) => t.paymentMethod === 'card')
+      if (expenseCardBrandFilter !== null) {
+        if (expenseCardBrandFilter === LEGACY_CARD_BRAND_SENTINEL) {
+          list = list.filter((t) => !t.cardBrand)
+        } else {
+          list = list.filter((t) => t.cardBrand === expenseCardBrandFilter)
+        }
+      }
+    }
+    const next = [...list]
+    next.sort((a, b) => compareTransactions(a, b, expenseSort))
+    return next
+  }, [
+    filtered,
+    expensePayFilter,
+    expenseCardBrandFilter,
+    expenseSort,
+  ])
+
+  const expenseFilteredTotal = useMemo(
+    () =>
+      expensesFilteredSorted.reduce((s, t) => s + t.amount, 0),
+    [expensesFilteredSorted],
+  )
 
   const expensePaymentBreakdown = useMemo(() => {
     let cash = 0
@@ -259,14 +403,29 @@ export default function LedgerApp() {
     return { cash, ieum, legacy, cardRows }
   }, [filtered])
 
-  const resolvedExpandedCardBrandId = useMemo(() => {
-    if (expandedCardBrandId === null) return null
-    return expensePaymentBreakdown.cardRows.some(
-      (r) => r.id === expandedCardBrandId,
-    )
-      ? expandedCardBrandId
-      : null
-  }, [expandedCardBrandId, expensePaymentBreakdown.cardRows])
+  useEffect(() => {
+    if (expensePayFilter !== 'card') return
+    if (expenseCardBrandFilter === null) return
+    if (expenseCardBrandFilter === LEGACY_CARD_BRAND_SENTINEL) {
+      if (expensePaymentBreakdown.legacy <= 0) {
+        setExpenseCardBrandFilter(null)
+      }
+      return
+    }
+    if (
+      expensePaymentBreakdown.cardRows.some(
+        (r) => r.id === expenseCardBrandFilter,
+      )
+    ) {
+      return
+    }
+    setExpenseCardBrandFilter(null)
+  }, [
+    expensePayFilter,
+    expenseCardBrandFilter,
+    expensePaymentBreakdown.cardRows,
+    expensePaymentBreakdown.legacy,
+  ])
 
   const dayModalTxs = useMemo(
     () =>
@@ -691,75 +850,23 @@ export default function LedgerApp() {
           </Card>
         </section>
 
-        <section
-          id="ledger-card-payment-breakdown"
-          aria-label="이달 지불 수단별 지출"
-        >
-          <Card>
-            <h2 className="!m-0 !text-lg font-semibold text-starbucks-green">
-              이번 달 · 지불 수단·카드사별 지출
-            </h2>
-            <p className="mt-1 text-sm text-text-soft">
-              지출만 집계합니다. 카드사 줄을 누르면 이번 달·연간·상세 거래 목록이
-              아래로 펼쳐져요.
-            </p>
-            {expenseTotal === 0 ? (
-              <p className="mt-6 py-4 text-center text-sm text-text-soft">
-                이번 달 지출 기록이 없습니다.
-              </p>
-            ) : (
-              <CardPaymentBreakdown
-                cash={expensePaymentBreakdown.cash}
-                ieum={expensePaymentBreakdown.ieum}
-                legacy={expensePaymentBreakdown.legacy}
-                cardRows={expensePaymentBreakdown.cardRows}
-                transactions={transactions}
-                year={cursor.y}
-                monthIndex={cursor.m}
-                fmt={fmtKrw}
-                onPickDay={(iso) => {
-                  setDayModalIso(iso)
-                  setSelectedIso(iso)
-                }}
-                expandedBrandId={resolvedExpandedCardBrandId}
-                onExpandedBrandIdChange={setExpandedCardBrandId}
-              />
-            )}
-          </Card>
-        </section>
-
-        <section aria-label="이번 달 분류별 지출">
-          <Card>
-            <h2 className="!m-0 !text-lg font-semibold text-starbucks-green">
-              이번 달 · 분류별 지출
-            </h2>
-            <p className="mt-1 text-sm text-text-soft">
-              등록 시 고른 분류 기준입니다. 분류를 누르면 해당 분류의 거래 목록과
-              합계·이번 달 전체 지출 대비 비율이 펼쳐져 보여요.
-            </p>
-            <ExpenseCategoryBreakdown
-              expenses={monthExpenseTransactions}
-              fmtKrw={fmtKrw}
-            />
-          </Card>
-        </section>
-
-        <section className="flex flex-col gap-4" aria-label="월별 내역">
+        <section aria-label="월별 수입 내역">
           <Card>
             <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h2 className="!m-0 !text-lg font-semibold text-starbucks-green">
                   수입 내역
                 </h2>
-                <p className="mt-1 text-sm text-text-soft">
-                  {incomesSorted.length}건 · 합계{' '}
-                  {fmtKrw.format(incomeTotal)}
-                </p>
+                <TransactionListSummaryBanner
+                  count={incomesSorted.length}
+                  formattedSum={fmtKrw.format(incomeTotal)}
+                  variant="income"
+                />
               </div>
-              <SortPair
-                label="정렬"
+              <SortToggleRow
                 value={incomeSort}
-                onChange={setIncomeSort}
+                onToggleAmount={toggleIncomeAmount}
+                onToggleDate={toggleIncomeDate}
               />
             </div>
             {incomesSorted.length === 0 ? (
@@ -798,31 +905,130 @@ export default function LedgerApp() {
               </ul>
             )}
           </Card>
+        </section>
 
+        <section aria-label="이번 달 지출 내역">
           <Card>
-            <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h2 className="!m-0 !text-lg font-semibold text-starbucks-green">
-                  지출 내역
-                </h2>
-                <p className="mt-1 text-sm text-text-soft">
-                  {expensesSorted.length}건 · 합계{' '}
-                  {fmtKrw.format(expenseTotal)}
-                </p>
+            <div className="mb-3 flex flex-col gap-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0 flex-1">
+                  <h2 className="!m-0 !text-lg font-semibold text-starbucks-green">
+                    지출 내역
+                  </h2>
+                  <TransactionListSummaryBanner
+                    count={expensesFilteredSorted.length}
+                    formattedSum={fmtKrw.format(expenseFilteredTotal)}
+                    variant="expense"
+                  />
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      aria-pressed={expensePayFilter === 'all'}
+                      onClick={() => {
+                        setExpensePayFilter('all')
+                        setExpenseCardBrandFilter(null)
+                      }}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                        expensePayFilter === 'all'
+                          ? 'border-starbucks-green bg-starbucks-green text-white'
+                          : 'border-black/20 text-[rgba(0,0,0,0.87)] hover:bg-neutral-cool'
+                      }`}
+                    >
+                      전체
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={expensePayFilter === 'cash'}
+                      onClick={() => {
+                        setExpensePayFilter('cash')
+                        setExpenseCardBrandFilter(null)
+                      }}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                        expensePayFilter === 'cash'
+                          ? 'border-starbucks-green bg-starbucks-green text-white'
+                          : 'border-black/20 text-[rgba(0,0,0,0.87)] hover:bg-neutral-cool'
+                      }`}
+                    >
+                      현금
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={expensePayFilter === 'ieum'}
+                      onClick={() => {
+                        setExpensePayFilter('ieum')
+                        setExpenseCardBrandFilter(null)
+                      }}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                        expensePayFilter === 'ieum'
+                          ? 'border-starbucks-green bg-starbucks-green text-white'
+                          : 'border-black/20 text-[rgba(0,0,0,0.87)] hover:bg-neutral-cool'
+                      }`}
+                    >
+                      이음카드
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={expensePayFilter === 'card'}
+                      onClick={() => {
+                        setExpensePayFilter('card')
+                      }}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                        expensePayFilter === 'card'
+                          ? 'border-starbucks-green bg-starbucks-green text-white'
+                          : 'border-black/20 text-[rgba(0,0,0,0.87)] hover:bg-neutral-cool'
+                      }`}
+                    >
+                      신용카드
+                    </button>
+                    {expensePayFilter === 'card' ? (
+                      <label className="flex flex-wrap items-center gap-2 rounded-full border border-black/[0.12] bg-ceramic/60 px-3 py-1.5">
+                        <span className="text-xs font-medium text-text-soft md:text-[0.8rem]">
+                          카드사
+                        </span>
+                        <select
+                          className="max-w-[11rem] min-w-[9rem] cursor-pointer rounded-md border border-black/[0.08] bg-white px-2 py-1 text-xs outline-none ring-green-accent/25 focus:ring-2 md:text-sm"
+                          aria-label="신용 카드사 선택"
+                          value={expenseCardBrandFilter ?? ''}
+                          onChange={(e) =>
+                            setExpenseCardBrandFilter(
+                              e.target.value ? e.target.value : null,
+                            )
+                          }
+                        >
+                          <option value="">전체 카드</option>
+                          {expensePaymentBreakdown.cardRows.map((row) => (
+                            <option key={row.id} value={row.id}>
+                              {row.label}
+                            </option>
+                          ))}
+                          {expensePaymentBreakdown.legacy > 0 ? (
+                            <option value={LEGACY_CARD_BRAND_SENTINEL}>
+                              미입력 · 과거 카드
+                            </option>
+                          ) : null}
+                        </select>
+                      </label>
+                    ) : null}
+                  </div>
+                </div>
+                <SortToggleRow
+                  value={expenseSort}
+                  onToggleAmount={toggleExpenseAmount}
+                  onToggleDate={toggleExpenseDate}
+                />
               </div>
-              <SortPair
-                label="정렬"
-                value={expenseSort}
-                onChange={setExpenseSort}
-              />
             </div>
-            {expensesSorted.length === 0 ? (
+            {expenseTotal === 0 ? (
               <p className="py-8 text-center text-sm text-text-soft">
                 이번 달 지출 기록이 없습니다.
               </p>
+            ) : expensesFilteredSorted.length === 0 ? (
+              <p className="py-8 text-center text-sm text-text-soft">
+                선택한 수단(또는 카드사)에 해당하는 지출이 없습니다.
+              </p>
             ) : (
               <ul className="divide-y divide-black/[0.06]">
-                {expensesSorted.map((t) => (
+                {expensesFilteredSorted.map((t) => (
                   <li key={t.id} className="flex items-start gap-2 py-3">
                     <button
                       type="button"
@@ -843,36 +1049,17 @@ export default function LedgerApp() {
                       ) : null}
                     </button>
                     <div className="flex shrink-0 flex-col items-end gap-1 self-center">
-                      {t.paymentMethod === 'card' && t.cardBrand ? (
-                        <button
-                          type="button"
-                          className="max-w-[7.5rem] truncate text-xs font-medium text-starbucks-green underline decoration-starbucks-green/25 underline-offset-2 hover:opacity-80"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setExpandedCardBrandId(t.cardBrand!)
-                            requestAnimationFrame(() => {
-                              document
-                                .getElementById('ledger-card-payment-breakdown')
-                                ?.scrollIntoView({
-                                  behavior: 'smooth',
-                                  block: 'nearest',
-                                })
-                            })
-                          }}
-                        >
-                          {cardBrandLabel(t.cardBrand) ?? '카드'}
-                        </button>
-                      ) : (
-                        <span className="text-xs text-text-soft">
-                          {t.paymentMethod === 'cash'
-                            ? '현금'
-                            : t.paymentMethod === 'ieum'
-                              ? '이음카드'
+                      <span className="max-w-[9rem] truncate text-right text-xs text-text-soft">
+                        {t.paymentMethod === 'cash'
+                          ? '현금'
+                          : t.paymentMethod === 'ieum'
+                            ? '이음카드'
                             : t.paymentMethod === 'card'
-                              ? '카드'
+                              ? t.cardBrand
+                                ? cardBrandLabel(t.cardBrand) ?? t.cardBrand
+                                : '신용카드(미입력)'
                               : '미입력'}
-                        </span>
-                      )}
+                      </span>
                       <span className="font-semibold tabular-nums text-semantic-expense">
                         −{fmtKrw.format(t.amount)}
                       </span>
@@ -881,6 +1068,22 @@ export default function LedgerApp() {
                 ))}
               </ul>
             )}
+          </Card>
+        </section>
+
+        <section aria-label="이번 달 분류별 지출">
+          <Card>
+            <h2 className="!m-0 !text-lg font-semibold text-starbucks-green">
+              이번 달 · 분류별 지출
+            </h2>
+            <p className="mt-1 text-sm text-text-soft">
+              등록 시 고른 분류 기준입니다. 분류를 누르면 해당 분류의 거래 목록과
+              합계·이번 달 전체 지출 대비 비율이 펼쳐져 보여요.
+            </p>
+            <ExpenseCategoryBreakdown
+              expenses={monthExpenseTransactions}
+              fmtKrw={fmtKrw}
+            />
           </Card>
         </section>
 
