@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import {
@@ -9,6 +9,8 @@ import {
 } from '../calendar/calendarMemoStorage'
 import { lunarCellInfo } from '../calendar/lunarDisplay'
 import { useHouseholdCalendarMemos } from '../calendar/useHouseholdCalendarMemos'
+import { buildDdaySummaryLines, eventsOnCalendarDay } from '../dday/ddayCompute'
+import { useHouseholdDDays } from '../dday/useHouseholdDDays'
 import { useLedger } from '../hooks/useLedger'
 import { holidayLabel } from '../lib/holidays'
 import { isCloudSyncEnabled } from '../lib/supabaseClient'
@@ -66,12 +68,6 @@ function memoHasContent(memo: CalendarDayMemo | undefined): boolean {
   return !!(memo && (memo.title?.trim() || memo.body?.trim()))
 }
 
-/** 셀 점 색 — 중요(별)면 호박색, 아니면 녹색 */
-function memoDotClass(memo: CalendarDayMemo | undefined): string | null {
-  if (!memoHasContent(memo)) return null
-  return memo?.important ? 'bg-amber-500' : 'bg-green-accent'
-}
-
 /** 메모·일정 카드용 한두 줄 미리보기 (구형 title 또는 본문 첫 줄) */
 function memoPreviewText(m: CalendarDayMemo | undefined): string {
   if (!m) return ''
@@ -108,13 +104,11 @@ function DayMemoPanel({
 }: DayMemoPanelProps) {
   const [body, setBody] = useState(initial?.body ?? '')
   const [time, setTime] = useState(initial?.time ?? '')
-  const [important, setImportant] = useState(initial?.important ?? false)
 
   useEffect(() => {
     setBody(initial?.body ?? '')
     setTime(initial?.time ?? '')
-    setImportant(initial?.important ?? false)
-  }, [iso, initial?.body, initial?.time, initial?.important])
+  }, [iso, initial?.body, initial?.time])
 
   const hol = holidayLabel(iso)
   const lunar = lunarCellInfo(iso, hol)
@@ -168,43 +162,17 @@ function DayMemoPanel({
               </li>
             ) : null}
             <li>
-              <span className="text-text-soft">중요 · </span>
-              {important ? (
-                <span className="text-amber-600">★ 표시됨</span>
-              ) : (
-                '없음'
-              )}
-            </li>
-            <li>
               <span className="text-text-soft">장부 · </span>
               거래 {ledgerTxCount}건
             </li>
           </ul>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-sm font-medium text-text-soft">중요 표시</span>
-          <button
-            type="button"
-            className={[
-              'inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border-2 text-2xl leading-none transition-colors',
-              important
-                ? 'border-amber-400 bg-amber-50 text-amber-500'
-                : 'border-black/[0.12] bg-white text-text-soft hover:border-amber-300/80',
-            ].join(' ')}
-            aria-pressed={important}
-            aria-label={important ? '중요 표시 끄기' : '중요 표시 켜기'}
-            onClick={() => setImportant((v) => !v)}
-          >
-            {important ? '★' : '☆'}
-          </button>
-        </div>
-
-        <label className="block text-sm font-medium text-text-soft">
-          시간 (선택)
+        <label className="flex flex-col gap-2 text-sm font-medium text-text-soft">
+          시간
           <input
             type="time"
-            className="mt-1 w-full max-w-[12rem] rounded-lg border border-black/[0.12] bg-white px-3 py-2 text-base text-[rgba(0,0,0,0.87)] outline-none ring-green-accent/30 focus:ring-2 sm:w-auto"
+            className="max-w-[9.5rem] border-0 bg-transparent px-0 py-1 text-sm text-[rgba(0,0,0,0.87)] outline-none ring-0 focus:border-0 focus:outline-none focus:ring-0"
             value={time}
             onChange={(e) => setTime(e.target.value)}
           />
@@ -236,7 +204,13 @@ function DayMemoPanel({
           type="button"
           variant="primary"
           className="min-h-11 flex-1"
-          onClick={() => onPersist({ body, time, important })}
+          onClick={() =>
+            onPersist({
+              body,
+              time,
+              important: initial?.important ?? false,
+            })
+          }
         >
           저장
         </Button>
@@ -254,8 +228,14 @@ export default function CalendarPage() {
   const [selectedIso, setSelectedIso] = useState<string>(() => todayIso())
 
   const { transactions, userId, householdId } = useLedger()
-  const { memos, patchMemos, cloudStatus, cloudMessage, cloudEnabled } =
+  const { memos, patchMemos, cloudStatus, cloudMessage } =
     useHouseholdCalendarMemos()
+
+  const { events: ddayEvents } = useHouseholdDDays()
+  const ddaySummaryLines = useMemo(
+    () => buildDdaySummaryLines(ddayEvents).slice(0, 10),
+    [ddayEvents],
+  )
 
   const backend = ledgerBackendMode()
   const cloudConfigured = isCloudSyncEnabled()
@@ -343,17 +323,44 @@ export default function CalendarPage() {
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-6 md:px-6">
       <div className="mb-6">
-        <h1 className="font-serif-display text-2xl font-semibold text-starbucks-green md:text-3xl">
-          일정 · 메모 달력
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm text-text-soft md:text-base">
-          위 달력에서 날짜를 누르면 아래에 그날 요약·메모를 쓸 수 있어요.
-          {cloudEnabled
-            ? ' 같은 가구(공유코드)에 연결된 가족과 실시간으로 동기화됩니다.'
-            : cloudConfigured && backend === 'supabase'
-              ? ' 로그인 후 가구를 만들거나 공유코드로 참여하면 가족과 일정을 공유할 수 있어요.'
-              : ' 비로그인·로컬 모드에서는 이 브라우저에만 저장됩니다.'}
-        </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 flex-1">
+            <h1 className="font-serif-display text-2xl font-semibold text-starbucks-green md:text-3xl">
+              일정 · 메모 달력
+            </h1>
+            {ddaySummaryLines.length > 0 ? (
+              <div
+                className="mt-3 flex flex-wrap gap-2"
+                aria-label="디데이 요약"
+              >
+                {ddaySummaryLines.map((line) => (
+                  <span
+                    key={line.id}
+                    className="inline-flex max-w-[min(100%,18rem)] items-center rounded-full border border-black/[0.08] bg-ceramic/90 px-2.5 py-1 text-xs text-[rgba(0,0,0,0.82)] md:max-w-md md:text-sm"
+                  >
+                    <span className="truncate">{line.text}</span>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-text-soft">
+                <Link
+                  to="/calendar/dday"
+                  className="font-medium text-starbucks-green underline-offset-2 hover:underline"
+                >
+                  디데이 설정
+                </Link>
+                에서 생일·시험일·아기 개월수 등을 등록할 수 있어요.
+              </p>
+            )}
+          </div>
+          <Link
+            to="/calendar/dday"
+            className="shrink-0 self-start rounded-full border border-black/[0.12] bg-white px-3 py-1.5 text-sm font-semibold text-starbucks-green transition-colors hover:bg-green-light/40"
+          >
+            디데이 설정
+          </Link>
+        </div>
         {backend === 'supabase' && cloudConfigured ? (
           <div className="mt-4 space-y-2">
             {!userId ? (
@@ -394,10 +401,6 @@ export default function CalendarPage() {
               </div>
             ) : cloudStatus === 'loading' ? (
               <p className="text-sm text-text-soft">가구 일정을 불러오는 중…</p>
-            ) : cloudEnabled ? (
-              <p className="text-sm font-medium text-starbucks-green">
-                가구와 연결됨 · 일정 변경이 저장되면 가족에게도 반영돼요.
-              </p>
             ) : null}
           </div>
         ) : null}
@@ -455,7 +458,6 @@ export default function CalendarPage() {
           <div className="grid grid-cols-7 gap-1">
             {cells.map(({ iso, day, inMonth }, cellIdx) => {
               const hol = holidayLabel(iso)
-              const lunar = lunarCellInfo(iso, hol)
               const memo = memos[iso]
               const hasMemo = memoHasContent(memo)
               const txCount = txCountByDate.get(iso) ?? 0
@@ -464,8 +466,9 @@ export default function CalendarPage() {
               const isSel = iso === selectedIso
               const isSunday = cellIdx % 7 === 0
               const isRedDay = (isSunday || !!hol) && inMonth
-              const dotCls = memoDotClass(memo)
               const starImportant = !!memo?.important && hasMemo
+              const memoBlurb = hasMemo ? memoPreviewText(memo) : ''
+              const ddaysThisDay = eventsOnCalendarDay(iso, ddayEvents)
 
               return (
                 <button
@@ -475,7 +478,7 @@ export default function CalendarPage() {
                   aria-pressed={isSel}
                   aria-label={`${iso} 메모·일정`}
                   className={[
-                    'relative flex min-h-[4.5rem] w-full cursor-pointer flex-col rounded-lg border px-1 py-1.5 text-left transition-colors active:scale-[0.98] md:min-h-[5.5rem] md:px-1.5 md:py-2',
+                    'relative flex min-h-[4.5rem] w-full cursor-pointer flex-col overflow-hidden rounded-lg border px-1 py-1.5 text-left transition-colors active:scale-[0.98] md:min-h-[6rem] md:px-1.5 md:py-2',
                     inMonth
                       ? 'border-black/[0.08] bg-white hover:border-green-accent/45 hover:bg-green-light/35'
                       : 'border-transparent bg-neutral-cool/50 text-text-soft/60 hover:bg-neutral-cool',
@@ -491,20 +494,22 @@ export default function CalendarPage() {
                     .filter(Boolean)
                     .join(' ')}
                 >
-                  <div className="flex w-full items-start justify-between gap-0.5">
-                    <span
-                      className={[
-                        'text-sm font-semibold tabular-nums md:text-base',
-                        inMonth && !isRedDay ? 'text-[rgba(0,0,0,0.87)]' : '',
-                        isRedDay ? 'text-red-500' : '',
-                        !inMonth ? 'text-text-soft/60' : '',
-                      ]
-                        .filter(Boolean)
-                        .join(' ')}
-                    >
-                      {day}
-                    </span>
-                    <span className="flex shrink-0 items-center gap-0.5">
+                  <span
+                    aria-hidden
+                    className={[
+                      'pointer-events-none absolute left-1/2 top-[42%] -translate-x-1/2 -translate-y-1/2 select-none text-[2.6rem] font-semibold leading-none tabular-nums md:top-[44%] md:text-[3.1rem]',
+                      inMonth && isRedDay
+                        ? 'text-red-500/[0.11]'
+                        : inMonth
+                          ? 'text-black/[0.06]'
+                          : 'text-text-soft/[0.14]',
+                    ].join(' ')}
+                  >
+                    {day}
+                  </span>
+
+                  <div className="relative z-[1] flex min-h-0 flex-1 flex-col gap-0.5">
+                    <div className="flex shrink-0 justify-end gap-0.5">
                       {starImportant ? (
                         <span
                           className="text-[0.65rem] leading-none text-amber-500 md:text-xs"
@@ -514,13 +519,6 @@ export default function CalendarPage() {
                           ★
                         </span>
                       ) : null}
-                      {hasMemo && dotCls ? (
-                        <span
-                          className={`inline-block size-1.5 rounded-full ${dotCls}`}
-                          aria-label="메모 있음"
-                          title="메모 있음"
-                        />
-                      ) : null}
                       {hasLedger ? (
                         <span
                           className="rounded bg-green-accent/15 px-1 text-[0.625rem] font-semibold tabular-nums text-green-accent md:text-[0.6875rem]"
@@ -529,25 +527,28 @@ export default function CalendarPage() {
                           {txCount}
                         </span>
                       ) : null}
-                    </span>
+                    </div>
+                    {hol && inMonth ? (
+                      <span className="line-clamp-2 text-left text-[0.62rem] font-medium leading-tight text-red-500 md:text-[0.68rem]">
+                        {hol}
+                      </span>
+                    ) : null}
+                    {hasMemo ? (
+                      <span className="line-clamp-3 text-left text-[0.65rem] leading-snug text-[rgba(0,0,0,0.78)] md:text-[0.7rem]">
+                        {memoBlurb}
+                      </span>
+                    ) : null}
+                    {ddaysThisDay.length > 0 ? (
+                      <span
+                        className="line-clamp-2 text-left text-[0.58rem] font-semibold leading-tight text-gold md:text-[0.62rem]"
+                        title={ddaysThisDay.map((e) => e.title).join(', ')}
+                      >
+                        {ddaysThisDay.length === 1
+                          ? `D ${ddaysThisDay[0].title}`
+                          : `D ${ddaysThisDay[0].title} 외 ${ddaysThisDay.length - 1}`}
+                      </span>
+                    ) : null}
                   </div>
-                  {lunar ? (
-                    <span
-                      className={[
-                        'mt-0.5 line-clamp-1 text-[0.65rem] leading-tight text-text-soft md:text-[0.7rem]',
-                        lunar.emphasize ? 'font-semibold text-starbucks-green' : '',
-                      ]
-                        .filter(Boolean)
-                        .join(' ')}
-                    >
-                      {lunar.label}
-                    </span>
-                  ) : null}
-                  {hol && inMonth ? (
-                    <span className="mt-0.5 line-clamp-2 text-left text-[0.62rem] font-medium leading-tight text-red-400 md:text-[0.68rem]">
-                      {hol}
-                    </span>
-                  ) : null}
                 </button>
               )
             })}

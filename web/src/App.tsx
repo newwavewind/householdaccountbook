@@ -5,6 +5,7 @@ import LedgerApp from './LedgerApp'
 import RootLayout from './layout/RootLayout'
 import BulkInputPage from './pages/BulkInputPage'
 import CalendarPage from './pages/CalendarPage'
+import DDaySettingsPage from './pages/DDaySettingsPage'
 import AdminModerationPage from './pages/AdminModerationPage'
 import AuthCallbackPage from './pages/AuthCallbackPage'
 import CommunityListPage from './pages/CommunityListPage'
@@ -20,6 +21,7 @@ export default function App() {
         <Routes>
         <Route element={<RootLayout />}>
           <Route path="/calendar" element={<CalendarPage />} />
+          <Route path="/calendar/dday" element={<DDaySettingsPage />} />
           <Route path="/input" element={<BulkInputPage />} />
           <Route path="/" element={<LedgerApp />} />
           <Route path="/community" element={<CommunityListPage />} />
