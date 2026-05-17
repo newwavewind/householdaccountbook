@@ -21,11 +21,11 @@ import { ledgerBackendMode } from '../lib/ledgerBackend'
 import {
   CALENDAR_EVENT_INK_SWATCHES,
   calendarEventInkTextClass,
+  type CalendarEventInkId,
 } from '../calendar/calendarEventInk'
 import { CalendarEventRichField } from '../calendar/CalendarEventRichField'
 import {
   htmlToPlain,
-  htmlToPlainLine,
   sanitizeCalendarEventHtml,
 } from '../calendar/calendarHtmlSanitize'
 import type { DdayEvent } from '../dday/ddayTypes'
@@ -98,13 +98,32 @@ function eventHasListingContent(e: CalendarDayEvent): boolean {
   )
 }
 
-function calendarCellPreviewLine(e: CalendarDayEvent): string {
-  const title =
-    e.label.trim() || htmlToPlainLine(e.labelHtml) || ''
-  const note = e.note?.trim() || htmlToPlainLine(e.noteHtml) || ''
-  const main =
-    title || note || (e.time ? formatTimeKo(e.time) : '')
-  return main
+function calendarCellPreviewContent(
+  e: CalendarDayEvent,
+):
+  | { kind: 'html'; html: string }
+  | { kind: 'plain'; text: string }
+  | null {
+  const labelSan =
+    e.labelHtml?.trim() ? sanitizeCalendarEventHtml(e.labelHtml) : ''
+  if (labelSan && htmlToPlain(labelSan)) {
+    return { kind: 'html', html: labelSan }
+  }
+  const lt = e.label.trim()
+  if (lt) return { kind: 'plain', text: lt }
+
+  const noteSan =
+    e.noteHtml?.trim() ? sanitizeCalendarEventHtml(e.noteHtml) : ''
+  if (noteSan && htmlToPlain(noteSan)) {
+    return { kind: 'html', html: noteSan }
+  }
+  const nt = e.note?.trim()
+  if (nt) return { kind: 'plain', text: nt }
+
+  const t = e.time?.trim()
+  if (t) return { kind: 'plain', text: formatTimeKo(t) }
+
+  return null
 }
 
 type DayMemoPanelProps = {
@@ -119,6 +138,98 @@ function emptyEventRow(): CalendarDayEvent {
   return { id: crypto.randomUUID(), label: '' }
 }
 
+function CalendarInkPopover({
+  ink,
+  isOpen,
+  onToggle,
+  onRequestClose,
+  onPick,
+}: {
+  ink: CalendarEventInkId | undefined
+  isOpen: boolean
+  onToggle: () => void
+  onRequestClose: () => void
+  onPick: (id: CalendarEventInkId | undefined) => void
+}) {
+  const wrapRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!isOpen) return
+    const onDocMouse = (e: MouseEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) onRequestClose()
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onRequestClose()
+    }
+    document.addEventListener('mousedown', onDocMouse, true)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDocMouse, true)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [isOpen, onRequestClose])
+
+  const current =
+    CALENDAR_EVENT_INK_SWATCHES.find((s) => s.id === (ink ?? 'default')) ??
+    CALENDAR_EVENT_INK_SWATCHES[0]
+
+  return (
+    <div ref={wrapRef} className="relative mt-1">
+      <p className="text-xs font-medium text-text-soft">글자 색</p>
+      <button
+        type="button"
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
+        aria-label={`글자 색: ${current.label}`}
+        onClick={onToggle}
+        className="mt-1.5 inline-flex max-w-full items-center gap-1.5 rounded-lg border border-black/[0.12] bg-white py-1.5 pl-2 pr-2 text-left text-xs font-medium outline-none ring-green-accent/0 transition-colors hover:bg-ceramic/40 focus-visible:ring-2"
+      >
+        <span
+          className={`block h-4 w-4 shrink-0 rounded-full ring-2 ring-black/10 ${current.dot}`}
+          aria-hidden
+        />
+        <span className="min-w-0 max-w-[6.75rem] shrink truncate">
+          {current.label}
+        </span>
+        <span className="shrink-0 text-[0.65rem] text-text-soft/80" aria-hidden>
+          ▾
+        </span>
+      </button>
+      {isOpen ? (
+        <div
+          role="dialog"
+          aria-label="글자 색 선택"
+          className="absolute left-0 z-[55] mt-1 max-h-[14rem] w-[min(100%,13rem)] overflow-y-auto rounded-lg border border-black/[0.1] bg-white py-1 shadow-xl"
+        >
+          {CALENDAR_EVENT_INK_SWATCHES.map((s) => {
+            const active = (ink ?? 'default') === s.id
+            return (
+              <button
+                key={s.id}
+                type="button"
+                className={[
+                  'flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-green-light/40',
+                  active ? 'bg-green-light/25 font-semibold' : '',
+                ].join(' ')}
+                onClick={() => {
+                  onPick(s.id === 'default' ? undefined : s.id)
+                  onRequestClose()
+                }}
+              >
+                <span
+                  className={`block h-4 w-4 shrink-0 rounded-full ring-2 ring-black/10 ${s.dot}`}
+                  aria-hidden
+                />
+                {s.label}
+              </button>
+            )
+          })}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 function DayMemoPanel({
   iso,
   initial,
@@ -127,10 +238,14 @@ function DayMemoPanel({
   onDelete,
 }: DayMemoPanelProps) {
   const [events, setEvents] = useState<CalendarDayEvent[]>([emptyEventRow()])
+  const [openInkIdx, setOpenInkIdx] = useState<number | null>(null)
+
+  const closeInkPicker = useCallback(() => setOpenInkIdx(null), [])
 
   useEffect(() => {
     const list = getDayEvents(initial)
     setEvents(list.length > 0 ? list : [emptyEventRow()])
+    setOpenInkIdx(null)
   }, [iso, initial?.updatedAt])
 
   const hol = holidayLabel(iso)
@@ -268,45 +383,21 @@ function DayMemoPanel({
                   중요
                 </label>
               </div>
-              <div className="mt-1" role="group" aria-label="글자 색">
-                <p className="text-xs font-medium text-text-soft">글자 색</p>
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {CALENDAR_EVENT_INK_SWATCHES.map((s) => {
-                    const current = ev.ink ?? 'default'
-                    const selected = current === s.id
-                    return (
-                      <button
-                        key={s.id}
-                        type="button"
-                        title={s.label}
-                        aria-label={s.label}
-                        aria-pressed={selected}
-                        onClick={() => {
-                          setEvents((prev) => {
-                            const next = [...prev]
-                            next[i] = {
-                              ...ev,
-                              ink: s.id === 'default' ? undefined : s.id,
-                            }
-                            return next
-                          })
-                        }}
-                        className={[
-                          'flex h-8 w-8 items-center justify-center rounded-full border bg-white p-1 transition-shadow',
-                          selected
-                            ? `ring-2 ring-offset-2 ring-offset-white ${s.ring}`
-                            : 'border-black/10 hover:border-black/25',
-                        ].join(' ')}
-                      >
-                        <span
-                          className={`block h-5 w-5 rounded-full ${s.dot}`}
-                          aria-hidden
-                        />
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
+              <CalendarInkPopover
+                ink={ev.ink}
+                isOpen={openInkIdx === i}
+                onToggle={() =>
+                  setOpenInkIdx((prev) => (prev === i ? null : i))
+                }
+                onRequestClose={closeInkPicker}
+                onPick={(next) => {
+                  setEvents((prev) => {
+                    const nextRows = [...prev]
+                    nextRows[i] = { ...ev, ink: next }
+                    return nextRows
+                  })
+                }}
+              />
               <div className="mt-2">
                 <p className="text-sm font-medium text-text-soft">제목</p>
                 <div
@@ -672,9 +763,8 @@ export default function CalendarPage() {
       const m = memos[iso]
       setSelectedIso(iso)
       setPeekIso(memoHasContent(m) ? iso : null)
-      scrollDetailIntoView()
     },
-    [scrollDetailIntoView, memos],
+    [memos],
   )
 
   const persistMemo = useCallback(
@@ -909,14 +999,27 @@ export default function CalendarPage() {
                     {hasMemo ? (
                       <ul className="line-clamp-3 w-full space-y-0.5 text-left text-[0.65rem] leading-snug md:text-[0.7rem]">
                         {getDayEvents(memo).map((e) => {
-                          const main = calendarCellPreviewLine(e)
-                          if (!main) return null
+                          const preview = calendarCellPreviewContent(e)
+                          if (!preview) return null
                           return (
                             <li
                               key={e.id}
-                              className={`truncate pl-0.5 ${calendarEventInkTextClass(e.ink)}`}
+                              className={`max-w-full pl-0.5 [&_mark]:rounded-[3px] ${calendarEventInkTextClass(e.ink)}`}
                             >
-                              {main}
+                              {preview.kind === 'html' ? (
+                                <span
+                                  className="inline-block max-w-full [&_mark]:rounded-[3px] [&_p]:m-0 [&_p]:inline"
+                                  title={htmlToPlain(preview.html)}
+                                  // eslint-disable-next-line react/no-danger
+                                  dangerouslySetInnerHTML={{
+                                    __html: preview.html,
+                                  }}
+                                />
+                              ) : (
+                                <span className="line-clamp-1 truncate">
+                                  {preview.text}
+                                </span>
+                              )}
                             </li>
                           )
                         })}
