@@ -4,7 +4,9 @@ import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import {
   deleteCalendarMemo,
-  upsertCalendarMemo,
+  getDayEvents,
+  setCalendarDayEvents,
+  type CalendarDayEvent,
   type CalendarDayMemo,
 } from '../calendar/calendarMemoStorage'
 import { lunarCellInfo } from '../calendar/lunarDisplay'
@@ -65,18 +67,7 @@ function formatSelectedHeading(iso: string) {
 }
 
 function memoHasContent(memo: CalendarDayMemo | undefined): boolean {
-  return !!(memo && (memo.title?.trim() || memo.body?.trim()))
-}
-
-/** 메모·일정 카드용 한두 줄 미리보기 (구형 title 또는 본문 첫 줄) */
-function memoPreviewText(m: CalendarDayMemo | undefined): string {
-  if (!m) return ''
-  const t = m.title?.trim()
-  if (t) return t
-  const b = m.body?.trim()
-  if (!b) return ''
-  const line = b.split(/\r?\n/)[0]?.trim() ?? ''
-  return line.length > 120 ? `${line.slice(0, 119)}…` : line
+  return getDayEvents(memo).length > 0
 }
 
 function formatTimeKo(hhmm: string): string {
@@ -85,14 +76,16 @@ function formatTimeKo(hhmm: string): string {
   return `${m[1]}:${m[2]}`
 }
 
-type DayMemoPersistDraft = Pick<CalendarDayMemo, 'body' | 'time' | 'important'>
-
 type DayMemoPanelProps = {
   iso: string
   initial: CalendarDayMemo | undefined
   ledgerTxCount: number
-  onPersist: (draft: DayMemoPersistDraft) => void
+  onPersist: (events: CalendarDayEvent[]) => void
   onDelete: () => void
+}
+
+function emptyEventRow(): CalendarDayEvent {
+  return { id: crypto.randomUUID(), label: '' }
 }
 
 function DayMemoPanel({
@@ -102,16 +95,19 @@ function DayMemoPanel({
   onPersist,
   onDelete,
 }: DayMemoPanelProps) {
-  const [body, setBody] = useState(initial?.body ?? '')
-  const [time, setTime] = useState(initial?.time ?? '')
+  const [events, setEvents] = useState<CalendarDayEvent[]>([emptyEventRow()])
 
   useEffect(() => {
-    setBody(initial?.body ?? '')
-    setTime(initial?.time ?? '')
-  }, [iso, initial?.body, initial?.time])
+    const list = getDayEvents(initial)
+    setEvents(list.length > 0 ? list : [emptyEventRow()])
+  }, [iso, initial?.updatedAt])
 
   const hol = holidayLabel(iso)
   const lunar = lunarCellInfo(iso, hol)
+
+  const summaryLines = events.filter(
+    (e) => e.label.trim() || e.note?.trim() || e.time?.trim(),
+  )
 
   return (
     <Card
@@ -147,20 +143,30 @@ function DayMemoPanel({
             이 날 요약
           </p>
           <ul className="mt-1.5 space-y-1 text-sm text-[rgba(0,0,0,0.87)]">
-            <li>
-              <span className="text-text-soft">메모 · </span>
-              {memoPreviewText({
-                title: initial?.title ?? '',
-                body,
-                updatedAt: '',
-              }) || '내용 없음 · 아래에서 입력'}
-            </li>
-            {time.trim() || initial?.time ? (
-              <li>
-                <span className="text-text-soft">시간 · </span>
-                {formatTimeKo(time.trim() || initial?.time || '')}
+            {summaryLines.length > 0 ? (
+              summaryLines.map((e) => (
+                <li key={e.id}>
+                  <span className="font-medium text-starbucks-green">
+                    {e.label.trim() || '일정'}
+                  </span>
+                  {e.time?.trim() ? (
+                    <span className="text-text-soft">
+                      {' '}
+                      · {formatTimeKo(e.time.trim())}
+                    </span>
+                  ) : null}
+                  {e.note?.trim() ? (
+                    <span className="block text-xs text-text-soft">
+                      {e.note.trim()}
+                    </span>
+                  ) : null}
+                </li>
+              ))
+            ) : (
+              <li className="text-text-soft">
+                아직 일정 없음 · 아래에서 추가 후 저장
               </li>
-            ) : null}
+            )}
             <li>
               <span className="text-text-soft">장부 · </span>
               거래 {ledgerTxCount}건
@@ -168,25 +174,118 @@ function DayMemoPanel({
           </ul>
         </div>
 
-        <label className="flex flex-col gap-2 text-sm font-medium text-text-soft">
-          시간
-          <input
-            type="time"
-            className="max-w-[9.5rem] border-0 bg-transparent px-0 py-1 text-sm text-[rgba(0,0,0,0.87)] outline-none ring-0 focus:border-0 focus:outline-none focus:ring-0"
-            value={time}
-            onChange={(e) => setTime(e.target.value)}
-          />
-        </label>
-        <label className="block text-sm font-medium text-text-soft">
-          메모
-          <textarea
-            className="mt-1 min-h-[7rem] w-full resize-y rounded-lg border border-black/[0.12] bg-white px-3 py-2 text-base text-[rgba(0,0,0,0.87)] outline-none ring-green-accent/30 focus:ring-2 md:min-h-[10rem]"
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="그날 할 일이나 메모를 적어요."
-            maxLength={8000}
-          />
-        </label>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium text-[rgba(0,0,0,0.87)]">
+              일정 · 메모
+            </p>
+            <Button
+              type="button"
+              variant="outlined"
+              className="!min-h-9 !px-3 !py-1 !text-xs"
+              onClick={() =>
+                setEvents((prev) => [...prev, emptyEventRow()])
+              }
+            >
+              일정 추가
+            </Button>
+          </div>
+
+          {events.map((ev, i) => (
+            <div
+              key={ev.id}
+              className="rounded-lg border border-black/[0.1] bg-white p-3 shadow-sm"
+            >
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-text-soft">
+                  일정 {i + 1}
+                </span>
+                <label className="flex cursor-pointer items-center gap-1.5 text-xs text-text-soft">
+                  <input
+                    type="checkbox"
+                    checked={ev.important === true}
+                    onChange={(e) => {
+                      const checked = e.target.checked
+                      setEvents((prev) => {
+                        const next = [...prev]
+                        next[i] = { ...ev, important: checked }
+                        return next
+                      })
+                    }}
+                    className="rounded border-input-border"
+                  />
+                  중요
+                </label>
+              </div>
+              <label className="block text-sm font-medium text-text-soft">
+                제목
+                <input
+                  type="text"
+                  value={ev.label}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setEvents((prev) => {
+                      const next = [...prev]
+                      next[i] = { ...ev, label: v }
+                      return next
+                    })
+                  }}
+                  placeholder="예: 조동친구, 장보기"
+                  maxLength={200}
+                  className="mt-1 w-full rounded-lg border border-black/[0.12] bg-white px-3 py-2 text-base text-[rgba(0,0,0,0.87)] outline-none ring-green-accent/30 focus:ring-2"
+                />
+              </label>
+              <label className="mt-2 block text-sm font-medium text-text-soft">
+                시간
+                <input
+                  type="time"
+                  value={ev.time ?? ''}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setEvents((prev) => {
+                      const next = [...prev]
+                      next[i] = { ...ev, time: v || undefined }
+                      return next
+                    })
+                  }}
+                  className="mt-1 max-w-[10rem] rounded-lg border border-black/[0.12] bg-white px-2 py-1.5 text-sm text-[rgba(0,0,0,0.87)] outline-none ring-green-accent/30 focus:ring-2"
+                />
+              </label>
+              <label className="mt-2 block text-sm font-medium text-text-soft">
+                메모
+                <textarea
+                  value={ev.note ?? ''}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setEvents((prev) => {
+                      const next = [...prev]
+                      next[i] = { ...ev, note: v }
+                      return next
+                    })
+                  }}
+                  placeholder="메모"
+                  maxLength={2000}
+                  rows={2}
+                  className="mt-1 w-full resize-y rounded-lg border border-black/[0.12] bg-white px-3 py-2 text-sm text-[rgba(0,0,0,0.87)] outline-none ring-green-accent/30 focus:ring-2"
+                />
+              </label>
+              <div className="mt-2 flex justify-end">
+                <button
+                  type="button"
+                  className="text-xs text-danger underline decoration-danger/30"
+                  onClick={() => {
+                    setEvents((prev) => {
+                      const next = prev.filter((_, j) => j !== i)
+                      return next.length > 0 ? next : [emptyEventRow()]
+                    })
+                  }}
+                >
+                  이 일정 삭제
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2 border-t border-black/[0.06] p-4">
@@ -195,22 +294,16 @@ function DayMemoPanel({
           variant="darkOutlined"
           className="min-h-11 flex-1 !border-danger !text-danger"
           onClick={() => {
-            if (confirm('이 날짜 메모를 삭제할까요?')) onDelete()
+            if (confirm('이 날짜의 모든 일정을 지울까요?')) onDelete()
           }}
         >
-          삭제
+          이 날 전체 삭제
         </Button>
         <Button
           type="button"
           variant="primary"
           className="min-h-11 flex-1"
-          onClick={() =>
-            onPersist({
-              body,
-              time,
-              important: initial?.important ?? false,
-            })
-          }
+          onClick={() => onPersist(events)}
         >
           저장
         </Button>
@@ -301,15 +394,8 @@ export default function CalendarPage() {
   )
 
   const persistMemo = useCallback(
-    (draft: DayMemoPersistDraft) => {
-      patchMemos((prev) =>
-        upsertCalendarMemo(prev, selectedIso, {
-          title: '',
-          body: draft.body,
-          time: draft.time,
-          important: draft.important,
-        }),
-      )
+    (nextEvents: CalendarDayEvent[]) => {
+      patchMemos((prev) => setCalendarDayEvents(prev, selectedIso, nextEvents))
     },
     [patchMemos, selectedIso],
   )
@@ -466,8 +552,8 @@ export default function CalendarPage() {
               const isSel = iso === selectedIso
               const isSunday = cellIdx % 7 === 0
               const isRedDay = (isSunday || !!hol) && inMonth
-              const starImportant = !!memo?.important && hasMemo
-              const memoBlurb = hasMemo ? memoPreviewText(memo) : ''
+              const starImportant =
+                  getDayEvents(memo).some((e) => e.important === true) && hasMemo
               const ddaysThisDay = eventsOnCalendarDay(iso, ddayEvents)
 
               return (
@@ -534,9 +620,23 @@ export default function CalendarPage() {
                       </span>
                     ) : null}
                     {hasMemo ? (
-                      <span className="line-clamp-3 text-left text-[0.65rem] leading-snug text-[rgba(0,0,0,0.78)] md:text-[0.7rem]">
-                        {memoBlurb}
-                      </span>
+                      <ul className="line-clamp-3 w-full space-y-0.5 text-left text-[0.65rem] leading-snug text-[rgba(0,0,0,0.78)] md:text-[0.7rem]">
+                        {getDayEvents(memo).map((e) => {
+                          const main =
+                            e.label.trim() ||
+                            e.note?.trim() ||
+                            (e.time ? formatTimeKo(e.time) : '')
+                          if (!main) return null
+                          return (
+                            <li key={e.id} className="truncate pl-0.5">
+                              {e.important ? (
+                                <span className="text-amber-500">★ </span>
+                              ) : null}
+                              {main}
+                            </li>
+                          )
+                        })}
+                      </ul>
                     ) : null}
                     {ddaysThisDay.length > 0 ? (
                       <span

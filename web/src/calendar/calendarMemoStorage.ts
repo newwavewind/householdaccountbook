@@ -11,14 +11,28 @@ function isLegacyPriority(v: unknown): v is LegacyPriority {
   )
 }
 
+/** 하루에 여러 개 둘 수 있는 일정·메모 한 줄 */
+export type CalendarDayEvent = {
+  id: string
+  /** 짧은 일정 이름(조동친구, 장보기 등) */
+  label: string
+  /** 추가 메모(선택) */
+  note?: string
+  /** HH:mm (선택) */
+  time?: string
+  important?: boolean
+}
+
 export type CalendarDayMemo = {
   title: string
   body: string
-  /** HH:mm (optional) */
+  /** 여러 일정 (v2). 없으면 title/body 등 구형 필드로 복원 */
+  events?: CalendarDayEvent[]
+  /** HH:mm (optional) — 구형 단일 시간 */
   time?: string
   /** 장소 (optional, 구 데이터) */
   location?: string
-  /** 별표 중요 표시 */
+  /** 별표 중요 표시 — 구형 단일 */
   important?: boolean
   updatedAt: string
 }
@@ -46,6 +60,29 @@ export function parseMemoMapPayload(raw: unknown): MemoMap {
     const rec: CalendarDayMemo = { title, body, time, updatedAt }
     if (location !== undefined && location.length > 0) rec.location = location
     if (important) rec.important = true
+
+    if (Array.isArray(o.events)) {
+      const parsed: CalendarDayEvent[] = []
+      for (const item of o.events) {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) continue
+        const r = item as Record<string, unknown>
+        const id =
+          typeof r.id === 'string' && r.id.trim() ? r.id : crypto.randomUUID()
+        const label = typeof r.label === 'string' ? r.label : ''
+        const note = typeof r.note === 'string' ? r.note : undefined
+        const evTime = typeof r.time === 'string' ? r.time : undefined
+        const evImportant = r.important === true
+        parsed.push({
+          id,
+          label,
+          note,
+          time: evTime,
+          important: evImportant,
+        })
+      }
+      if (parsed.length > 0) rec.events = parsed
+    }
+
     out[k] = rec
   }
   return out
@@ -106,4 +143,109 @@ export function deleteCalendarMemo(map: MemoMap, iso: string): MemoMap {
   const n = { ...map }
   delete n[iso]
   return n
+}
+
+function migrateLegacyToEvents(memo: CalendarDayMemo): CalendarDayEvent[] {
+  const title = memo.title?.trim() ?? ''
+  const bodyFull = memo.body ?? ''
+  const lines = bodyFull
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+  const t = memo.time?.trim()
+
+  // 제목 없이 여러 줄이면 줄마다 따로 일정으로 (기존 메모를 자동 분할)
+  if (!title && lines.length > 1) {
+    return lines.map((line) => ({
+      id: crypto.randomUUID(),
+      label: line,
+      important: memo.important === true,
+    }))
+  }
+
+  if (!title && lines.length === 1) {
+    return [
+      {
+        id: crypto.randomUUID(),
+        label: lines[0]!,
+        time: t || undefined,
+        important: memo.important === true,
+      },
+    ]
+  }
+
+  if (!title && lines.length === 0) {
+    if (!t) return []
+    return [
+      {
+        id: crypto.randomUUID(),
+        label: '일정',
+        time: t,
+        important: memo.important === true,
+      },
+    ]
+  }
+
+  return [
+    {
+      id: crypto.randomUUID(),
+      label: title,
+      note: bodyFull.trim() || undefined,
+      time: t || undefined,
+      important: memo.important === true,
+    },
+  ]
+}
+
+/** 저장본·구형(title/body) 필드를 이벤트 배열로 통일해 읽기 */
+export function getDayEvents(
+  memo: CalendarDayMemo | undefined,
+): CalendarDayEvent[] {
+  if (!memo) return []
+  if (Array.isArray(memo.events) && memo.events.length > 0) {
+    return memo.events.map((e) => ({
+      id: typeof e.id === 'string' && e.id.trim() ? e.id : crypto.randomUUID(),
+      label: typeof e.label === 'string' ? e.label : '',
+      note:
+        typeof e.note === 'string' && e.note.trim()
+          ? e.note.trim()
+          : undefined,
+      time:
+        typeof e.time === 'string' && e.time.trim()
+          ? e.time.trim()
+          : undefined,
+      important: e.important === true,
+    }))
+  }
+  return migrateLegacyToEvents(memo)
+}
+
+/** 여러 일정을 한 번에 저장(빈 목록이면 해당 날짜 키 삭제) */
+export function setCalendarDayEvents(
+  map: MemoMap,
+  iso: string,
+  events: CalendarDayEvent[],
+): MemoMap {
+  const cleaned = events
+    .map((e) => ({
+      id: e.id?.trim() ? e.id.trim() : crypto.randomUUID(),
+      label: (e.label ?? '').trim(),
+      note: e.note?.trim() || undefined,
+      time: e.time?.trim() || undefined,
+      important: e.important === true,
+    }))
+    .filter((e) => e.label || e.note || e.time)
+
+  const next = { ...map }
+  if (cleaned.length === 0) {
+    delete next[iso]
+    return next
+  }
+  next[iso] = {
+    title: '',
+    body: '',
+    events: cleaned,
+    updatedAt: new Date().toISOString(),
+  }
+  return next
 }
