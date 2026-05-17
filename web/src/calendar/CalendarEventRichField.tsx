@@ -27,11 +27,10 @@ const FONTS = [
   { label: '고정폭', value: 'Consolas, monospace' },
 ] as const
 
-/** 부드러운 형광펜 느낌(원색 금지) — 저장 시 해당 HEX로 들어감 */
+/** 부드러운 형광펜 느낌(원색 금지) — 사용자 지정 기본 5색 */
 export const HIGHLIGHT_PALETTE = [
   { hex: '#ffc9cf', label: '빨강' },
   { hex: '#f8c8eb', label: '핑크' },
-  { hex: '#ffd9bc', label: '주황' },
   { hex: '#c5edd2', label: '초록' },
   { hex: '#fff4b8', label: '노랑' },
   { hex: '#c6e7ff', label: '파랑' },
@@ -220,7 +219,7 @@ export function CalendarEventRichField({
               <p className="mb-2 text-[0.65rem] font-semibold uppercase tracking-wide text-text-soft">
                 색 선택
               </p>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-5 gap-1.5">
                 {HIGHLIGHT_PALETTE.map((opt) => {
                   const pressed = editor.isActive('highlight', { color: opt.hex })
                   return (
