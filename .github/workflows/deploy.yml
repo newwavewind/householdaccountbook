@@ -1,3 +1,7 @@
+# GitHub Pages 빌드에 Supabase·장부용 Vite 환경 변수를 넣으려면 Repository secrets:
+#   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+# 선택: VITE_GOOGLE_CLIENT_ID (GIS 팝업 로그인 시)
+# 로컬에서 한 번에 올리기: node scripts/push-github-pages-secrets.mjs  (gh auth login 후)
 name: Deploy to GitHub Pages
 
 on:
@@ -32,11 +36,35 @@ jobs:
         run: npm ci
         working-directory: web
 
+      - name: Verify Supabase secrets (Pages 빌드)
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+            echo "::error::Actions secrets 에 VITE_SUPABASE_URL 과 VITE_SUPABASE_ANON_KEY 를 추가하세요."
+            echo "Settings → Secrets and variables → Actions → New repository secret"
+            echo "또는 로컬: node scripts/push-github-pages-secrets.mjs"
+            exit 1
+          fi
+          case "$VITE_SUPABASE_URL" in
+            http://*|https://*) ;;
+            *)
+              echo "::error::VITE_SUPABASE_URL 은 http:// 또는 https:// 로 시작해야 합니다."
+              exit 1
+              ;;
+          esac
+
       - name: Build
         run: npm run build
         working-directory: web
         env:
           VITE_BASE_PATH: /householdaccountbook/
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_LEDGER_BACKEND: supabase
+          VITE_COMMUNITY_BACKEND: supabase
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
