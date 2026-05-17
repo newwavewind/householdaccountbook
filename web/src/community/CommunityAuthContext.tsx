@@ -11,6 +11,7 @@ import { clearLocalAppDataOnLogout } from '../lib/clearLocalAppData'
 import { communityBackendMode } from '../lib/communityBackend'
 import { getCommunitySupabase } from '../lib/communitySupabaseClient'
 import { probeGoogleOAuth, supabaseAuthV1CallbackUrl } from '../lib/supabaseOAuthProbe'
+import { oauthCallbackFullUrl } from '../lib/appUrls'
 import { setPrismaApiToken, getPrismaApiToken } from '../lib/prismaApi'
 import type { CommunityUser, ProfileRole } from './types'
 import {
@@ -278,14 +279,14 @@ export function CommunityAuthProvider({ children }: { children: ReactNode }) {
       }
       if (probe.code === 'bad_redirect') {
         window.alert(
-          `콜백 주소가 허용 목록에 없을 수 있어요.\n\nSupabase → Authentication → URL Configuration → Redirect URLs 에 아래를 추가하세요:\n${window.location.origin}/auth/callback\n\n(${probe.detail})`,
+          `콜백 주소가 허용 목록에 없을 수 있어요.\n\nSupabase → Authentication → URL Configuration → Redirect URLs 에 아래를 추가하세요:\n${oauthCallbackFullUrl()}\n\n(${probe.detail})`,
         )
         return
       }
       window.alert(`Google 로그인을 시작할 수 없습니다.\n\n${probe.detail}`)
       return
     }
-    const redirectTo = `${window.location.origin}/auth/callback`
+    const redirectTo = oauthCallbackFullUrl()
     const { error } = await client.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo },

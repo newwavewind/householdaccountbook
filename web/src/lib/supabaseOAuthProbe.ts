@@ -1,3 +1,5 @@
+import { oauthCallbackFullUrl } from './appUrls'
+
 /** 브라우저에서 Google OAuth 시작 전, 제공자 활성 여부를 가볍게 확인합니다. */
 export type GoogleOAuthProbe =
   | { ok: true }
@@ -12,7 +14,7 @@ export async function probeGoogleOAuth(): Promise<GoogleOAuthProbe> {
 
   const redirectTo =
     typeof window !== 'undefined'
-      ? `${window.location.origin}/auth/callback`
+      ? oauthCallbackFullUrl()
       : 'http://localhost:5173/auth/callback'
 
   const url = `${base}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectTo)}`

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { communityBackendMode } from '../lib/communityBackend'
 import { getCommunitySupabase } from '../lib/communitySupabaseClient'
 import { supabaseAuthV1CallbackUrl } from '../lib/supabaseOAuthProbe'
+import { oauthCallbackFullUrl } from '../lib/appUrls'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 
@@ -211,7 +212,7 @@ export default function AuthCallbackPage() {
           window.history.replaceState(
             {},
             document.title,
-            `${window.location.origin}/auth/callback`,
+            `${oauthCallbackFullUrl()}`,
           )
         } catch {
           /* ignore */

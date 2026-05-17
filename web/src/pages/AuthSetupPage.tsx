@@ -10,6 +10,7 @@ import {
   supabaseAuthV1CallbackUrl,
   supabaseProjectRefFromUrl,
 } from '../lib/supabaseOAuthProbe'
+import { oauthCallbackFullUrl } from '../lib/appUrls'
 
 function GoogleMark({ className = 'h-5 w-5' }: { className?: string }) {
   return (
@@ -62,9 +63,7 @@ function SupabaseLoginScreen() {
   }, [])
 
   const callbackHint =
-    typeof window !== 'undefined'
-      ? `${window.location.origin}/auth/callback`
-      : 'http://localhost:5173/auth/callback'
+    typeof window !== 'undefined' ? oauthCallbackFullUrl() : 'http://localhost:5173/auth/callback'
   const googleOAuthRedirectUri = supabaseAuthV1CallbackUrl(
     import.meta.env.VITE_SUPABASE_URL,
   )
@@ -344,7 +343,7 @@ VITE_SUPABASE_ANON_KEY=eyJhbG...`}
                 Authentication → URL Configuration 에서 Site URL과 Redirect URL에 콜백을
                 등록합니다.
                 <pre className="mt-2 overflow-x-auto rounded-lg bg-house-green/10 p-3 text-xs">
-                  {`${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`}
+                  {oauthCallbackFullUrl()}
                 </pre>
               </li>
               <li>
