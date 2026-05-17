@@ -9,6 +9,7 @@ export const INCOME_CATEGORIES = [
 
 export const EXPENSE_CATEGORIES = [
   '식비',
+  '마트',
   '배달음식',
   '교통',
   '주유비',

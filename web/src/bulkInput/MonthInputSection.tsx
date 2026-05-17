@@ -319,7 +319,7 @@ export function MonthInputSection({
                       aria-label={`${monthIndex + 1}월 일`}
                       inputMode="numeric"
                       placeholder="일"
-                      className="w-12 rounded-lg border border-input-border px-2 py-1.5 tabular-nums outline-none focus:border-green-accent"
+                      className="w-10 rounded-lg border border-input-border px-1.5 py-1.5 tabular-nums outline-none focus:border-green-accent"
                       maxLength={2}
                       value={r.day}
                       onChange={(e) => {
@@ -361,7 +361,7 @@ export function MonthInputSection({
                       aria-label="금액"
                       inputMode="numeric"
                       placeholder="0"
-                      className="w-14 min-w-0 rounded-lg border border-input-border px-2 py-1.5 tabular-nums outline-none focus:border-green-accent"
+                      className="min-w-[7.25rem] w-[7.25rem] shrink-0 rounded-lg border border-input-border px-2 py-1.5 tabular-nums outline-none focus:border-green-accent sm:min-w-[7.75rem] sm:w-[7.75rem]"
                       value={
                         amountFocusLocalKey === r.localKey
                           ? amountDigitsOnly(r.amount)
@@ -406,7 +406,7 @@ export function MonthInputSection({
                   <td className="py-2 pr-2">
                     <input
                       aria-label="메모"
-                      className="w-full min-w-[8rem] rounded-lg border border-input-border px-2 py-1.5 outline-none focus:border-green-accent"
+                      className="w-full max-w-[10.5rem] min-w-[6rem] rounded-lg border border-input-border px-2 py-1.5 outline-none focus:border-green-accent sm:max-w-[11rem]"
                       value={r.memo}
                       onChange={(e) => {
                         const next = [...rows]

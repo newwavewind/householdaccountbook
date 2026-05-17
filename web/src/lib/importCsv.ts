@@ -19,6 +19,8 @@ function resolveCardBrand(raw: string): string {
 const CATEGORY_ALIAS: Record<string, string> = {
   수입: '기타',
   식비: '식비',
+  마트: '마트',
+  대형마트: '마트',
   '교통/차량': '교통',
   교통: '교통',
   '주거/통신': '공과금',
