@@ -522,6 +522,7 @@ export function MonthInputSection({
                       type="button"
                       className="text-xs text-danger underline decoration-danger/30"
                       onClick={() => {
+                        if (!window.confirm('정말로 삭제할까요?')) return
                         setCategoryOpenLocalKey(null)
                         setCardOpenLocalKey(null)
                         const rest = rows.filter((_, j) => j !== i)
