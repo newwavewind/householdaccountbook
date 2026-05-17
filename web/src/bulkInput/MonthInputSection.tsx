@@ -122,6 +122,8 @@ export function MonthInputSection({
   const [confirmFlashLocalKey, setConfirmFlashLocalKey] = useState<string | null>(
     null,
   )
+  /** 인앱 확인 (window.confirm은 일부 브라우저/미리보기에서 무시될 수 있음) */
+  const [bulkRowDeleteKey, setBulkRowDeleteKey] = useState<string | null>(null)
   const confirmFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const maxDay = daysInMonth(year, monthIndex)
   const title = monthLabel(monthIndex)
@@ -522,13 +524,9 @@ export function MonthInputSection({
                       type="button"
                       className="text-xs text-danger underline decoration-danger/30"
                       onClick={() => {
-                        if (!window.confirm('정말로 삭제할까요?')) return
                         setCategoryOpenLocalKey(null)
                         setCardOpenLocalKey(null)
-                        const rest = rows.filter((_, j) => j !== i)
-                        onChangeRows(rest.length > 0 ? rest : [emptyDraftRow()])
-                        // 삭제 후 즉시 반영 (rest가 빈 배열이면 해당 달 전체 삭제)
-                        onApplyMonth(rest)
+                        setBulkRowDeleteKey(r.localKey)
                       }}
                     >
                       삭제
@@ -587,6 +585,58 @@ export function MonthInputSection({
             </div>
           )}
         </div>
+        {bulkRowDeleteKey ? (
+          <div
+            className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="bulk-row-delete-title"
+            onClick={() => setBulkRowDeleteKey(null)}
+          >
+            <div
+              className="w-full max-w-[18rem] rounded-[var(--radius-card)] bg-white p-6 shadow-[var(--shadow-card)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p
+                id="bulk-row-delete-title"
+                className="text-center text-base font-semibold text-[rgba(0,0,0,0.87)]"
+              >
+                정말로 삭제할까요?
+              </p>
+              <div className="mt-5 flex gap-3">
+                <Button
+                  type="button"
+                  variant="outlined"
+                  className="flex-1"
+                  onClick={() => setBulkRowDeleteKey(null)}
+                >
+                  취소
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  className="flex-1 !border-danger !bg-danger"
+                  onClick={() => {
+                    const idx = rowsRef.current.findIndex(
+                      (row) => row.localKey === bulkRowDeleteKey,
+                    )
+                    if (idx < 0) {
+                      setBulkRowDeleteKey(null)
+                      return
+                    }
+                    const snapshot = rowsRef.current
+                    const rest = snapshot.filter((_, j) => j !== idx)
+                    onChangeRows(rest.length > 0 ? rest : [emptyDraftRow()])
+                    onApplyMonth(rest)
+                    setBulkRowDeleteKey(null)
+                  }}
+                >
+                  삭제
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
         <p className="mt-3 text-xs text-text-soft">
           일 칸에는 1부터 {maxDay}까지 숫자만 넣습니다. 금액은 숫자만 입력하면 되고, 다른 칸으로
           넘어가면 천 단위 콤마로 보입니다.{' '}
