@@ -60,7 +60,7 @@ type LedgerContextValue = {
   replaceAll: (list: Transaction[]) => void
   clear: () => void
   syncState: LedgerSyncState
-  /** 로그인된 userId (supabase 모드) */
+  /** Supabase Auth UID — 클라이언트·세션이 있으면 장부 백엔드와 무관하게 채움(구성원 동기화용) */
   userId: string | null
   /** 소속 가구 ID. null이면 가구 미설정 */
   householdId: string | null
@@ -108,36 +108,41 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     }
   }, [syncState])
 
-  // ── supabase 모드: auth 상태 감시 ─────────────────────────────────────────
+  // ── Supabase Auth 세션 — 커뮤니티(Google) 로그인과 동일 클라이언트.
+  //    예전에는 VITE_LEDGER_BACKEND=supabase 일 때만 userId 를 넣어, 로컬/Prisma 장부 +
+  //    Supabase 로그인 조합에서 userId 가 항상 null → user_family_members 저장/로드가
+  //    전부 스킵되고, 로그아웃 시 지운 로컬 캐시만 남아 구성원이 비는 문제가 있었다.
   useEffect(() => {
-    if (backend !== 'supabase') return
     const sb = getSupabase()
     if (!sb) {
-      setAuthReady(true)
+      setUserId(null)
+      if (backend === 'supabase') setAuthReady(true)
       return
     }
 
     void sb.auth.getSession().then(({ data: { session } }) => {
       setUserId(session?.user?.id ?? null)
-      setAuthReady(true)
+      if (backend === 'supabase') setAuthReady(true)
     })
 
     const { data: { subscription } } = sb.auth.onAuthStateChange((_evt, session) => {
       setUserId(session?.user?.id ?? null)
       if (!session) setHouseholdId(null)
+      if (backend === 'supabase') setAuthReady(true)
     })
 
     return () => subscription.unsubscribe()
   }, [backend])
 
-  // ── supabase 모드: userId 확정 후 household_id 조회 ──────────────────────────
+  // ── userId 확정 후 household_id 조회 (Supabase 클라이언트가 있을 때) ──────────
   useEffect(() => {
-    if (backend !== 'supabase' || !authReady || !userId) {
-      if (!userId) setHouseholdId(null)
+    if (!userId) {
+      setHouseholdId(null)
       return
     }
     const sb = getSupabase()
     if (!sb) return
+    if (backend === 'supabase' && !authReady) return
     let cancelled = false
     void (async () => {
       const { data } = await sb
