@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { clearLocalAppDataOnLogout } from '../lib/clearLocalAppData'
 import { communityBackendMode } from '../lib/communityBackend'
 import { getCommunitySupabase } from '../lib/communitySupabaseClient'
 import { probeGoogleOAuth, supabaseAuthV1CallbackUrl } from '../lib/supabaseOAuthProbe'
@@ -296,18 +297,20 @@ export function CommunityAuthProvider({ children }: { children: ReactNode }) {
     if (mode === 'mock') {
       writeMockSession(null)
       syncMockFromStorage()
+      clearLocalAppDataOnLogout()
+      window.location.reload()
       return
     }
     if (mode === 'prisma') {
       setPrismaApiToken(null)
-      setUser(null)
-      setRole('user')
+      clearLocalAppDataOnLogout()
+      window.location.reload()
       return
     }
     const client = getCommunitySupabase()
     if (client) await client.auth.signOut()
-    setUser(null)
-    setRole('user')
+    clearLocalAppDataOnLogout()
+    window.location.reload()
   }, [mode, syncMockFromStorage])
 
   const value = useMemo(

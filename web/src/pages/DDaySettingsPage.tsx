@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -20,6 +20,14 @@ const KIND_OPTIONS: DdayKind[] = [
   'custom',
 ]
 
+const basisBtn = (active: boolean) =>
+  [
+    'min-h-[3.25rem] flex-1 rounded-xl border-2 px-3 py-2.5 text-left text-sm transition-colors md:min-h-0 md:py-3',
+    active
+      ? 'border-green-accent bg-green-light/40 text-starbucks-green shadow-sm'
+      : 'border-black/[0.1] bg-white text-[rgba(0,0,0,0.75)] hover:border-green-accent/50',
+  ].join(' ')
+
 export default function DDaySettingsPage() {
   const nav = useNavigate()
   const { events, patchEvents, cloudStatus, cloudMessage, cloudEnabled } =
@@ -34,17 +42,31 @@ export default function DDaySettingsPage() {
   })
 
   const [annualBasis, setAnnualBasis] = useState<'solar' | 'lunar'>('solar')
-  const [lunarMonth, setLunarMonth] = useState(1)
-  const [lunarDay, setLunarDay] = useState(1)
-  const [lunarLeap, setLunarLeap] = useState(false)
+  /** 가족 생일·기념일 — 음력 (예: 5월 27일) */
+  const [annualLunarMonth, setAnnualLunarMonth] = useState(5)
+  const [annualLunarDay, setAnnualLunarDay] = useState(27)
+  const [annualLunarLeap, setAnnualLunarLeap] = useState(false)
 
   const [babyBasis, setBabyBasis] = useState<'solar' | 'lunar'>('solar')
   const [birthLunarYear, setBirthLunarYear] = useState(2020)
+  const [babyLunarMonth, setBabyLunarMonth] = useState(1)
+  const [babyLunarDay, setBabyLunarDay] = useState(1)
+  const [babyLunarLeap, setBabyLunarLeap] = useState(false)
 
+  const prevKindRef = useRef<DdayKind>(kind)
   useEffect(() => {
-    if (kind === 'birthday' || kind === 'couple') {
+    const prev = prevKindRef.current
+    const wasAnnual = prev === 'birthday' || prev === 'couple'
+    const isAnnual = kind === 'birthday' || kind === 'couple'
+    if (isAnnual && !wasAnnual) {
       setAnnualBasis('solar')
     }
+    const wasBaby = prev === 'baby'
+    const isBaby = kind === 'baby'
+    if (isBaby && !wasBaby) {
+      setBabyBasis('solar')
+    }
+    prevKindRef.current = kind
   }, [kind])
 
   const linesById = useMemo(() => {
@@ -69,9 +91,9 @@ export default function DDaySettingsPage() {
           title: t,
           kind,
           dateBasis: 'lunar',
-          lunarMonth,
-          lunarDay,
-          lunarLeap,
+          lunarMonth: annualLunarMonth,
+          lunarDay: annualLunarDay,
+          lunarLeap: annualLunarLeap,
           updatedAt,
         }
       } else {
@@ -91,9 +113,9 @@ export default function DDaySettingsPage() {
       if (babyBasis === 'lunar') {
         const birthDate = solarIsoFromLunarBirth(
           birthLunarYear,
-          lunarMonth,
-          lunarDay,
-          lunarLeap,
+          babyLunarMonth,
+          babyLunarDay,
+          babyLunarLeap,
         )
         if (!birthDate) {
           alert('음력 날짜를 확인해 주세요. (해당 연·월·일에 윤달이 없을 수 있어요)')
@@ -106,9 +128,9 @@ export default function DDaySettingsPage() {
           birthBasis: 'lunar',
           birthDate,
           birthLunarYear,
-          lunarMonth,
-          lunarDay,
-          lunarLeap,
+          lunarMonth: babyLunarMonth,
+          lunarDay: babyLunarDay,
+          lunarLeap: babyLunarLeap,
           updatedAt,
         }
       } else {
@@ -144,9 +166,8 @@ export default function DDaySettingsPage() {
 
   const showAnnualControls = kind === 'birthday' || kind === 'couple'
   const showBabyControls = kind === 'baby'
-  const showLunarControls =
-    (showAnnualControls && annualBasis === 'lunar') ||
-    (showBabyControls && babyBasis === 'lunar')
+  const showAnnualLunarFields = showAnnualControls && annualBasis === 'lunar'
+  const showBabyLunarFields = showBabyControls && babyBasis === 'lunar'
   const showSolarDateOnly =
     (showAnnualControls && annualBasis === 'solar') ||
     (showBabyControls && babyBasis === 'solar') ||
@@ -158,18 +179,15 @@ export default function DDaySettingsPage() {
       ? '목표일'
       : kind === 'baby'
         ? babyBasis === 'lunar'
-          ? '출생 연도·음력 (아래)'
+          ? '아래에서 음력 출생 연도·월·일을 입력하세요'
           : '출생일 (양력)'
         : annualBasis === 'lunar'
-          ? '음력 월·일 (아래)'
-          : '기념일 (양력, 매년)'
+          ? '아래에서 음력 월·일을 입력하세요'
+          : '기념일 (양력 달력)'
 
   const eventSubtitle = (e: DdayEvent): string => {
     const base = DDAY_KIND_LABEL[e.kind]
-    if (
-      e.kind === 'birthday' ||
-      e.kind === 'couple'
-    ) {
+    if (e.kind === 'birthday' || e.kind === 'couple') {
       if (e.dateBasis === 'lunar') {
         return `${base} · 음력 ${formatLunarMd(e.lunarMonth, e.lunarDay, e.lunarLeap)}`
       }
@@ -219,7 +237,7 @@ export default function DDaySettingsPage() {
         <h2 className="text-base font-semibold text-[rgba(0,0,0,0.87)]">
           새로 추가
         </h2>
-        <div className="mt-4 space-y-3">
+        <div className="mt-4 space-y-4">
           <label className="block text-sm font-medium text-text-soft">
             종류
             <select
@@ -235,54 +253,6 @@ export default function DDaySettingsPage() {
             </select>
           </label>
 
-          {showAnnualControls ? (
-            <div className="flex flex-wrap gap-3 text-sm font-medium text-text-soft">
-              <span>양·음력</span>
-              <label className="inline-flex cursor-pointer items-center gap-1.5">
-                <input
-                  type="radio"
-                  name="annualBasis"
-                  checked={annualBasis === 'solar'}
-                  onChange={() => setAnnualBasis('solar')}
-                />
-                양력 (매년 같은 날짜)
-              </label>
-              <label className="inline-flex cursor-pointer items-center gap-1.5">
-                <input
-                  type="radio"
-                  name="annualBasis"
-                  checked={annualBasis === 'lunar'}
-                  onChange={() => setAnnualBasis('lunar')}
-                />
-                음력 (생신·음력 기념일)
-              </label>
-            </div>
-          ) : null}
-
-          {showBabyControls ? (
-            <div className="flex flex-wrap gap-3 text-sm font-medium text-text-soft">
-              <span>출생일</span>
-              <label className="inline-flex cursor-pointer items-center gap-1.5">
-                <input
-                  type="radio"
-                  name="babyBasis"
-                  checked={babyBasis === 'solar'}
-                  onChange={() => setBabyBasis('solar')}
-                />
-                양력
-              </label>
-              <label className="inline-flex cursor-pointer items-center gap-1.5">
-                <input
-                  type="radio"
-                  name="babyBasis"
-                  checked={babyBasis === 'lunar'}
-                  onChange={() => setBabyBasis('lunar')}
-                />
-                음력
-              </label>
-            </div>
-          ) : null}
-
           <label className="block text-sm font-medium text-text-soft">
             이름
             <input
@@ -290,58 +260,172 @@ export default function DDaySettingsPage() {
               className="mt-1 w-full rounded-lg border border-black/[0.12] bg-white px-3 py-2 text-base text-[rgba(0,0,0,0.87)] outline-none ring-green-accent/30 focus:ring-2"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="예: 엄마, 결혼기념일, 2026 수능"
+              placeholder="예: 아버지, 엄마, 결혼기념일"
               maxLength={80}
             />
           </label>
 
-          {showBabyControls && babyBasis === 'lunar' ? (
-            <label className="block text-sm font-medium text-text-soft">
-              음력 출생 연도
-              <input
-                type="number"
-                min={1900}
-                max={2100}
-                className="mt-1 w-full max-w-[10rem] rounded-lg border border-black/[0.12] bg-white px-3 py-2 text-base text-[rgba(0,0,0,0.87)] outline-none ring-green-accent/30 focus:ring-2"
-                value={birthLunarYear}
-                onChange={(e) => setBirthLunarYear(Number(e.target.value))}
-              />
-            </label>
+          {showAnnualControls ? (
+            <fieldset className="space-y-2 rounded-xl border border-black/[0.08] bg-ceramic/50 p-3 md:p-4">
+              <legend className="px-1 text-sm font-semibold text-[rgba(0,0,0,0.87)]">
+                기념일 · 생일 — 양력 vs 음력
+              </legend>
+              <p className="text-xs leading-relaxed text-text-soft md:text-sm">
+                부모 <strong className="text-[rgba(0,0,0,0.78)]">음력 생신</strong>
+                이면 반드시{' '}
+                <strong className="text-starbucks-green">음력</strong>을 누른 뒤 음력
+                월·일을 넣으세요. 양력이면 달력에서 날짜만 고르면 됩니다.
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  className={basisBtn(annualBasis === 'solar')}
+                  onClick={() => setAnnualBasis('solar')}
+                >
+                  <span className="block font-semibold">양력</span>
+                  <span className="mt-0.5 block text-xs font-normal text-text-soft">
+                    매년 같은 양력 날짜 (아래 달력)
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className={basisBtn(annualBasis === 'lunar')}
+                  onClick={() => setAnnualBasis('lunar')}
+                >
+                  <span className="block font-semibold">음력</span>
+                  <span className="mt-0.5 block text-xs font-normal text-text-soft">
+                    매년 음력 생신·음력 기념일 (월·일 직접 입력)
+                  </span>
+                </button>
+              </div>
+            </fieldset>
           ) : null}
 
-          {showLunarControls ? (
-            <div className="flex flex-wrap items-end gap-3">
-              <label className="text-sm font-medium text-text-soft">
-                음력 월
-                <input
-                  type="number"
-                  min={1}
-                  max={12}
-                  className="mt-1 block w-20 rounded-lg border border-black/[0.12] bg-white px-2 py-2 text-base text-[rgba(0,0,0,0.87)] outline-none ring-green-accent/30 focus:ring-2"
-                  value={lunarMonth}
-                  onChange={(e) => setLunarMonth(Number(e.target.value))}
-                />
-              </label>
-              <label className="text-sm font-medium text-text-soft">
-                음력 일
-                <input
-                  type="number"
-                  min={1}
-                  max={30}
-                  className="mt-1 block w-20 rounded-lg border border-black/[0.12] bg-white px-2 py-2 text-base text-[rgba(0,0,0,0.87)] outline-none ring-green-accent/30 focus:ring-2"
-                  value={lunarDay}
-                  onChange={(e) => setLunarDay(Number(e.target.value))}
-                />
-              </label>
-              <label className="flex cursor-pointer items-center gap-2 pb-2 text-sm text-text-soft">
-                <input
-                  type="checkbox"
-                  checked={lunarLeap}
-                  onChange={(e) => setLunarLeap(e.target.checked)}
-                />
-                윤달
-              </label>
+          {showBabyControls ? (
+            <fieldset className="space-y-2 rounded-xl border border-black/[0.08] bg-ceramic/50 p-3 md:p-4">
+              <legend className="px-1 text-sm font-semibold text-[rgba(0,0,0,0.87)]">
+                출생일 — 양력 vs 음력
+              </legend>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  className={basisBtn(babyBasis === 'solar')}
+                  onClick={() => setBabyBasis('solar')}
+                >
+                  <span className="block font-semibold">양력 출생</span>
+                  <span className="mt-0.5 block text-xs font-normal text-text-soft">
+                    출생증·닥터가 알려준 양력 날짜
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className={basisBtn(babyBasis === 'lunar')}
+                  onClick={() => setBabyBasis('lunar')}
+                >
+                  <span className="block font-semibold">음력 출생</span>
+                  <span className="mt-0.5 block text-xs font-normal text-text-soft">
+                    출생 연도 + 음력 월·일
+                  </span>
+                </button>
+              </div>
+            </fieldset>
+          ) : null}
+
+          {showAnnualLunarFields ? (
+            <div className="rounded-xl border border-dashed border-green-accent/40 bg-green-light/20 p-3 md:p-4">
+              <p className="text-sm font-medium text-starbucks-green">
+                음력 기념일 입력
+              </p>
+              <p className="mt-1 text-xs text-text-soft">
+                예: 아버지 생신 음력 5월 27일 → 월 <strong>5</strong>, 일{' '}
+                <strong>27</strong>, 윤달이면 체크
+              </p>
+              <div className="mt-3 flex flex-wrap items-end gap-3">
+                <label className="text-sm font-medium text-text-soft">
+                  음력 월
+                  <input
+                    type="number"
+                    min={1}
+                    max={12}
+                    className="mt-1 block w-24 rounded-lg border border-black/[0.12] bg-white px-2 py-2 text-base text-[rgba(0,0,0,0.87)] outline-none ring-green-accent/30 focus:ring-2"
+                    value={annualLunarMonth}
+                    onChange={(e) => setAnnualLunarMonth(Number(e.target.value))}
+                  />
+                </label>
+                <label className="text-sm font-medium text-text-soft">
+                  음력 일
+                  <input
+                    type="number"
+                    min={1}
+                    max={30}
+                    className="mt-1 block w-24 rounded-lg border border-black/[0.12] bg-white px-2 py-2 text-base text-[rgba(0,0,0,0.87)] outline-none ring-green-accent/30 focus:ring-2"
+                    value={annualLunarDay}
+                    onChange={(e) => setAnnualLunarDay(Number(e.target.value))}
+                  />
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 pb-2 text-sm text-text-soft">
+                  <input
+                    type="checkbox"
+                    checked={annualLunarLeap}
+                    onChange={(e) => setAnnualLunarLeap(e.target.checked)}
+                  />
+                  윤달
+                </label>
+              </div>
             </div>
+          ) : null}
+
+          {showBabyLunarFields ? (
+            <>
+              <label className="block text-sm font-medium text-text-soft">
+                음력 출생 연도 (천간·달 기준 해)
+                <input
+                  type="number"
+                  min={1900}
+                  max={2100}
+                  className="mt-1 w-full max-w-[12rem] rounded-lg border border-black/[0.12] bg-white px-3 py-2 text-base text-[rgba(0,0,0,0.87)] outline-none ring-green-accent/30 focus:ring-2"
+                  value={birthLunarYear}
+                  onChange={(e) => setBirthLunarYear(Number(e.target.value))}
+                />
+              </label>
+              <div className="rounded-xl border border-dashed border-green-accent/40 bg-green-light/20 p-3 md:p-4">
+                <p className="text-sm font-medium text-starbucks-green">
+                  음력 생일
+                </p>
+                <div className="mt-3 flex flex-wrap items-end gap-3">
+                  <label className="text-sm font-medium text-text-soft">
+                    월
+                    <input
+                      type="number"
+                      min={1}
+                      max={12}
+                      className="mt-1 block w-24 rounded-lg border border-black/[0.12] bg-white px-2 py-2 text-base"
+                      value={babyLunarMonth}
+                      onChange={(e) => setBabyLunarMonth(Number(e.target.value))}
+                    />
+                  </label>
+                  <label className="text-sm font-medium text-text-soft">
+                    일
+                    <input
+                      type="number"
+                      min={1}
+                      max={30}
+                      className="mt-1 block w-24 rounded-lg border border-black/[0.12] bg-white px-2 py-2 text-base"
+                      value={babyLunarDay}
+                      onChange={(e) => setBabyLunarDay(Number(e.target.value))}
+                    />
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2 pb-2 text-sm text-text-soft">
+                    <input
+                      type="checkbox"
+                      checked={babyLunarLeap}
+                      onChange={(e) => setBabyLunarLeap(e.target.checked)}
+                    />
+                    윤달
+                  </label>
+                </div>
+              </div>
+            </>
           ) : null}
 
           {showSolarDateOnly ? (
@@ -349,7 +433,7 @@ export default function DDaySettingsPage() {
               {dateLabel}
               <input
                 type="date"
-                className="mt-1 w-full max-w-[12rem] rounded-lg border border-black/[0.12] bg-white px-3 py-2 text-base text-[rgba(0,0,0,0.87)] outline-none ring-green-accent/30 focus:ring-2"
+                className="mt-1 w-full max-w-[14rem] rounded-lg border border-black/[0.12] bg-white px-3 py-2 text-base text-[rgba(0,0,0,0.87)] outline-none ring-green-accent/30 focus:ring-2"
                 value={dateInput}
                 onChange={(e) => setDateInput(e.target.value)}
               />
