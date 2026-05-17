@@ -478,58 +478,60 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
   /** 가족 구성원 이름 목록 — localStorage 초기값, Supabase 유저 메타·가구 동기화 */
   const [cloudMembers, setCloudMembersState] = useState<string[]>(loadMembersFromStorage)
 
-  // user_family_members — 가구 미가입 때만 사용. 가구가 있으면 households.members가 정본이므로
-  // 이 fetch가 나중에 도착하면 짧거나 오래된 user 행으로 덮어쓰는 레이스를 막음.
+  /** Supabase에서 구성원 병합 로드 — 항상 user_family_members는 읽되, 비가구 사용자만 해당 행이 유효.
+   *  가구 가입 사용자는 예전 레이스(가구 ID가 잡히자 user_* fetch가 즉시 취소됨) 때문에 user_* 행만
+   *  채워져 있는 경우가 많아 households.members 와 함께 병렬로 읽어 가구 배열이 비면 user_* 폴백. */
   useEffect(() => {
     if (!userId) return
-    if (householdId) return
     const sb = getSupabase()
     if (!sb) return
+    const uid = userId
+    const hidSnap = householdId
     let cancelled = false
-    void sb
-      .from('user_family_members')
-      .select('members')
-      .eq('user_id', userId)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (cancelled) return
-        if (householdIdRef.current) return
-        if (data && Array.isArray(data.members) && data.members.length > 0) {
-          const members = data.members as string[]
-          setCloudMembersState(members)
-          saveMembersToStorage(members)
-        }
-      })
+
+    void (async () => {
+      const userQ = sb
+        .from('user_family_members')
+        .select('members')
+        .eq('user_id', uid)
+        .maybeSingle()
+      const householdQ =
+        hidSnap != null
+          ? sb
+              .from('households')
+              .select('members')
+              .eq('id', hidSnap)
+              .maybeSingle()
+          : Promise.resolve({ data: null as { members?: unknown } | null })
+
+      const [{ data: uRow }, { data: hRow }] = await Promise.all([userQ, householdQ])
+
+      if (cancelled) return
+
+      const userMembers =
+        Array.isArray(uRow?.members) ? (uRow.members as string[]) : []
+      const householdMembers =
+        Array.isArray(hRow?.members) ? (hRow.members as string[]) : []
+
+      if (hidSnap != null && householdIdRef.current !== hidSnap) return
+
+      let next: string[]
+      if (householdMembers.length > 0) {
+        next = householdMembers
+      } else if (userMembers.length > 0) {
+        next = userMembers
+      } else {
+        next = []
+      }
+
+      setCloudMembersState(next)
+      saveMembersToStorage(next)
+    })()
+
     return () => {
       cancelled = true
     }
   }, [userId, householdId])
-
-  // householdId 확정 후 Supabase households.members 로드 (가족 공유용, 우선순위 높음)
-  useEffect(() => {
-    if (!householdId) return
-    const sb = getSupabase()
-    if (!sb) return
-    const hid = householdId
-    let cancelled = false
-    void sb
-      .from('households')
-      .select('members')
-      .eq('id', hid)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (cancelled) return
-        if (householdIdRef.current !== hid) return
-        if (data && Array.isArray(data.members) && data.members.length > 0) {
-          const members = data.members as string[]
-          setCloudMembersState(members)
-          saveMembersToStorage(members)
-        }
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [householdId])
 
   const setCloudMembers = useCallback((members: string[]) => {
     setCloudMembersState(members)
