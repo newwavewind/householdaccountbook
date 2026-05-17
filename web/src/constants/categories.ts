@@ -18,6 +18,7 @@ export const EXPENSE_CATEGORIES = [
   '쿠팡',
   '네이버스토어',
   '구독',
+  '연회비',
   '의료',
   '교육',
   '문화',
