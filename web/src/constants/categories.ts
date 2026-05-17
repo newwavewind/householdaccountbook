@@ -13,6 +13,7 @@ export const EXPENSE_CATEGORIES = [
   '배달음식',
   '교통',
   '주유비',
+  '하이패스',
   '자동차할부',
   '쇼핑',
   '쿠팡',
