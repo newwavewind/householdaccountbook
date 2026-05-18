@@ -3,6 +3,7 @@
 # 선택: VITE_GOOGLE_CLIENT_ID (GIS 팝업 로그인 시)
 # 선택: VITE_KAKAO_JAVASCRIPT_KEY (달력 메모 카카오톡 공유 — 없으면 Web Share/클립보드)
 # 로컬에서 한 번에 올리기: node scripts/push-github-pages-secrets.mjs  (gh auth login 후)
+# Vercel Production(web 프로젝트)은 이 워크플로와 별개 — main 푸시 시 Vercel 대시보드 Git 연동으로 배포됨.
 name: Deploy to GitHub Pages
 
 on:
