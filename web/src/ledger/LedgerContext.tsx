@@ -86,6 +86,8 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
   const [authReady, setAuthReady] = useState(backend !== 'supabase')
 
   const [transactions, setTransactions] = useState<Transaction[]>(loadFromStorage)
+  const transactionsRef = useRef<Transaction[]>(transactions)
+  transactionsRef.current = transactions
 
   // supabase 모드: 로그인 상태에 따른 초기 syncState
   const [syncState, setSyncState] = useState<LedgerSyncState>(() => {
@@ -483,9 +485,39 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
   /** 가족 구성원 이름 목록 — localStorage 초기값, Supabase 유저 메타·가구 동기화 */
   const [cloudMembers, setCloudMembersState] = useState<string[]>(loadMembersFromStorage)
 
-  /** Supabase에서 구성원 병합 로드 — 항상 user_family_members는 읽되, 비가구 사용자만 해당 행이 유효.
-   *  가구 가입 사용자는 예전 레이스(가구 ID가 잡히자 user_* fetch가 즉시 취소됨) 때문에 user_* 행만
-   *  채워져 있는 경우가 많아 households.members 와 함께 병렬로 읽어 가구 배열이 비면 user_* 폴백. */
+  const mergeMemberNamesWithTransactions = useCallback((base: string[]): string[] => {
+    const names = new Set(base.map((s) => s.trim()).filter(Boolean))
+    for (const t of transactionsRef.current) {
+      const m = t.memberName?.trim()
+      if (m) names.add(m)
+    }
+    return Array.from(names).sort((a, b) => a.localeCompare(b, 'ko'))
+  }, [])
+
+  const setCloudMembers = useCallback((members: string[]) => {
+    setCloudMembersState(members)
+    saveMembersToStorage(members)
+    const sb = getSupabase()
+    if (!sb || !userId) return
+    // user_family_members에 직접 upsert (RPC 보다 신뢰성 높음)
+    void sb
+      .from('user_family_members')
+      .upsert(
+        { user_id: userId, members, updated_at: new Date().toISOString() },
+        { onConflict: 'user_id' },
+      )
+    // 가구 ID 있으면 household.members에도 저장 (가족 간 공유)
+    if (householdId) {
+      void sb.rpc('set_household_members', {
+        p_household_id: householdId,
+        p_members: members,
+      })
+    }
+  }, [userId, householdId])
+
+  /** Supabase에서 구성원 로드. 재로그인 직후 householdId가 잠시 null인 동안 DB만 보고 []로 덮어쓰면
+   *  로컬 캐시가 비어 구성원이 사라진 것처럼 보임 → 가구 ID 확정 전에는 빈 결과로 덮어쓰지 않음.
+   *  households.members 가 비어 있어도 거래의 memberName 으로 복구·병합. */
   useEffect(() => {
     if (!userId) return
     const sb = getSupabase()
@@ -520,44 +552,50 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
 
       if (hidSnap != null && householdIdRef.current !== hidSnap) return
 
-      let next: string[]
-      if (householdMembers.length > 0) {
-        next = householdMembers
+      let base: string[]
+      if (hidSnap == null) {
+        if (userMembers.length === 0) {
+          const txOnly = mergeMemberNamesWithTransactions([])
+          if (txOnly.length === 0) return
+          setCloudMembers(txOnly)
+          return
+        }
+        base = userMembers
+      } else if (householdMembers.length > 0) {
+        base = householdMembers
       } else if (userMembers.length > 0) {
-        next = userMembers
+        base = userMembers
       } else {
-        next = []
+        base = []
       }
 
-      setCloudMembersState(next)
-      saveMembersToStorage(next)
+      setCloudMembers(mergeMemberNamesWithTransactions(base))
     })()
 
     return () => {
       cancelled = true
     }
-  }, [userId, householdId])
+  }, [userId, householdId, mergeMemberNamesWithTransactions, setCloudMembers])
 
-  const setCloudMembers = useCallback((members: string[]) => {
-    setCloudMembersState(members)
-    saveMembersToStorage(members)
-    const sb = getSupabase()
-    if (!sb || !userId) return
-    // user_family_members에 직접 upsert (RPC 보다 신뢰성 높음)
-    void sb
-      .from('user_family_members')
-      .upsert(
-        { user_id: userId, members, updated_at: new Date().toISOString() },
-        { onConflict: 'user_id' },
-      )
-    // 가구 ID 있으면 household.members에도 저장 (가족 간 공유)
-    if (householdId) {
-      void sb.rpc('set_household_members', {
-        p_household_id: householdId,
-        p_members: members,
-      })
-    }
-  }, [userId, householdId])
+  /** 클라우드 장부 준비 후에도 구성원 목록이 여전히 비면 거래의 memberName 으로 복구 (동기화 타이밍·로컬 캐시 삭제 직후) */
+  useEffect(() => {
+    if (backend !== 'supabase' || !userId || !householdId) return
+    if (syncState.mode !== 'cloud' || syncState.status !== 'ready') return
+    if (cloudMembers.length > 0) return
+    const merged = mergeMemberNamesWithTransactions([])
+    if (merged.length === 0) return
+    setCloudMembers(merged)
+  }, [
+    backend,
+    userId,
+    householdId,
+    syncState.mode,
+    syncState.status,
+    transactions,
+    cloudMembers.length,
+    mergeMemberNamesWithTransactions,
+    setCloudMembers,
+  ])
 
   const value = useMemo(
     (): LedgerContextValue => ({
