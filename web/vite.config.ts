@@ -3,6 +3,16 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+/** GitHub Pages 서브패스 배포 시 manifest start_url·scope·아이콘 URL이 루트(`/`)로 깨지지 않도록 */
+function pwaBasePrefix(): string {
+  const raw = process.env.VITE_BASE_PATH
+  if (!raw || raw === '/') return '/'
+  const path = raw.replace(/^\/+/, '').replace(/\/+$/, '')
+  return path ? `/${path}/` : '/'
+}
+
+const pwaPathPrefix = pwaBasePrefix()
+
 // https://vite.dev/config/
 export default defineConfig({
   base: process.env.VITE_BASE_PATH ?? '/',
@@ -36,8 +46,8 @@ export default defineConfig({
         name: 'MJ가계부',
         short_name: 'MJ가계부',
         description: 'MJ가계부 — 심플한 가계부 앱',
-        start_url: '/',
-        scope: '/',
+        start_url: pwaPathPrefix,
+        scope: pwaPathPrefix,
         display: 'standalone',
         display_override: ['standalone', 'browser'],
         background_color: '#f2f0eb',
@@ -48,19 +58,19 @@ export default defineConfig({
         categories: ['finance', 'productivity'],
         icons: [
           {
-            src: 'pwa-192.png',
+            src: `${pwaPathPrefix}pwa-192.png`,
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any',
           },
           {
-            src: 'pwa-512.png',
+            src: `${pwaPathPrefix}pwa-512.png`,
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any',
           },
           {
-            src: 'pwa-512.png',
+            src: `${pwaPathPrefix}pwa-512.png`,
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',
