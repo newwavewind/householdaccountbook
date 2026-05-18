@@ -14,7 +14,17 @@ import {
   type RefObject,
 } from 'react'
 import { CalendarInkColorDropdown } from './CalendarInkColorDropdown'
-import { sanitizeCalendarEventHtml } from './calendarHtmlSanitize'
+import { CalendarFontSize } from './calendarFontSizeExtension'
+import {
+  CALENDAR_FONT_SIZES,
+  CALENDAR_RICH_FONTS,
+  resolveCalendarFontSelectValue,
+  resolveCalendarFontSizeSelectValue,
+} from './calendarRichTextFonts'
+import {
+  sanitizeCalendarEventHtml,
+  sanitizeStickyNoteHtml,
+} from './calendarHtmlSanitize'
 import type { CalendarEventInkId } from './calendarEventInk'
 import type { StickyTint } from './calendarStickyNotesStorage'
 import { STICKY_THEMES } from './stickyNoteTheme'
@@ -32,19 +42,6 @@ function deriveContent(html: string | undefined, plain: string): string {
     .replace(/>/g, '&gt;')
   return `<p>${esc}</p>`
 }
-
-const FONTS = [
-  { label: '기본', value: '' },
-  { label: '본고딕', value: 'system-ui, sans-serif' },
-  { label: '명조', value: 'Georgia, "Apple SD Gothic Neo", serif' },
-  /** 한컴 한글 «복숭아»(HGPEACH); 미설치 시 웹 폰트 Gamja Flower로 유사 표시 */
-  {
-    label: '복숭아',
-    value: '"복숭아", "HGPeach", "Gamja Flower", "Apple SD Gothic Neo", cursive',
-  },
-  { label: '궁서', value: '"Gungsuh", "궁서", Batang, "Apple SD Gothic Neo", serif' },
-  { label: '고정폭', value: 'Consolas, monospace' },
-] as const
 
 /** 부드러운 형광펜 느낌(원색 금지) — 사용자 지정 기본 5색 */
 export const HIGHLIGHT_PALETTE = [
@@ -92,6 +89,8 @@ type Props = {
   memoInk?: CalendarEventInkId | undefined
   onMemoInkChange?: (next: CalendarEventInkId | undefined) => void
   inkControlId?: string
+  /** sticky 등 다른 HTML 정책이 필요할 때 */
+  sanitizeHtml?: (raw: string) => string
 }
 
 export function CalendarEventRichField({
@@ -106,8 +105,13 @@ export function CalendarEventRichField({
   memoInk,
   onMemoInkChange,
   inkControlId,
+  sanitizeHtml,
 }: Props) {
+  const sanitize =
+    sanitizeHtml ?? (variant === 'sticky' ? sanitizeStickyNoteHtml : sanitizeCalendarEventHtml)
+
   const [fontSel, setFontSel] = useState('')
+  const [fontSizeSel, setFontSizeSel] = useState('')
   const [highlightOpen, setHighlightOpen] = useState(false)
   const [, setToolbarTick] = useState(0)
   const hlWrapRef = useRef<HTMLDivElement>(null)
@@ -134,6 +138,7 @@ export function CalendarEventRichField({
       }),
       TextStyle,
       FontFamily.configure({ types: ['textStyle'] }),
+      CalendarFontSize,
       Highlight.configure({ multicolor: true }),
       Placeholder.configure({ placeholder }),
     ],
@@ -145,15 +150,17 @@ export function CalendarEventRichField({
       },
     },
     onUpdate: ({ editor: ed }) => {
-      const ff = (ed.getAttributes('textStyle').fontFamily as string) ?? ''
-      setFontSel(ff)
+      const style = ed.getAttributes('textStyle')
+      setFontSel((style.fontFamily as string) ?? '')
+      setFontSizeSel((style.fontSize as string) ?? '')
       const raw = ed.getHTML()
-      const safe = sanitizeCalendarEventHtml(raw)
+      const safe = sanitize(raw)
       onChange({ html: safe, plain: ed.getText().trim() })
     },
     onSelectionUpdate: ({ editor: ed }) => {
-      const ff = (ed.getAttributes('textStyle').fontFamily as string) ?? ''
-      setFontSel(ff)
+      const style = ed.getAttributes('textStyle')
+      setFontSel((style.fontFamily as string) ?? '')
+      setFontSizeSel((style.fontSize as string) ?? '')
     },
   })
 
@@ -175,8 +182,9 @@ export function CalendarEventRichField({
     if (next !== cur && next.replace(/\s/g, '') !== cur.replace(/\s/g, '')) {
       editor.commands.setContent(next, { emitUpdate: false })
     }
-    const ff = (editor.getAttributes('textStyle').fontFamily as string) ?? ''
-    setFontSel(ff)
+    const style = editor.getAttributes('textStyle')
+    setFontSel((style.fontFamily as string) ?? '')
+    setFontSizeSel((style.fontSize as string) ?? '')
   }, [editor, html, plain])
 
   if (!editor) return null
@@ -187,7 +195,7 @@ export function CalendarEventRichField({
 
   function pushChange() {
     onChange({
-      html: sanitizeCalendarEventHtml(editor.getHTML()),
+      html: sanitize(editor.getHTML()),
       plain: editor.getText().trim(),
     })
   }
@@ -259,6 +267,10 @@ export function CalendarEventRichField({
     </div>
   ) : null
 
+  const toolbarSelectClass = isSticky
+    ? `${st.toolbarBtnClass} h-7 max-w-[4.75rem] shrink-0 rounded border border-black/10 bg-white/80 px-1 text-[9px]`
+    : 'h-8 max-w-[5.5rem] shrink-0 rounded-md border border-border-default bg-surface-raised px-2 text-[11px] text-text-primary outline-none transition-colors focus-visible:ring-2 focus-visible:ring-green-accent/35'
+
   const fontSelect = (
     <>
       <label className="sr-only" htmlFor={`cal-font-${encodeURIComponent(ariaLabel)}`}>
@@ -266,7 +278,7 @@ export function CalendarEventRichField({
       </label>
       <select
         id={`cal-font-${encodeURIComponent(ariaLabel)}`}
-        value={FONTS.some((f) => f.value === fontSel) ? fontSel : ''}
+        value={resolveCalendarFontSelectValue(fontSel)}
         onChange={(e) => {
           const v = e.target.value
           const chain = editor.chain().focus()
@@ -278,15 +290,41 @@ export function CalendarEventRichField({
           setFontSel(v)
           pushChange()
         }}
-        className={
-          isSticky
-            ? `${st.toolbarBtnClass} h-7 max-w-[5.25rem] shrink-0 rounded border border-black/10 bg-white/80 px-1 text-[10px]`
-            : 'h-8 max-w-[6.25rem] shrink-0 rounded-md border border-border-default bg-surface-raised px-2 text-[11px] text-text-primary outline-none transition-colors focus-visible:ring-2 focus-visible:ring-green-accent/35'
-        }
+        className={toolbarSelectClass}
       >
-        {FONTS.map((f) => (
+        {CALENDAR_RICH_FONTS.map((f) => (
           <option key={f.label} value={f.value}>
             {f.label}
+          </option>
+        ))}
+      </select>
+    </>
+  )
+
+  const fontSizeSelect = (
+    <>
+      <label className="sr-only" htmlFor={`cal-font-size-${encodeURIComponent(ariaLabel)}`}>
+        글자 크기
+      </label>
+      <select
+        id={`cal-font-size-${encodeURIComponent(ariaLabel)}`}
+        value={resolveCalendarFontSizeSelectValue(fontSizeSel)}
+        onChange={(e) => {
+          const v = e.target.value
+          const chain = editor.chain().focus()
+          if (!v) {
+            chain.unsetFontSize().run()
+          } else {
+            chain.setFontSize(v).run()
+          }
+          setFontSizeSel(v)
+          pushChange()
+        }}
+        className={toolbarSelectClass}
+      >
+        {CALENDAR_FONT_SIZES.map((s) => (
+          <option key={s.label} value={s.value}>
+            {s.label}
           </option>
         ))}
       </select>
@@ -427,6 +465,7 @@ export function CalendarEventRichField({
   const toolbar = isSticky ? (
     <>
       {fontSelect}
+      {fontSizeSelect}
       {memoInkControl}
       {boldItalic}
       {underlineStrikeListImgSticky}
@@ -435,6 +474,7 @@ export function CalendarEventRichField({
   ) : (
     <>
       {fontSelect}
+      {fontSizeSelect}
       <span
         className="mx-0.5 hidden h-5 w-px shrink-0 bg-border-muted sm:block"
         aria-hidden

@@ -40,12 +40,13 @@ export function sanitizeStickyNoteHtml(raw: string): string {
       'u',
       's',
       'span',
+      'mark',
       'ul',
       'ol',
       'li',
       'img',
     ],
-    ALLOWED_ATTR: ['class', 'style', 'src', 'alt'],
+    ALLOWED_ATTR: ['class', 'style', 'data-color', 'color', 'src', 'alt'],
   })
 }
 

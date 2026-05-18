@@ -1,16 +1,6 @@
-﻿import Image from '@tiptap/extension-image'
-import Placeholder from '@tiptap/extension-placeholder'
-import Underline from '@tiptap/extension-underline'
-import { EditorContent, useEditor } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ChangeEvent,
-} from 'react'
+﻿import { useCallback, useEffect, useRef, useState } from 'react'
 import { KakaoTalkShareIconButton } from '../components/KakaoTalkShareIconButton'
+import { CalendarEventRichField } from './CalendarEventRichField'
 import {
   htmlToPlain,
   sanitizeStickyNoteHtml,
@@ -33,8 +23,6 @@ function deriveEditorHtml(html: string | undefined, plain: string): string {
     .replace(/>/g, '&gt;')
   return `<p>${esc}</p>`
 }
-
-const IMG_MAX_BYTES = 1_800_000
 
 type PatchProps = {
   note: CalendarStickyNote
@@ -68,7 +56,6 @@ function StickyMemoCompactPreview({ note }: { note: CalendarStickyNote }) {
           className={`sticky-compact-preview min-h-0 flex-1 overflow-hidden p-2 text-[0.72rem] leading-snug sm:p-2.5 sm:text-[0.76rem] ${
             note.tint === 'charcoal' ? 'text-white/90' : 'text-text-primary'
           } [&_img]:max-h-16 [&_img]:w-auto [&_img]:max-w-full [&_img]:rounded [&_ul]:list-disc [&_ul]:pl-3.5`}
-          // sanitizeStickyNoteHtml 로 정제된 HTML
           dangerouslySetInnerHTML={{ __html: safe }}
         />
       )}
@@ -85,9 +72,7 @@ function StickyMemoExpandedCard({
   const theme = STICKY_THEMES[note.tint]
   const [paletteOpen, setPaletteOpen] = useState(false)
   const paletteRef = useRef<HTMLDivElement>(null)
-  const fileRef = useRef<HTMLInputElement>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [, setToolbarTick] = useState(0)
 
   const schedulePatch = useCallback(
     (html: string, plain: string) => {
@@ -114,103 +99,6 @@ function StickyMemoExpandedCard({
     document.addEventListener('mousedown', onDoc, true)
     return () => document.removeEventListener('mousedown', onDoc, true)
   }, [paletteOpen])
-
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        heading: false,
-        blockquote: false,
-        codeBlock: false,
-        horizontalRule: false,
-        code: false,
-        orderedList: false,
-        bulletList: {
-          HTMLAttributes: { class: 'list-disc pl-5 space-y-0.5' },
-        },
-      }),
-      Underline,
-      Image.configure({
-        inline: false,
-        allowBase64: true,
-      }),
-      Placeholder.configure({
-        placeholder: '메모를 작성하세요…',
-      }),
-    ],
-    content: deriveEditorHtml(note.bodyHtml, note.body),
-    editorProps: {
-      attributes: {
-        'aria-label': '스티커 메모 내용',
-        class: `max-w-none min-h-[inherit] px-3 py-2 text-sm leading-relaxed outline-none [&_.ProseMirror]:outline-none [&_img]:max-h-48 [&_img]:w-auto [&_img]:max-w-full [&_img]:rounded ${
-          note.tint === 'charcoal'
-            ? 'text-white/92 [&_.ProseMirror]:text-white/92'
-            : 'text-text-primary'
-        }`,
-      },
-    },
-    onUpdate: ({ editor: ed }) => {
-      const raw = ed.getHTML()
-      const safe = sanitizeStickyNoteHtml(raw)
-      const plain = ed.getText().replace(/\s+/g, ' ').trim()
-      schedulePatch(safe, plain)
-    },
-  })
-
-  useEffect(() => {
-    if (!editor) return
-    const next = deriveEditorHtml(note.bodyHtml, note.body)
-    const cur = editor.getHTML()
-    if (sanitizeStickyNoteHtml(cur) === sanitizeStickyNoteHtml(next)) return
-    editor.commands.setContent(next, { emitUpdate: false })
-  }, [editor, note.body, note.bodyHtml])
-
-  useEffect(() => {
-    if (!editor) return
-    const bump = () => setToolbarTick((t) => t + 1)
-    editor.on('selectionUpdate', bump)
-    editor.on('transaction', bump)
-    return () => {
-      editor.off('selectionUpdate', bump)
-      editor.off('transaction', bump)
-    }
-  }, [editor])
-
-  useEffect(() => {
-    if (!editor) return
-    const ink =
-      note.tint === 'charcoal'
-        ? 'text-white/92 [&_.ProseMirror]:text-white/92'
-        : 'text-text-primary'
-    const prevProps = editor.options.editorProps ?? {}
-    editor.setOptions({
-      editorProps: {
-        ...prevProps,
-        attributes: {
-          ...(prevProps.attributes as Record<string, unknown>),
-          'aria-label': '스티커 메모 내용',
-          class: `max-w-none min-h-[inherit] px-3 py-2 text-sm leading-relaxed outline-none [&_.ProseMirror]:outline-none [&_img]:max-h-48 [&_img]:w-auto [&_img]:max-w-full [&_img]:rounded ${ink}`,
-        },
-      },
-    })
-  }, [editor, note.tint])
-
-  const onImagePick = (e: ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]
-    e.target.value = ''
-    if (!f || !editor) return
-    if (!f.type.startsWith('image/')) return
-    if (f.size > IMG_MAX_BYTES) {
-      window.alert('이미지는 약 1.8MB 이하로 올려 주세요.')
-      return
-    }
-    const reader = new FileReader()
-    reader.onload = () => {
-      const src = typeof reader.result === 'string' ? reader.result : ''
-      if (!src.startsWith('data:image/')) return
-      editor.chain().focus().setImage({ src }).run()
-    }
-    reader.readAsDataURL(f)
-  }
 
   const isCharcoal = note.tint === 'charcoal'
   const swatchBorder = isCharcoal ? 'border-white/25' : 'border-black/15'
@@ -306,78 +194,17 @@ function StickyMemoExpandedCard({
         </div>
       </header>
 
-      <div className={`min-h-0 flex-1 overflow-y-auto ${theme.bodyClass}`}>
-        <EditorContent
-          editor={editor}
-          className={`sticky-editor min-h-[inherit] [&_.ProseMirror]:min-h-[11rem] ${theme.placeholderClass}`}
+      <div className={`flex min-h-0 flex-1 flex-col overflow-hidden ${theme.bodyClass}`}>
+        <CalendarEventRichField
+          aria-label="스티커 메모"
+          placeholder="메모를 작성하세요…"
+          html={note.bodyHtml}
+          plain={note.body}
+          variant="sticky"
+          paperTint={note.tint}
+          onChange={({ html, plain }) => schedulePatch(html, plain)}
         />
       </div>
-
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        className="sr-only"
-        aria-hidden
-        onChange={onImagePick}
-      />
-
-      <footer
-        className={`flex shrink-0 flex-wrap items-center gap-0.5 px-1.5 py-1 ${theme.footerClass}`}
-      >
-        {editor ? (
-          <>
-            <button
-              type="button"
-              className={`${theme.toolbarBtnClass} ${editor.isActive('bold') ? theme.toolbarBtnActiveClass : ''}`}
-              aria-label="굵게"
-              onClick={() => editor.chain().focus().toggleBold().run()}
-            >
-              <strong>B</strong>
-            </button>
-            <button
-              type="button"
-              className={`${theme.toolbarBtnClass} ${editor.isActive('italic') ? theme.toolbarBtnActiveClass : ''}`}
-              aria-label="기울임"
-              onClick={() => editor.chain().focus().toggleItalic().run()}
-            >
-              <em>I</em>
-            </button>
-            <button
-              type="button"
-              className={`${theme.toolbarBtnClass} ${editor.isActive('underline') ? theme.toolbarBtnActiveClass : ''}`}
-              aria-label="밑줄"
-              onClick={() => editor.chain().focus().toggleUnderline().run()}
-            >
-              <span className="underline">U</span>
-            </button>
-            <button
-              type="button"
-              className={`${theme.toolbarBtnClass} ${editor.isActive('strike') ? theme.toolbarBtnActiveClass : ''}`}
-              aria-label="취소선"
-              onClick={() => editor.chain().focus().toggleStrike().run()}
-            >
-              <s>ab</s>
-            </button>
-            <button
-              type="button"
-              className={`${theme.toolbarBtnClass} ${editor.isActive('bulletList') ? theme.toolbarBtnActiveClass : ''}`}
-              aria-label="글머리 기호"
-              onClick={() => editor.chain().focus().toggleBulletList().run()}
-            >
-              <span className="text-xs">•≡</span>
-            </button>
-            <button
-              type="button"
-              className={theme.toolbarBtnClass}
-              aria-label="이미지 넣기"
-              onClick={() => fileRef.current?.click()}
-            >
-              <span className="text-xs">▢</span>
-            </button>
-          </>
-        ) : null}
-      </footer>
     </div>
   )
 }
