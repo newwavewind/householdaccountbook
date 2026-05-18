@@ -133,8 +133,8 @@
   --color-well: rgba(23, 23, 23, 0.04);
   --color-inset-highlight: rgba(255, 255, 255, 0.88);
 
-  --color-semantic-income: #166534;
-  --color-semantic-expense: #b91c1c;
+  --color-semantic-income: #65a30d;
+  --color-semantic-expense: #dc2626;
 
   --color-gold: #b45309;
   --color-warning: #d97706;
@@ -166,6 +166,15 @@
 
 .theme2 .community-post-body blockquote {
   border-left-color: var(--color-charcoal-border);
+}
+
+/*
+  장부·요약 금액: Brainfish 톤에 맞춘 라임/레드 + 숫자 강조
+*/
+.theme2 :where(.text-semantic-income, .text-semantic-expense) {
+  font-weight: 600;
+  letter-spacing: -0.028em;
+  font-variant-numeric: tabular-nums;
 }
 
 /*
@@ -218,8 +227,8 @@
   --color-well: rgba(55, 65, 81, 0.05);
   --color-inset-highlight: rgba(255, 255, 255, 0.92);
 
-  --color-semantic-income: #6aa84f;
-  --color-semantic-expense: #c2410c;
+  --color-semantic-income: #3d7d2c;
+  --color-semantic-expense: #b42318;
 
   --color-gold: #b45309;
   --color-warning: #f59e0b;
@@ -254,6 +263,13 @@
 
 .theme3 .community-post-body blockquote {
   border-left-color: var(--color-border-strong);
+}
+
+/* 장부·요약 금액: PostHog 스케일(IBM Plex·콤팩트)에 맞춤 */
+.theme3 :where(.text-semantic-income, .text-semantic-expense) {
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
 }
 
 @layer base {
