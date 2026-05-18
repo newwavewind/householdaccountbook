@@ -11,6 +11,7 @@ import {
   supabaseProjectRefFromUrl,
 } from '../lib/supabaseOAuthProbe'
 import { oauthCallbackFullUrl } from '../lib/appUrls'
+import { VERCEL_PRODUCTION_AUTH_CALLBACK } from '../lib/deployUrls'
 
 function GoogleMark({ className = 'h-5 w-5' }: { className?: string }) {
   return (
@@ -344,9 +345,7 @@ VITE_SUPABASE_ANON_KEY=eyJhbG...`}
                 주소)과 <strong>Redirect URLs</strong>를 넣습니다. Redirect에는{' '}
                 <strong>실제로 쓰는 배포마다</strong> 앱 콜백을 모두 추가해야 합니다. (예:{' '}
                 <code className="rounded bg-ceramic px-1">http://localhost:5173/auth/callback</code>,{' '}
-                <code className="rounded bg-ceramic px-1">
-                  https://householdaccountbook.vercel.app/auth/callback
-                </code>
+                <code className="rounded bg-ceramic px-1">{VERCEL_PRODUCTION_AUTH_CALLBACK}</code>
                 、GitHub Pages면{' '}
                 <code className="rounded bg-ceramic px-1">
                   https://계정.github.io/저장소명/auth/callback
