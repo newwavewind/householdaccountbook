@@ -78,24 +78,15 @@ export default function RootLayout() {
       <header className="sticky top-0 z-40 border-b border-black/[0.06] bg-neutral-warm/95 backdrop-blur-sm">
         <div className="relative mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 py-2 md:flex-wrap md:px-6 md:py-3">
           <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden pr-[5.25rem] md:min-w-0 md:flex-initial md:flex-wrap md:gap-4 md:overflow-visible md:pr-0">
-            <NavLink
-              to="/"
-              className="shrink-0 font-serif-display text-lg font-semibold text-starbucks-green"
-            >
-              가계부
-            </NavLink>
             <nav
               className="flex min-w-0 flex-nowrap gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] md:flex-wrap md:overflow-visible [&::-webkit-scrollbar]:hidden"
               aria-label="주 메뉴"
             >
               <NavLink className={navCls} to="/calendar">
-                일정
-              </NavLink>
-              <NavLink className={navCls} to="/input">
-                입력
+                다이어리
               </NavLink>
               <NavLink className={navCls} to="/">
-                장부
+                가계부
               </NavLink>
               <NavLink className={navCls} to="/community">
                 커뮤니티

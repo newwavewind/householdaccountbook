@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { NavLink } from 'react-router-dom'
 import { Button } from './components/ui/Button'
 import { Card } from './components/ui/Card'
 import { Fab } from './components/ui/Fab'
@@ -548,6 +549,18 @@ export default function LedgerApp() {
             <p className="truncate text-lg font-semibold tracking-[-0.16px] text-starbucks-green md:text-xl">
               가계부
             </p>
+            <NavLink
+              to="/input"
+              className={({ isActive }) =>
+                `shrink-0 rounded-full border border-green-accent px-2.5 py-1 text-xs font-semibold transition-colors active:scale-[0.98] md:px-3 md:py-1.5 md:text-sm ${
+                  isActive
+                    ? 'bg-green-accent text-white'
+                    : 'text-green-accent hover:bg-green-light/60'
+                }`
+              }
+            >
+              PC입력
+            </NavLink>
             {syncState.mode === 'cloud' ? (
               <span
                 title={
