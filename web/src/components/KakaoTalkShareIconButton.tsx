@@ -49,10 +49,10 @@ export function KakaoTalkShareIconButton({
       }}
     >
       <span
-        className="inline-flex min-w-[1.35rem] items-center justify-center rounded bg-[#FEE500] px-1 py-px text-[0.6rem] font-extrabold leading-none text-[#191919] shadow-[inset_0_0_0_1px_rgb(0_0_0/0.06)]"
+        className="inline-flex min-w-[2.5rem] items-center justify-center rounded bg-[#FEE500] px-1 py-px text-[0.55rem] font-extrabold leading-none text-[#191919] shadow-[inset_0_0_0_1px_rgb(0_0_0/0.06)]"
         aria-hidden
       >
-        톡
+        카카오
       </span>
     </button>
   )
