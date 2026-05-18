@@ -1,12 +1,22 @@
 ﻿import FontFamily from '@tiptap/extension-font-family'
 import Highlight from '@tiptap/extension-highlight'
+import Image from '@tiptap/extension-image'
 import Placeholder from '@tiptap/extension-placeholder'
+import Underline from '@tiptap/extension-underline'
 import { TextStyle } from '@tiptap/extension-text-style'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type RefObject,
+} from 'react'
 import { sanitizeCalendarEventHtml } from './calendarHtmlSanitize'
 import { STICKY_THEMES } from './stickyNoteTheme'
+
+const IMG_MAX_BYTES = 1_800_000
 
 function deriveContent(html: string | undefined, plain: string): string {
   const h = html?.trim()
@@ -81,7 +91,9 @@ export function CalendarEventRichField({
 }: Props) {
   const [fontSel, setFontSel] = useState('')
   const [highlightOpen, setHighlightOpen] = useState(false)
+  const [, setToolbarTick] = useState(0)
   const hlWrapRef = useRef<HTMLDivElement>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   useCloseOnDismiss(highlightOpen, hlWrapRef, () => setHighlightOpen(false))
 
@@ -89,11 +101,18 @@ export function CalendarEventRichField({
     extensions: [
       StarterKit.configure({
         heading: false,
-        bulletList: false,
+        bulletList: {
+          HTMLAttributes: { class: 'list-disc pl-5 space-y-0.5' },
+        },
         orderedList: false,
         blockquote: false,
         codeBlock: false,
         horizontalRule: false,
+      }),
+      Underline,
+      Image.configure({
+        inline: false,
+        allowBase64: true,
       }),
       TextStyle,
       FontFamily.configure({ types: ['textStyle'] }),
@@ -104,7 +123,7 @@ export function CalendarEventRichField({
     editorProps: {
       attributes: {
         'aria-label': ariaLabel,
-        class: `max-w-full px-3 py-2.5 text-sm text-text-primary outline-none ring-0 focus-visible:ring-0 ${minHeightClass} [&_.ProseMirror]:min-h-[inherit] [&_.ProseMirror]:outline-none [&_.ProseMirror]:leading-relaxed`,
+        class: `max-w-full px-3 py-2.5 text-sm text-text-primary outline-none ring-0 focus-visible:ring-0 ${minHeightClass} [&_.ProseMirror]:min-h-[inherit] [&_.ProseMirror]:outline-none [&_.ProseMirror]:leading-relaxed [&_img]:max-h-48 [&_img]:w-auto [&_img]:max-w-full [&_img]:rounded`,
       },
     },
     onUpdate: ({ editor: ed }) => {
@@ -119,6 +138,17 @@ export function CalendarEventRichField({
       setFontSel(ff)
     },
   })
+
+  useEffect(() => {
+    if (!editor) return
+    const bump = () => setToolbarTick((t) => t + 1)
+    editor.on('selectionUpdate', bump)
+    editor.on('transaction', bump)
+    return () => {
+      editor.off('selectionUpdate', bump)
+      editor.off('transaction', bump)
+    }
+  }, [editor])
 
   useEffect(() => {
     if (!editor) return
@@ -142,6 +172,25 @@ export function CalendarEventRichField({
       html: sanitizeCalendarEventHtml(editor.getHTML()),
       plain: editor.getText().trim(),
     })
+  }
+
+  const onImagePick = (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    e.target.value = ''
+    if (!f || !editor) return
+    if (!f.type.startsWith('image/')) return
+    if (f.size > IMG_MAX_BYTES) {
+      window.alert('이미지는 약 1.8MB 이하로 올려 주세요.')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      const src = typeof reader.result === 'string' ? reader.result : ''
+      if (!src.startsWith('data:image/')) return
+      editor.chain().focus().setImage({ src }).run()
+      pushChange()
+    }
+    reader.readAsDataURL(f)
   }
 
   const highlightPanel = highlightOpen ? (
@@ -192,7 +241,7 @@ export function CalendarEventRichField({
     </div>
   ) : null
 
-  const toolbar = (
+  const fontSelect = (
     <>
       <label className="sr-only" htmlFor={`cal-font-${encodeURIComponent(ariaLabel)}`}>
         글꼴
@@ -223,12 +272,11 @@ export function CalendarEventRichField({
           </option>
         ))}
       </select>
-      {!isSticky ? (
-        <span
-          className="mx-0.5 hidden h-5 w-px shrink-0 bg-border-muted sm:block"
-          aria-hidden
-        />
-      ) : null}
+    </>
+  )
+
+  const boldItalic = (
+    <>
       <button
         type="button"
         onClick={() => {
@@ -267,45 +315,119 @@ export function CalendarEventRichField({
       >
         {isSticky ? <em>I</em> : '기울임'}
       </button>
-      {!isSticky ? (
-        <span
-          className="mx-0.5 hidden h-5 w-px shrink-0 bg-border-muted sm:block"
-          aria-hidden
-        />
-      ) : null}
-      <div
-        ref={hlWrapRef}
-        className={`relative flex min-w-0 items-center ${isSticky ? '' : 'flex-1 sm:flex-initial'}`}
+    </>
+  )
+
+  const underlineStrikeListImgSticky = isSticky ? (
+    <>
+      <button
+        type="button"
+        className={`${st.toolbarBtnClass} ${editor.isActive('underline') ? st.toolbarBtnActiveClass : ''}`}
+        aria-label="밑줄"
+        onClick={() => {
+          editor.chain().focus().toggleUnderline().run()
+          pushChange()
+        }}
       >
-        <button
-          type="button"
-          aria-expanded={highlightOpen}
-          aria-haspopup="dialog"
-          onClick={() => setHighlightOpen((o) => !o)}
-          className={
-            isSticky
-              ? [
-                  st.toolbarBtnClass,
-                  highlightOpen || highlightOn ? st.toolbarBtnActiveClass : '',
-                ].join(' ')
-              : [
-                  'h-8 shrink-0 rounded-md border px-2 text-[11px] font-medium transition-colors',
-                  highlightOpen || highlightOn
-                    ? 'border-green-accent/60 bg-green-light/40 text-text-primary'
-                    : 'border-transparent bg-surface-raised text-text-secondary hover:bg-well',
-                ].join(' ')
-          }
-        >
-          {isSticky ? <span className="text-xs">형광</span> : '형광'}
-        </button>
-        {highlightPanel}
-      </div>
+        <span className="underline">U</span>
+      </button>
+      <button
+        type="button"
+        className={`${st.toolbarBtnClass} ${editor.isActive('strike') ? st.toolbarBtnActiveClass : ''}`}
+        aria-label="취소선"
+        onClick={() => {
+          editor.chain().focus().toggleStrike().run()
+          pushChange()
+        }}
+      >
+        <s>ab</s>
+      </button>
+      <button
+        type="button"
+        className={`${st.toolbarBtnClass} ${editor.isActive('bulletList') ? st.toolbarBtnActiveClass : ''}`}
+        aria-label="글머리 기호"
+        onClick={() => {
+          editor.chain().focus().toggleBulletList().run()
+          pushChange()
+        }}
+      >
+        <span className="text-xs">•≡</span>
+      </button>
+      <button
+        type="button"
+        className={st.toolbarBtnClass}
+        aria-label="이미지 넣기"
+        onClick={() => fileRef.current?.click()}
+      >
+        <span className="text-xs">▢</span>
+      </button>
+    </>
+  ) : null
+
+  const highlightBlock = (
+    <div
+      ref={hlWrapRef}
+      className={`relative flex min-w-0 items-center ${isSticky ? 'ml-auto' : 'flex-1 sm:flex-initial'}`}
+    >
+      <button
+        type="button"
+        aria-expanded={highlightOpen}
+        aria-haspopup="dialog"
+        onClick={() => setHighlightOpen((o) => !o)}
+        className={
+          isSticky
+            ? [
+                st.toolbarBtnClass,
+                highlightOpen || highlightOn ? st.toolbarBtnActiveClass : '',
+              ].join(' ')
+            : [
+                'h-8 shrink-0 rounded-md border px-2 text-[11px] font-medium transition-colors',
+                highlightOpen || highlightOn
+                  ? 'border-green-accent/60 bg-green-light/40 text-text-primary'
+                  : 'border-transparent bg-surface-raised text-text-secondary hover:bg-well',
+              ].join(' ')
+        }
+      >
+        {isSticky ? <span className="text-xs">형광</span> : '형광'}
+      </button>
+      {highlightPanel}
+    </div>
+  )
+
+  const toolbar = isSticky ? (
+    <>
+      {fontSelect}
+      {boldItalic}
+      {underlineStrikeListImgSticky}
+      {highlightBlock}
+    </>
+  ) : (
+    <>
+      {fontSelect}
+      <span
+        className="mx-0.5 hidden h-5 w-px shrink-0 bg-border-muted sm:block"
+        aria-hidden
+      />
+      {boldItalic}
+      <span
+        className="mx-0.5 hidden h-5 w-px shrink-0 bg-border-muted sm:block"
+        aria-hidden
+      />
+      {highlightBlock}
     </>
   )
 
   if (isSticky) {
     return (
       <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-transparent">
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="sr-only"
+          aria-hidden
+          onChange={onImagePick}
+        />
         <div
           className={`min-h-0 flex-1 overflow-y-auto ${st.placeholderClass} [&_.ProseMirror]:px-3 [&_.ProseMirror]:py-2`}
         >

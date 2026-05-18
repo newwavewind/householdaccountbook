@@ -16,8 +16,12 @@ export function sanitizeCalendarEventHtml(raw: string): string {
       's',
       'span',
       'mark',
+      'ul',
+      'ol',
+      'li',
+      'img',
     ],
-    ALLOWED_ATTR: ['style', 'class', 'data-color', 'color'],
+    ALLOWED_ATTR: ['style', 'class', 'data-color', 'color', 'src', 'alt'],
   })
 }
 

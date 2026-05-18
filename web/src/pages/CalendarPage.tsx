@@ -403,6 +403,21 @@ function DayMemoPanel({
                       className="h-7 max-w-[7rem] rounded border border-black/20 bg-white/90 px-1.5 text-xs text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-black/20"
                       aria-label={`일정 ${i + 1} 시간`}
                     />
+                    <button
+                      type="button"
+                      className={`${stickyTheme.headerBtnClass} h-7 shrink-0 px-1.5 text-[0.65rem]`}
+                      aria-label={`일정 ${i + 1} 시간 없음`}
+                      title="시간 지정 안 함"
+                      onClick={() => {
+                        setEvents((prev) => {
+                          const next = [...prev]
+                          next[i] = { ...ev, time: undefined }
+                          return next
+                        })
+                      }}
+                    >
+                      시간 없음
+                    </button>
                   </div>
                   <div className="flex shrink-0 items-center gap-0.5">
                     <CalendarInkColorDropdown
@@ -503,12 +518,15 @@ function CalendarDayPeekSheet({
   ledgerTxCount,
   ddaysThisDay,
   onClose,
+  onToggleEventImportant,
 }: {
   iso: string
   memo: CalendarDayMemo | undefined
   ledgerTxCount: number
   ddaysThisDay: DdayEvent[]
   onClose: () => void
+  /** 모달에서 일정 중요 표시를 바로 저장할 때 */
+  onToggleEventImportant?: (eventId: string, important: boolean) => void
 }) {
   const hol = holidayLabel(iso)
   const lunar = lunarCellInfo(iso, hol)
@@ -584,7 +602,19 @@ function CalendarDayPeekSheet({
                           {formatTimeKo(e.time.trim())}
                         </span>
                       ) : null}
-                      {e.important === true ? (
+                      {onToggleEventImportant ? (
+                        <label className="flex cursor-pointer items-center gap-1 text-xs font-medium text-text-secondary">
+                          <input
+                            type="checkbox"
+                            checked={e.important === true}
+                            onChange={(ev) =>
+                              onToggleEventImportant(e.id, ev.target.checked)
+                            }
+                            className="size-3.5 rounded border-black/25 text-amber-600"
+                          />
+                          <span className="text-amber-700">중요</span>
+                        </label>
+                      ) : e.important === true ? (
                         <span className="text-xs font-semibold text-amber-600">
                           중요
                         </span>
@@ -774,11 +804,25 @@ export default function CalendarPage() {
 
   const onPickDay = useCallback(
     (iso: string) => {
-      setPeekIso(null)
       setSelectedIso(iso)
+      setPeekIso(iso)
       requestAnimationFrame(() => scrollDetailIntoView())
     },
     [scrollDetailIntoView],
+  )
+
+  const patchPeekDayEventImportant = useCallback(
+    (eventId: string, important: boolean) => {
+      if (!peekIso) return
+      patchMemos((prev) => {
+        const list = getDayEvents(prev[peekIso])
+        const next = list.map((row) =>
+          row.id === eventId ? { ...row, important } : row,
+        )
+        return setCalendarDayEvents(prev, peekIso, next)
+      })
+    },
+    [patchMemos, peekIso],
   )
 
   const persistMemo = useCallback(
@@ -1063,6 +1107,7 @@ export default function CalendarPage() {
               ledgerTxCount={txCountByDate.get(peekIso) ?? 0}
               ddaysThisDay={eventsOnCalendarDay(peekIso, ddayEvents)}
               onClose={() => setPeekIso(null)}
+              onToggleEventImportant={patchPeekDayEventImportant}
             />,
             document.body,
           )
