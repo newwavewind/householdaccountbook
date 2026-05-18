@@ -171,6 +171,8 @@ type DayMemoPanelProps = {
   initial: CalendarDayMemo | undefined
   onPersist: (events: CalendarDayEvent[]) => void
   onDelete: () => void
+  /** 달력 피크(요약 모달) — 자동으로 가리지 않고 필요할 때만 연다 */
+  onOpenPeek?: () => void
 }
 
 function emptyEventRow(): CalendarDayEvent {
@@ -289,6 +291,7 @@ function DayMemoPanel({
   initial,
   onPersist,
   onDelete,
+  onOpenPeek,
 }: DayMemoPanelProps) {
   const [events, setEvents] = useState<CalendarDayEvent[]>([emptyEventRow()])
 
@@ -296,7 +299,7 @@ function DayMemoPanel({
     const raw = getDayEvents(initial)
     const list = raw.map(mergeCalendarEventToUnifiedMemo)
     setEvents(list.length > 0 ? list : [emptyEventRow()])
-  }, [iso, initial?.updatedAt])
+  }, [iso, initial])
 
   const hol = holidayLabel(iso)
   const lunar = lunarCellInfo(iso, hol)
@@ -306,24 +309,36 @@ function DayMemoPanel({
       id="calendar-day-detail"
       className="scroll-mt-24 p-0"
     >
-      <div className="border-b border-border-muted px-4 py-3 md:px-5 md:py-4">
-        <p className="text-base font-semibold text-starbucks-green">
-          {formatSelectedHeading(iso)}
-        </p>
-        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm text-text-soft">
-          {hol ? (
-            <span className="font-medium text-gold">{hol}</span>
-          ) : null}
-          {lunar ? (
-            <span
-              className={
-                lunar.emphasize ? 'font-semibold text-starbucks-green' : ''
-              }
-            >
-              음력 {lunar.label}
-            </span>
-          ) : null}
+      <div className="flex flex-wrap items-start justify-between gap-2 border-b border-border-muted px-4 py-3 md:px-5 md:py-4">
+        <div className="min-w-0 flex-1">
+          <p className="text-base font-semibold text-starbucks-green">
+            {formatSelectedHeading(iso)}
+          </p>
+          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm text-text-soft">
+            {hol ? (
+              <span className="font-medium text-gold">{hol}</span>
+            ) : null}
+            {lunar ? (
+              <span
+                className={
+                  lunar.emphasize ? 'font-semibold text-starbucks-green' : ''
+                }
+              >
+                음력 {lunar.label}
+              </span>
+            ) : null}
+          </div>
         </div>
+        {onOpenPeek ? (
+          <Button
+            type="button"
+            variant="outlined"
+            className="!min-h-9 shrink-0 touch-manipulation !px-3 !py-1.5 !text-xs"
+            onClick={onOpenPeek}
+          >
+            이 날 요약 보기
+          </Button>
+        ) : null}
       </div>
 
       <div className="space-y-3 px-4 py-3 md:px-5">
@@ -738,12 +753,15 @@ export default function CalendarPage() {
 
   useEffect(() => {
     const d = deepLinkDayRef.current
-    if (!d || selectedIso !== d) return
+    if (!d) return
+    if (selectedIso !== d) {
+      deepLinkDayRef.current = null
+      return
+    }
     if (cloudStatus === 'loading') return
-    setPeekIso(memoHasContent(memos[d]) ? d : null)
     scrollDetailIntoView()
     deepLinkDayRef.current = null
-  }, [selectedIso, memos, cloudStatus, scrollDetailIntoView])
+  }, [selectedIso, cloudStatus, scrollDetailIntoView])
 
   const goThisMonth = useCallback(() => {
     setPeekIso(null)
@@ -756,11 +774,11 @@ export default function CalendarPage() {
 
   const onPickDay = useCallback(
     (iso: string) => {
-      const m = memos[iso]
+      setPeekIso(null)
       setSelectedIso(iso)
-      setPeekIso(memoHasContent(m) ? iso : null)
+      requestAnimationFrame(() => scrollDetailIntoView())
     },
-    [memos],
+    [scrollDetailIntoView],
   )
 
   const persistMemo = useCallback(
@@ -1032,6 +1050,7 @@ export default function CalendarPage() {
             initial={selectedMemo}
             onPersist={persistMemo}
             onDelete={removeMemo}
+            onOpenPeek={() => setPeekIso(selectedIso)}
           />
         </div>
       </div>
