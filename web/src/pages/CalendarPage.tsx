@@ -14,6 +14,8 @@ import {
 import { lunarCellInfo } from '../calendar/lunarDisplay'
 import CalendarStickyNotesBoard from '../calendar/CalendarStickyNotesBoard'
 import { useHouseholdCalendarMemos } from '../calendar/useHouseholdCalendarMemos'
+import { useHouseholdCalendarStickers } from '../calendar/useHouseholdCalendarStickers'
+import { useDiaryCloudMigration } from '../hooks/useDiaryCloudMigration'
 import { buildDdaySummaryLines, eventsOnCalendarDay } from '../dday/ddayCompute'
 import { DdaySummaryTicker } from '../dday/DdaySummaryTicker'
 import { useHouseholdDDays } from '../dday/useHouseholdDDays'
@@ -641,7 +643,19 @@ export default function CalendarPage() {
   const { memos, patchMemos, cloudStatus, cloudMessage } =
     useHouseholdCalendarMemos()
 
-  const { events: ddayEvents } = useHouseholdDDays()
+  const { events: ddayEvents, cloudStatus: ddayCloudStatus } = useHouseholdDDays()
+  const {
+    notes: stickyNotes,
+    patchNotes: patchStickyNotes,
+    cloudStatus: stickerCloudStatus,
+    cloudMessage: stickerCloudMessage,
+  } = useHouseholdCalendarStickers()
+
+  useDiaryCloudMigration(householdId, {
+    memos: cloudStatus,
+    ddays: ddayCloudStatus,
+    stickers: stickerCloudStatus,
+  })
   const ddaySummaryLines = useMemo(
     () => buildDdaySummaryLines(ddayEvents),
     [ddayEvents],
@@ -842,15 +856,21 @@ export default function CalendarPage() {
                   변수와 같은지 확인해 주세요.
                 </p>
               </div>
-            ) : cloudStatus === 'loading' ? (
-              <p className="text-sm text-text-soft">가구 일정을 불러오는 중…</p>
+            ) : cloudStatus === 'loading' ||
+              ddayCloudStatus === 'loading' ||
+              stickerCloudStatus === 'loading' ? (
+              <p className="text-sm text-text-soft">가구 다이어리를 불러오는 중…</p>
+            ) : stickerCloudStatus === 'error' && stickerCloudMessage ? (
+              <div className="rounded-[var(--radius-card)] border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-danger">
+                스티커 동기화 오류: {stickerCloudMessage}
+              </div>
             ) : null}
           </div>
         ) : null}
       </div>
 
       <div className="flex flex-col gap-6">
-        <CalendarStickyNotesBoard />
+        <CalendarStickyNotesBoard notes={stickyNotes} patchNotes={patchStickyNotes} />
 
         <Card className="min-w-0 p-3 md:p-5">
           <div className="mb-4 flex flex-col gap-3 rounded-[var(--radius-card)] bg-ceramic/80 p-3 md:flex-row md:items-center md:justify-between md:p-4">

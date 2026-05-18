@@ -1,39 +1,27 @@
-﻿import { useCallback, useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import { Button } from '../components/ui/Button'
 import { CalendarStickyMemoCard } from './CalendarStickyMemoCard'
 import {
-  loadStickyNotes,
   loadStickyViewMode,
   type CalendarStickyNote,
   nextTint,
-  saveStickyNotes,
   saveStickyViewMode,
 } from './calendarStickyNotesStorage'
 
-export default function CalendarStickyNotesBoard() {
-  const [notes, setNotes] = useState<CalendarStickyNote[]>(loadStickyNotes)
+type Props = {
+  notes: CalendarStickyNote[]
+  patchNotes: (fn: (prev: CalendarStickyNote[]) => CalendarStickyNote[]) => void
+}
+
+export default function CalendarStickyNotesBoard({ notes, patchNotes }: Props) {
   const [viewMode, setViewMode] = useState<'compact' | 'expanded'>(() =>
     loadStickyViewMode(),
   )
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const noteCountRef = useRef(0)
 
   useEffect(() => {
     noteCountRef.current = notes.length
   }, [notes.length])
-
-  const scheduleSave = useCallback((next: CalendarStickyNote[]) => {
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => {
-      saveStickyNotes(next)
-    }, 280)
-  }, [])
-
-  useEffect(() => {
-    return () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current)
-    }
-  }, [])
 
   const setView = (mode: 'compact' | 'expanded') => {
     setViewMode(mode)
@@ -48,38 +36,23 @@ export default function CalendarStickyNotesBoard() {
       tint: nextTint(noteCountRef.current),
       updatedAt: new Date().toISOString(),
     }
-    setNotes((prev) => {
-      let next: CalendarStickyNote[]
-      if (!afterId) {
-        next = [...prev, n]
-      } else {
-        const i = prev.findIndex((x) => x.id === afterId)
-        next =
-          i < 0 ? [...prev, n] : [...prev.slice(0, i + 1), n, ...prev.slice(i + 1)]
-      }
-      saveStickyNotes(next)
-      return next
+    patchNotes((prev) => {
+      if (!afterId) return [...prev, n]
+      const i = prev.findIndex((x) => x.id === afterId)
+      return i < 0 ? [...prev, n] : [...prev.slice(0, i + 1), n, ...prev.slice(i + 1)]
     })
   }
 
   const patchNote = (id: string, patch: Partial<CalendarStickyNote>) => {
-    setNotes((prev) => {
-      const next = prev.map((x) =>
-        x.id === id
-          ? { ...x, ...patch, updatedAt: new Date().toISOString() }
-          : x,
-      )
-      scheduleSave(next)
-      return next
-    })
+    patchNotes((prev) =>
+      prev.map((x) =>
+        x.id === id ? { ...x, ...patch, updatedAt: new Date().toISOString() } : x,
+      ),
+    )
   }
 
   const removeNote = (id: string) => {
-    setNotes((prev) => {
-      const next = prev.filter((x) => x.id !== id)
-      saveStickyNotes(next)
-      return next
-    })
+    patchNotes((prev) => prev.filter((x) => x.id !== id))
   }
 
   const compact = viewMode === 'compact'
