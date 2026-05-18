@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react'
+import { createPortal } from 'react-dom'
 import {
   STICKY_TINT_LABEL,
   STICKY_TINT_ORDER,
@@ -16,11 +23,41 @@ const BODY_PREVIEW: Record<StickyTint, string> = {
   charcoal: '#3d3d3d',
 }
 
+const PANEL_Z = 10000
+const VIEWPORT_PAD = 8
+const PANEL_WIDTH = 208
+
+function clampPanelPosition(
+  anchor: DOMRect,
+  panelW: number,
+  panelH: number,
+  menuAlign: 'left' | 'right',
+): { top: number; left: number } {
+  let left =
+    menuAlign === 'right' ? anchor.right - panelW : anchor.left
+  left = Math.max(
+    VIEWPORT_PAD,
+    Math.min(left, window.innerWidth - panelW - VIEWPORT_PAD),
+  )
+
+  let top = anchor.top - panelH - VIEWPORT_PAD
+  if (top < VIEWPORT_PAD) {
+    top = anchor.bottom + VIEWPORT_PAD
+  }
+  top = Math.max(
+    VIEWPORT_PAD,
+    Math.min(top, window.innerHeight - panelH - VIEWPORT_PAD),
+  )
+
+  return { top, left }
+}
+
 type Props = {
   value: StickyTint
   onPick: (t: StickyTint) => void
   'aria-label': string
   menuAlign?: 'left' | 'right'
+  listLabel?: string
 }
 
 export function CalendarEventMemoTintPicker({
@@ -28,22 +65,59 @@ export function CalendarEventMemoTintPicker({
   onPick,
   'aria-label': ariaLabel,
   menuAlign = 'right',
+  listLabel = '메모지 색',
 }: Props) {
   const theme = STICKY_THEMES[value]
   const [open, setOpen] = useState(false)
-  const wrapRef = useRef<HTMLDivElement>(null)
+  const [panelStyle, setPanelStyle] = useState<CSSProperties | null>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
   const isCharcoal = value === 'charcoal'
   const swatchBorder = isCharcoal ? 'border-white/25' : 'border-black/15'
 
-  const menuPos =
-    menuAlign === 'right'
-      ? 'bottom-full right-0 mb-1'
-      : 'bottom-full left-0 mb-1'
+  const reposition = () => {
+    const btn = btnRef.current
+    const menu = menuRef.current
+    if (!btn || !menu) return
+    const anchor = btn.getBoundingClientRect()
+    const { top, left } = clampPanelPosition(
+      anchor,
+      menu.offsetWidth || PANEL_WIDTH,
+      menu.offsetHeight,
+      menuAlign,
+    )
+    setPanelStyle({
+      position: 'fixed',
+      top,
+      left,
+      width: PANEL_WIDTH,
+      zIndex: PANEL_Z,
+      visibility: 'visible',
+    })
+  }
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setPanelStyle(null)
+      return
+    }
+    reposition()
+    const raf = requestAnimationFrame(reposition)
+    window.addEventListener('resize', reposition)
+    window.addEventListener('scroll', reposition, true)
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('resize', reposition)
+      window.removeEventListener('scroll', reposition, true)
+    }
+  }, [open, menuAlign, value])
 
   useEffect(() => {
     if (!open) return
     const onDoc = (e: MouseEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false)
+      const t = e.target as Node
+      if (btnRef.current?.contains(t) || menuRef.current?.contains(t)) return
+      setOpen(false)
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false)
@@ -56,55 +130,72 @@ export function CalendarEventMemoTintPicker({
     }
   }, [open])
 
+  const menuPanel = open ? (
+    <div
+      ref={menuRef}
+      role="listbox"
+      aria-label={listLabel}
+      style={
+        panelStyle ?? {
+          position: 'fixed',
+          top: -9999,
+          left: VIEWPORT_PAD,
+          width: PANEL_WIDTH,
+          visibility: 'hidden',
+          zIndex: PANEL_Z,
+        }
+      }
+      className={`rounded-lg border bg-surface-raised p-2 shadow-lg ${
+        isCharcoal ? 'border-white/20' : 'border-black/10'
+      }`}
+    >
+      <p className="mb-1.5 px-1 text-[0.65rem] font-medium text-text-soft">
+        {listLabel}
+      </p>
+      <div className="grid grid-cols-4 gap-2">
+        {STICKY_TINT_ORDER.map((t) => (
+          <button
+            key={t}
+            type="button"
+            title={STICKY_TINT_LABEL[t]}
+            className={`flex flex-col items-center gap-0.5 rounded-md border-2 p-0.5 text-[0.6rem] text-text-soft shadow-sm transition-transform active:scale-95 ${
+              value === t ? 'ring-2 ring-starbucks-green ring-offset-1' : ''
+            } ${swatchBorder}`}
+            onClick={() => {
+              onPick(t)
+              setOpen(false)
+            }}
+          >
+            <span
+              className="block h-7 w-full rounded-sm border border-black/10"
+              style={{ backgroundColor: BODY_PREVIEW[t] }}
+              aria-hidden
+            />
+            <span className="max-w-[3.25rem] truncate px-0.5">
+              {STICKY_TINT_LABEL[t]}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  ) : null
+
   return (
-    <div ref={wrapRef} className="relative z-20 flex items-center">
+    <>
       <button
+        ref={btnRef}
         type="button"
         className={`${theme.headerBtnClass} touch-manipulation`}
         aria-label={ariaLabel}
         aria-expanded={open}
+        aria-haspopup="listbox"
         onClick={() => setOpen((v) => !v)}
       >
         <span className="px-1 text-base font-bold leading-none">⋯</span>
       </button>
-      {open ? (
-        <div
-          className={`absolute ${menuPos} z-[70] w-[min(calc(100vw-2rem),13rem)] rounded-lg border bg-surface-raised p-2 shadow-lg ${
-            isCharcoal ? 'border-white/20' : 'border-black/10'
-          }`}
-          role="listbox"
-          aria-label="메모지 색"
-        >
-          <p className="mb-1.5 px-1 text-[0.65rem] font-medium text-text-soft">
-            메모지 색
-          </p>
-          <div className="grid grid-cols-4 gap-2">
-            {STICKY_TINT_ORDER.map((t) => (
-              <button
-                key={t}
-                type="button"
-                title={STICKY_TINT_LABEL[t]}
-                className={`flex flex-col items-center gap-0.5 rounded-md border-2 p-0.5 text-[0.6rem] text-text-soft shadow-sm transition-transform active:scale-95 ${
-                  value === t ? 'ring-2 ring-starbucks-green ring-offset-1' : ''
-                } ${swatchBorder}`}
-                onClick={() => {
-                  onPick(t)
-                  setOpen(false)
-                }}
-              >
-                <span
-                  className="block h-7 w-full rounded-sm border border-black/10"
-                  style={{ backgroundColor: BODY_PREVIEW[t] }}
-                  aria-hidden
-                />
-                <span className="max-w-[3.25rem] truncate px-0.5">
-                  {STICKY_TINT_LABEL[t]}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : null}
-    </div>
+      {typeof document !== 'undefined' && menuPanel
+        ? createPortal(menuPanel, document.body)
+        : null}
+    </>
   )
 }

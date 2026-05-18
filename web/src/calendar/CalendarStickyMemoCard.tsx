@@ -1,15 +1,12 @@
-﻿import { useCallback, useEffect, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useRef } from 'react'
 import { KakaoTalkShareIconButton } from '../components/KakaoTalkShareIconButton'
 import { CalendarEventRichField } from './CalendarEventRichField'
 import {
   htmlToPlain,
   sanitizeStickyNoteHtml,
 } from './calendarHtmlSanitize'
-import type { CalendarStickyNote, StickyTint } from './calendarStickyNotesStorage'
-import {
-  STICKY_TINT_LABEL,
-  STICKY_TINT_ORDER,
-} from './calendarStickyNotesStorage'
+import type { CalendarStickyNote } from './calendarStickyNotesStorage'
+import { CalendarEventMemoTintPicker } from './CalendarEventMemoTintPicker'
 import { STICKY_THEMES } from './stickyNoteTheme'
 
 function deriveEditorHtml(html: string | undefined, plain: string): string {
@@ -70,8 +67,6 @@ function StickyMemoExpandedCard({
   onAddAfter,
 }: PatchProps) {
   const theme = STICKY_THEMES[note.tint]
-  const [paletteOpen, setPaletteOpen] = useState(false)
-  const paletteRef = useRef<HTMLDivElement>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const schedulePatch = useCallback(
@@ -91,28 +86,6 @@ function StickyMemoExpandedCard({
     }
   }, [])
 
-  useEffect(() => {
-    if (!paletteOpen) return
-    const onDoc = (e: MouseEvent) => {
-      if (!paletteRef.current?.contains(e.target as Node)) setPaletteOpen(false)
-    }
-    document.addEventListener('mousedown', onDoc, true)
-    return () => document.removeEventListener('mousedown', onDoc, true)
-  }, [paletteOpen])
-
-  const isCharcoal = note.tint === 'charcoal'
-  const swatchBorder = isCharcoal ? 'border-white/25' : 'border-black/15'
-
-  const bodyPreviewColors: Record<StickyTint, string> = {
-    yellow: '#fffef5',
-    green: '#eef8ef',
-    pink: '#fff5f8',
-    purple: '#f7f2ff',
-    blue: '#f3f8ff',
-    gray: '#f5f5f5',
-    charcoal: '#3d3d3d',
-  }
-
   return (
     <div className="flex min-h-[18rem] flex-col overflow-visible rounded-md border border-black/15 shadow-[3px_5px_18px_rgba(0,0,0,0.14)]">
       <header
@@ -126,52 +99,14 @@ function StickyMemoExpandedCard({
         >
           <span className="text-lg font-light leading-none">+</span>
         </button>
-        <div className="relative z-20 flex items-center gap-0.5" ref={paletteRef}>
-          <button
-            type="button"
-            className={theme.headerBtnClass}
+        <div className="flex items-center gap-0.5">
+          <CalendarEventMemoTintPicker
+            value={note.tint}
             aria-label="메모 색 선택"
-            aria-expanded={paletteOpen}
-            onClick={() => setPaletteOpen((v) => !v)}
-          >
-            <span className="px-1 text-base font-bold leading-none">⋯</span>
-          </button>
-          {paletteOpen ? (
-            <div
-              className={`absolute bottom-full right-0 z-[70] mb-1 w-[min(calc(100vw-2rem),13rem)] rounded-lg border bg-surface-raised p-2 shadow-lg ${isCharcoal ? 'border-white/20' : 'border-black/10'}`}
-              role="listbox"
-              aria-label="노트 색"
-            >
-              <p className="mb-1.5 px-1 text-[0.65rem] font-medium text-text-soft">
-                색 선택
-              </p>
-              <div className="grid grid-cols-4 gap-2">
-                {STICKY_TINT_ORDER.map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    title={STICKY_TINT_LABEL[t]}
-                    className={`flex flex-col items-center gap-0.5 rounded-md border-2 p-0.5 text-[0.6rem] text-text-soft shadow-sm transition-transform active:scale-95 ${
-                      note.tint === t ? 'ring-2 ring-starbucks-green ring-offset-1' : ''
-                    } ${swatchBorder}`}
-                    onClick={() => {
-                      onPatch(note.id, { tint: t })
-                      setPaletteOpen(false)
-                    }}
-                  >
-                    <span
-                      className="block h-7 w-full rounded-sm border border-black/10"
-                      style={{ backgroundColor: bodyPreviewColors[t] }}
-                      aria-hidden
-                    />
-                    <span className="max-w-[3.25rem] truncate px-0.5">
-                      {STICKY_TINT_LABEL[t]}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : null}
+            listLabel="색 선택"
+            menuAlign="right"
+            onPick={(t) => onPatch(note.id, { tint: t })}
+          />
           <KakaoTalkShareIconButton
             className={theme.headerBtnClass}
             titlePrefix="[달력 스티커 메모]"
