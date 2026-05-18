@@ -340,8 +340,23 @@ VITE_SUPABASE_ANON_KEY=eyJhbG...`}
                 Cloud에서 받은 Client ID / Secret을 넣습니다.
               </li>
               <li>
-                Authentication → URL Configuration 에서 Site URL과 Redirect URL에 콜백을
-                등록합니다.
+                Authentication → URL Configuration 에서 <strong>Site URL</strong>(대표 서비스
+                주소)과 <strong>Redirect URLs</strong>를 넣습니다. Redirect에는{' '}
+                <strong>실제로 쓰는 배포마다</strong> 앱 콜백을 모두 추가해야 합니다. (예:{' '}
+                <code className="rounded bg-ceramic px-1">http://localhost:5173/auth/callback</code>,{' '}
+                <code className="rounded bg-ceramic px-1">
+                  https://householdaccountbook.vercel.app/auth/callback
+                </code>
+                、GitHub Pages면{' '}
+                <code className="rounded bg-ceramic px-1">
+                  https://계정.github.io/저장소명/auth/callback
+                </code>
+                등 — 저장소 설정의 <code className="rounded bg-ceramic px-1">base</code>와 동일한
+                경로.)
+                <p className="mt-2 text-text-soft">
+                  아래 한 줄은 <strong>지금 이 창이 뜬 사이트</strong> 기준 콜백입니다. Vercel·Pages
+                  등에서 열었다면 그 주소에 맞게 Supabase에도 같은 형태로 등록하세요.
+                </p>
                 <pre className="mt-2 overflow-x-auto rounded-lg bg-house-green/10 p-3 text-xs">
                   {oauthCallbackFullUrl()}
                 </pre>

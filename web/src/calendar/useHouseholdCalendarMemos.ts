@@ -186,6 +186,8 @@ export function useHouseholdCalendarMemos() {
 
   useEffect(() => {
     if (!canSync || !householdId) return
+    /** 로그아웃 등으로 로컬이 비어 있는 첫 렌더에서, 원격 fetch 전에 빈 payload 가 upsert 되면 DB를 덮어쓴다. */
+    if (cloudStatus !== 'ready') return
 
     const j = JSON.stringify(memos)
     if (j === lastRemoteJsonRef.current) return
@@ -229,7 +231,7 @@ export function useHouseholdCalendarMemos() {
     return () => {
       if (pushTimerRef.current) clearTimeout(pushTimerRef.current)
     }
-  }, [memos, canSync, householdId])
+  }, [memos, canSync, householdId, cloudStatus])
 
   const patchMemos = useCallback((fn: (prev: MemoMap) => MemoMap) => {
     setMemos((prev) => {

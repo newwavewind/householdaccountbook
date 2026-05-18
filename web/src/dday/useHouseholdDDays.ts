@@ -185,6 +185,8 @@ export function useHouseholdDDays() {
 
   useEffect(() => {
     if (!canSync || !householdId) return
+    /** 로컬이 비운 직후 빈 events 가 먼저 push 되면 household_ddays 가 빈 배열로 덮어써질 수 있음. */
+    if (cloudStatus !== 'ready') return
 
     const j = payloadJson(events)
     if (j === lastRemoteJsonRef.current) return
@@ -226,7 +228,7 @@ export function useHouseholdDDays() {
     return () => {
       if (pushTimerRef.current) clearTimeout(pushTimerRef.current)
     }
-  }, [events, canSync, householdId])
+  }, [events, canSync, householdId, cloudStatus])
 
   const patchEvents = useCallback((fn: (prev: DdayEvent[]) => DdayEvent[]) => {
     setEvents((prev) => {
