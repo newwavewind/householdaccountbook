@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import {
@@ -623,7 +623,7 @@ function CalendarDayPeekSheet({
               이 날 거래 <span className="font-semibold tabular-nums">{ledgerTxCount}</span>건
             </p>
             <p className="mt-3 text-xs text-text-soft">
-              아래 &quot;이 날 요약&quot; 영역에서 편집·저장할 수 있어요.
+              아래에서 일정을 편집한 뒤 저장하면 반영돼요.
             </p>
           </section>
         </div>
@@ -635,7 +635,9 @@ function CalendarDayPeekSheet({
 export default function CalendarPage() {
   const now = useMemo(() => new Date(), [])
   const nav = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const detailRef = useRef<HTMLDivElement | null>(null)
+  const deepLinkDayRef = useRef<string | null>(null)
   const [cursorY, setCursorY] = useState(now.getFullYear())
   const [cursorM, setCursorM] = useState(now.getMonth())
   const [selectedIso, setSelectedIso] = useState<string>(() => todayIso())
@@ -708,6 +710,40 @@ export default function CalendarPage() {
       })
     })
   }, [])
+
+  useEffect(() => {
+    const raw = searchParams.get('day')
+    if (!raw) return
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      setSearchParams({}, { replace: true })
+      return
+    }
+    const [y, mo, dd] = raw.split('-').map(Number)
+    const dt = new Date(y, mo - 1, dd)
+    if (
+      dt.getFullYear() !== y ||
+      dt.getMonth() !== mo - 1 ||
+      dt.getDate() !== dd
+    ) {
+      setSearchParams({}, { replace: true })
+      return
+    }
+    deepLinkDayRef.current = raw
+    setPeekIso(null)
+    setCursorY(y)
+    setCursorM(mo - 1)
+    setSelectedIso(raw)
+    setSearchParams({}, { replace: true })
+  }, [searchParams, setSearchParams])
+
+  useEffect(() => {
+    const d = deepLinkDayRef.current
+    if (!d || selectedIso !== d) return
+    if (cloudStatus === 'loading') return
+    setPeekIso(memoHasContent(memos[d]) ? d : null)
+    scrollDetailIntoView()
+    deepLinkDayRef.current = null
+  }, [selectedIso, memos, cloudStatus, scrollDetailIntoView])
 
   const goThisMonth = useCallback(() => {
     setPeekIso(null)

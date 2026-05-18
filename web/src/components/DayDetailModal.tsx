@@ -1,4 +1,5 @@
 ﻿import { useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import { Button } from './ui/Button'
 import { holidayLabel } from '../lib/holidays'
 import { cardBrandLabel } from '../constants/cardBrands'
@@ -162,6 +163,19 @@ export function DayDetailModal({
               ))}
             </ul>
           )}
+        </div>
+
+        <div className="border-t border-border-muted px-4 py-3">
+          <Link
+            to={`/calendar?day=${encodeURIComponent(iso)}`}
+            onClick={onClose}
+            className="block text-center text-sm font-medium text-starbucks-green underline-offset-2 hover:underline"
+          >
+            이 날짜 일정·메모 편집(달력 화면) →
+          </Link>
+          <p className="mt-1.5 text-center text-xs text-text-soft">
+            장부 거래는 여기 모달에서, 캘린더 일정·스티커 메모는 달력 탭에서 다뤄요.
+          </p>
         </div>
 
         <div className="flex gap-2 border-t border-border-muted p-4">

@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { NavLink } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
 import { Button } from './components/ui/Button'
 import { Card } from './components/ui/Card'
 import { Fab } from './components/ui/Fab'
@@ -858,9 +858,21 @@ export default function LedgerApp() {
             <h2 className="!m-0 !mb-3 !text-lg font-semibold text-starbucks-green">
               달력 · 공휴일
             </h2>
+            <p className="mb-2 text-sm text-text-soft">
+              날짜에 마우스를 올리면 요약이 보이고, 클릭하면{' '}
+              <span className="font-medium text-text-primary">이 날 거래</span>를
+              볼 수 있어요.
+            </p>
             <p className="mb-4 text-sm text-text-soft">
-              날짜에 마우스를 올리면 요약이 보이고, 클릭하면 상세 내역을 볼 수
-              있어요.
+              시간·중요 표시·스티커형{' '}
+              <span className="font-medium text-text-primary">일정·메모</span>는{' '}
+              <Link
+                to="/calendar"
+                className="font-semibold text-starbucks-green underline-offset-2 hover:underline"
+              >
+                달력 화면
+              </Link>
+              에서 편집해요. 날짜를 눌렀을 때 뜨는 창에서도 바로 갈 수 있어요.
             </p>
             <LedgerCalendar
               year={cursor.y}
