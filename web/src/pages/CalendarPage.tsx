@@ -786,12 +786,9 @@ export default function CalendarPage() {
       <div className="mb-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 flex-1">
-            <h1 className="font-serif-display text-2xl font-semibold text-starbucks-green md:text-3xl">
-              일정 · 메모 달력
-            </h1>
             {ddaySummaryLines.length > 0 ? (
               <div
-                className="mt-3 flex flex-wrap gap-2"
+                className="flex flex-wrap gap-2"
                 aria-label="디데이 요약"
               >
                 {ddaySummaryLines.map((line) => (
@@ -804,7 +801,7 @@ export default function CalendarPage() {
                 ))}
               </div>
             ) : (
-              <p className="mt-2 text-sm text-text-soft">
+              <p className="text-sm text-text-soft">
                 <Link
                   to="/calendar/dday"
                   className="font-medium text-starbucks-green underline-offset-2 hover:underline"
