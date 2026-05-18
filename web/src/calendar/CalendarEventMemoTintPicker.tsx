@@ -35,20 +35,32 @@ export function CalendarEventMemoTintPicker({
   const isCharcoal = value === 'charcoal'
   const swatchBorder = isCharcoal ? 'border-white/25' : 'border-black/15'
 
+  const menuPos =
+    menuAlign === 'right'
+      ? 'bottom-full right-0 mb-1'
+      : 'bottom-full left-0 mb-1'
+
   useEffect(() => {
     if (!open) return
     const onDoc = (e: MouseEvent) => {
       if (!wrapRef.current?.contains(e.target as Node)) setOpen(false)
     }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
     document.addEventListener('mousedown', onDoc, true)
-    return () => document.removeEventListener('mousedown', onDoc, true)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDoc, true)
+      document.removeEventListener('keydown', onKey)
+    }
   }, [open])
 
   return (
-    <div ref={wrapRef} className="relative flex items-center">
+    <div ref={wrapRef} className="relative z-20 flex items-center">
       <button
         type="button"
-        className={theme.headerBtnClass}
+        className={`${theme.headerBtnClass} touch-manipulation`}
         aria-label={ariaLabel}
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
@@ -57,7 +69,7 @@ export function CalendarEventMemoTintPicker({
       </button>
       {open ? (
         <div
-          className={`absolute ${menuAlign === 'right' ? 'right-0' : 'left-0'} top-full z-[60] mt-1 w-52 rounded-lg border bg-surface-raised p-2 shadow-lg ${
+          className={`absolute ${menuPos} z-[70] w-[min(calc(100vw-2rem),13rem)] rounded-lg border bg-surface-raised p-2 shadow-lg ${
             isCharcoal ? 'border-white/20' : 'border-black/10'
           }`}
           role="listbox"

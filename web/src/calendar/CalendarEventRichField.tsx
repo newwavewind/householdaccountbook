@@ -28,8 +28,7 @@ import {
 import type { CalendarEventInkId } from './calendarEventInk'
 import type { StickyTint } from './calendarStickyNotesStorage'
 import { STICKY_THEMES } from './stickyNoteTheme'
-
-const IMG_MAX_BYTES = 1_800_000
+import { uploadCalendarImage } from './uploadCalendarImage'
 
 function deriveContent(html: string | undefined, plain: string): string {
   const h = html?.trim()
@@ -113,6 +112,7 @@ export function CalendarEventRichField({
   const [fontSel, setFontSel] = useState('')
   const [fontSizeSel, setFontSizeSel] = useState('')
   const [highlightOpen, setHighlightOpen] = useState(false)
+  const [imageUploading, setImageUploading] = useState(false)
   const [, setToolbarTick] = useState(0)
   const hlWrapRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -200,23 +200,20 @@ export function CalendarEventRichField({
     })
   }
 
-  const onImagePick = (e: ChangeEvent<HTMLInputElement>) => {
+  const onImagePick = async (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     e.target.value = ''
     if (!f || !editor) return
-    if (!f.type.startsWith('image/')) return
-    if (f.size > IMG_MAX_BYTES) {
-      window.alert('이미지는 약 1.8MB 이하로 올려 주세요.')
-      return
-    }
-    const reader = new FileReader()
-    reader.onload = () => {
-      const src = typeof reader.result === 'string' ? reader.result : ''
-      if (!src.startsWith('data:image/')) return
-      editor.chain().focus().setImage({ src }).run()
+    setImageUploading(true)
+    try {
+      const publicUrl = await uploadCalendarImage(f)
+      editor.chain().focus().setImage({ src: publicUrl, alt: '' }).run()
       pushChange()
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : '업로드에 실패했습니다.')
+    } finally {
+      setImageUploading(false)
     }
-    reader.readAsDataURL(f)
   }
 
   const highlightPanel = highlightOpen ? (
@@ -412,10 +409,11 @@ export function CalendarEventRichField({
       <button
         type="button"
         className={st.toolbarBtnClass}
-        aria-label="이미지 넣기"
+        aria-label="사진 넣기"
+        disabled={imageUploading}
         onClick={() => fileRef.current?.click()}
       >
-        <span className="text-xs">▢</span>
+        <span className="text-xs">{imageUploading ? '업로드…' : '사진'}</span>
       </button>
     </>
   ) : null
@@ -488,17 +486,22 @@ export function CalendarEventRichField({
     </>
   )
 
+  const hiddenFileInput = (
+    <input
+      ref={fileRef}
+      type="file"
+      accept="image/*"
+      className="sr-only"
+      aria-hidden
+      disabled={imageUploading}
+      onChange={onImagePick}
+    />
+  )
+
   if (isSticky) {
     return (
       <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-transparent">
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          className="sr-only"
-          aria-hidden
-          onChange={onImagePick}
-        />
+        {hiddenFileInput}
         <div
           className={`min-h-0 flex-1 overflow-y-auto ${st.placeholderClass} [&_.ProseMirror]:px-3 [&_.ProseMirror]:py-2`}
         >

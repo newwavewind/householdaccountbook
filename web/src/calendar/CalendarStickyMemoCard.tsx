@@ -114,9 +114,9 @@ function StickyMemoExpandedCard({
   }
 
   return (
-    <div className="flex min-h-[18rem] flex-col overflow-hidden rounded-md border border-black/15 shadow-[3px_5px_18px_rgba(0,0,0,0.14)]">
+    <div className="flex min-h-[18rem] flex-col overflow-visible rounded-md border border-black/15 shadow-[3px_5px_18px_rgba(0,0,0,0.14)]">
       <header
-        className={`flex h-9 shrink-0 items-center justify-between px-1.5 ${theme.headerClass}`}
+        className={`relative z-10 flex h-9 shrink-0 items-center justify-between overflow-visible px-1.5 ${theme.headerClass}`}
       >
         <button
           type="button"
@@ -126,7 +126,7 @@ function StickyMemoExpandedCard({
         >
           <span className="text-lg font-light leading-none">+</span>
         </button>
-        <div className="relative flex items-center gap-0.5" ref={paletteRef}>
+        <div className="relative z-20 flex items-center gap-0.5" ref={paletteRef}>
           <button
             type="button"
             className={theme.headerBtnClass}
@@ -138,7 +138,7 @@ function StickyMemoExpandedCard({
           </button>
           {paletteOpen ? (
             <div
-              className={`absolute right-0 top-full z-50 mt-1 w-52 rounded-lg border bg-surface-raised p-2 shadow-lg ${isCharcoal ? 'border-white/20' : 'border-black/10'}`}
+              className={`absolute bottom-full right-0 z-[70] mb-1 w-[min(calc(100vw-2rem),13rem)] rounded-lg border bg-surface-raised p-2 shadow-lg ${isCharcoal ? 'border-white/20' : 'border-black/10'}`}
               role="listbox"
               aria-label="노트 색"
             >

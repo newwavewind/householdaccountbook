@@ -265,10 +265,10 @@ function DayMemoPanel({
             return (
               <div
                 key={ev.id}
-                className="flex min-h-[18rem] flex-col overflow-hidden rounded-md border border-black/15 shadow-[3px_5px_18px_rgba(0,0,0,0.14)]"
+                className="flex min-h-[18rem] flex-col overflow-visible rounded-md border border-black/15 shadow-[3px_5px_18px_rgba(0,0,0,0.14)]"
               >
                 <header
-                  className={`flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1.5 px-1.5 py-1 ${stickyTheme.headerClass}`}
+                  className={`relative z-10 flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1.5 overflow-visible px-1.5 py-1 ${stickyTheme.headerClass}`}
                 >
                   <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 md:gap-x-3">
                     <span className="text-[0.72rem] font-semibold tabular-nums text-text-secondary">
