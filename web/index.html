@@ -25,7 +25,9 @@
           var k = 'mj-gaegyeobu-theme-v1';
           var p = localStorage.getItem(k);
           var t2 = p === 'theme2' || p === 'design2';
+          var t3 = p === 'theme3';
           document.documentElement.classList.toggle('theme2', t2);
+          document.documentElement.classList.toggle('theme3', t3);
           document.documentElement.style.colorScheme = 'light';
         } catch (e) {}
       })();

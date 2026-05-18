@@ -5,12 +5,30 @@ import {
   useCommunityBackendReadyMessage,
 } from '../community/CommunityAuthContext'
 import { communityBackendMode } from '../lib/communityBackend'
+import { useThemePreference } from '../theme/ThemeContext'
 import { ThemeToggle } from '../theme/ThemeToggle'
+import type { ThemePreference } from '../theme/themePreference'
 
-const navCls = ({ isActive }: { isActive: boolean }) =>
-  `shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors theme2:rounded-md ${isActive ? 'bg-green-accent text-on-accent theme2:border theme2:border-charcoal-border theme2:shadow-[var(--shadow-frap-base)]' : 'text-starbucks-green hover:bg-green-light/40 theme2:hover:bg-green-light/50'}`
+function navLinkClassName(
+  theme: ThemePreference,
+  { isActive }: { isActive: boolean },
+) {
+  if (theme === 'theme3') {
+    return `shrink-0 rounded-md px-3 py-1.5 text-sm font-semibold transition-colors ${
+      isActive
+        ? 'bg-green-light text-midnight-ink'
+        : 'text-faded-grey hover:bg-green-light/50'
+    }`
+  }
+  return `shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors theme2:rounded-md ${
+    isActive
+      ? 'bg-green-accent text-on-accent theme2:border theme2:border-charcoal-border theme2:shadow-[var(--shadow-frap-base)]'
+      : 'text-starbucks-green hover:bg-green-light/40 theme2:hover:bg-green-light/50'
+  }`
+}
 
 export default function RootLayout() {
+  const { preference } = useThemePreference()
   const nav = useNavigate()
   const mode = communityBackendMode()
   const backendMsg = useCommunityBackendReadyMessage()
@@ -83,17 +101,17 @@ export default function RootLayout() {
               className="flex min-w-0 flex-nowrap gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] md:flex-wrap md:overflow-visible [&::-webkit-scrollbar]:hidden"
               aria-label="주 메뉴"
             >
-              <NavLink className={navCls} to="/calendar">
+              <NavLink className={(p) => navLinkClassName(preference, p)} to="/calendar">
                 다이어리
               </NavLink>
-              <NavLink className={navCls} to="/">
+              <NavLink className={(p) => navLinkClassName(preference, p)} to="/">
                 가계부
               </NavLink>
-              <NavLink className={navCls} to="/community">
+              <NavLink className={(p) => navLinkClassName(preference, p)} to="/community">
                 커뮤니티
               </NavLink>
               {auth.role === 'admin' ? (
-                <NavLink className={navCls} to="/admin">
+                <NavLink className={(p) => navLinkClassName(preference, p)} to="/admin">
                   관리
                 </NavLink>
               ) : null}

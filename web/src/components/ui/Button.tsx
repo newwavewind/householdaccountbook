@@ -1,7 +1,7 @@
 ﻿import type { ButtonHTMLAttributes } from 'react'
 
 const base =
-  'inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border px-4 py-[7px] text-base font-semibold tracking-tight transition-all duration-200 ease-in-out active:scale-[0.95] disabled:pointer-events-none disabled:opacity-50'
+  'inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border px-4 py-[7px] text-base font-semibold tracking-tight transition-all duration-200 ease-in-out active:scale-[0.95] disabled:pointer-events-none disabled:opacity-50 theme3:rounded-md'
 
 const variants = {
   primary:

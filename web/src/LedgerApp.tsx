@@ -16,6 +16,7 @@ import type { PaymentMethod, Transaction } from './types/transaction'
 import HouseholdSetupModal from './components/HouseholdSetupModal'
 import { getSupabase } from './lib/supabaseClient'
 import { ledgerBackendMode } from './lib/ledgerBackend'
+import { useThemePreference } from './theme/ThemeContext'
 
 type TxListSort = {
   /** 현재 사용자가 선택한 우선 정렬 기준 */
@@ -169,6 +170,8 @@ export default function LedgerApp() {
     cloudMembers,
     setCloudMembers,
   } = useLedger()
+
+  const { preference: uiTheme } = useThemePreference()
 
   const isSupabase = ledgerBackendMode() === 'supabase'
   const showHouseholdSetup = isSupabase && !!userId && !householdId
@@ -552,11 +555,17 @@ export default function LedgerApp() {
             <NavLink
               to="/input"
               className={({ isActive }) =>
-                `shrink-0 rounded-full border border-green-accent px-2.5 py-1 text-xs font-semibold transition-colors active:scale-[0.98] theme2:rounded-md md:px-3 md:py-1.5 md:text-sm ${
-                  isActive
-                    ? 'bg-green-accent text-on-accent theme2:border-charcoal-border theme2:shadow-[var(--shadow-frap-base)]'
-                    : 'text-green-accent hover:bg-green-light/60 theme2:hover:bg-green-light/70'
-                }`
+                uiTheme === 'theme3'
+                  ? `shrink-0 rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors active:scale-[0.98] md:px-3 md:py-1.5 md:text-sm ${
+                      isActive
+                        ? 'border-green-accent bg-green-accent text-on-accent'
+                        : 'border-border-strong bg-surface-raised text-midnight-ink hover:bg-neutral-cool'
+                    }`
+                  : `shrink-0 rounded-full border border-green-accent px-2.5 py-1 text-xs font-semibold transition-colors active:scale-[0.98] theme2:rounded-md md:px-3 md:py-1.5 md:text-sm ${
+                      isActive
+                        ? 'bg-green-accent text-on-accent theme2:border-charcoal-border theme2:shadow-[var(--shadow-frap-base)]'
+                        : 'text-green-accent hover:bg-green-light/60 theme2:hover:bg-green-light/70'
+                    }`
               }
             >
               PC입력
