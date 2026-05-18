@@ -1,0 +1,8 @@
+{
+  "name": "householdaccountbook",
+  "private": true,
+  "description": "가계부앱 — 로컬에서 루트 빌드: 먼저 web에서 npm ci 또는 npm install",
+  "scripts": {
+    "build": "npm run build --prefix web"
+  }
+}

@@ -8,7 +8,7 @@
     "dev:api": "npm --prefix ../server run dev",
     "dev:full": "concurrently -k -n web,api -c cyan,magenta \"vite\" \"npm run dev:api\"",
     "google:oauth-setup": "node ../scripts/open-google-oauth-setup.mjs",
-    "build": "tsc -b && vite build",
+    "build": "node ./node_modules/typescript/lib/tsc.js -b && node ./node_modules/vite/bin/vite.js build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
