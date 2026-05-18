@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { communityBackendMode } from '../lib/communityBackend'
 import { getCommunitySupabase } from '../lib/communitySupabaseClient'
@@ -240,8 +240,8 @@ export default function AuthCallbackPage() {
   }, [nav])
 
   return (
-    <main className="mx-auto flex min-h-[70dvh] max-w-lg flex-col justify-center bg-gradient-to-b from-[#f7f5f0] to-neutral-warm px-4 py-16">
-      <Card className="border border-black/[0.08] bg-white p-8 text-center shadow-[var(--shadow-card)] md:p-10">
+    <main className="mx-auto flex min-h-[70dvh] max-w-lg flex-col justify-center bg-gradient-to-b from-auth-gradient-from to-neutral-warm px-4 py-16">
+      <Card className="border border-border-subtle bg-surface-raised p-8 text-center shadow-[var(--shadow-card)] md:p-10">
         {status === 'loading' ? (
           <div className="flex flex-col items-center gap-4">
             <div

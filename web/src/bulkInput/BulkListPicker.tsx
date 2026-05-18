@@ -1,4 +1,4 @@
-import {
+﻿import {
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -236,7 +236,7 @@ export function BulkListPicker({
               role="option"
               aria-selected={selected}
               tabIndex={-1}
-              className={`cursor-pointer rounded-[8px] px-3 py-2 text-sm outline-none transition-colors ${idx === highlight ? 'bg-green-light text-[rgba(0,0,0,0.87)]' : 'text-[rgba(0,0,0,0.87)]'} ${selected ? 'font-semibold' : ''}`}
+              className={`cursor-pointer rounded-[8px] px-3 py-2 text-sm outline-none transition-colors ${idx === highlight ? 'bg-green-light text-text-primary' : 'text-text-primary'} ${selected ? 'font-semibold' : ''}`}
               onMouseDown={(e) => {
                 e.preventDefault()
                 pickAt(idx)

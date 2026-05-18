@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+﻿import { useMemo } from 'react'
 import { Button } from './ui/Button'
 import { holidayLabel } from '../lib/holidays'
 import { cardBrandLabel } from '../constants/cardBrands'
@@ -57,10 +57,10 @@ export function DayDetailModal({
       <div
         role="dialog"
         aria-modal
-        className="flex max-h-[92dvh] w-full max-w-lg flex-col rounded-t-[var(--radius-card)] bg-white shadow-[var(--shadow-card)] sm:max-h-[85dvh] sm:rounded-[var(--radius-card)]"
+        className="flex max-h-[92dvh] w-full max-w-lg flex-col rounded-t-[var(--radius-card)] bg-surface-raised shadow-[var(--shadow-card)] sm:max-h-[85dvh] sm:rounded-[var(--radius-card)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="border-b border-black/[0.06] px-5 py-4">
+        <div className="border-b border-border-muted px-5 py-4">
           <p className="text-base font-semibold text-starbucks-green">{title}</p>
           {hol ? (
             <p className="mt-1 text-sm font-medium text-gold">{hol}</p>
@@ -109,7 +109,7 @@ export function DayDetailModal({
                         </span>
                       ) : null}
                       {t.type === 'expense' ? (
-                        <span className="rounded-full bg-neutral-cool px-2 py-0.5 text-xs font-medium text-[rgba(0,0,0,0.87)]">
+                        <span className="rounded-full bg-neutral-cool px-2 py-0.5 text-xs font-medium text-text-primary">
                           {t.paymentMethod === 'cash'
                             ? '현금'
                             : t.paymentMethod === 'ieum'
@@ -121,7 +121,7 @@ export function DayDetailModal({
                       ) : null}
                     </div>
                     {t.memo ? (
-                      <p className="mt-1 text-sm text-[rgba(0,0,0,0.87)]">
+                      <p className="mt-1 text-sm text-text-primary">
                         {t.memo}
                       </p>
                     ) : null}
@@ -164,7 +164,7 @@ export function DayDetailModal({
           )}
         </div>
 
-        <div className="flex gap-2 border-t border-black/[0.06] p-4">
+        <div className="flex gap-2 border-t border-border-muted p-4">
           <Button
             type="button"
             variant="outlined"

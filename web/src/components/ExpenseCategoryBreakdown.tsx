@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { EXPENSE_CATEGORIES } from '../constants/categories'
 import { cardBrandLabel } from '../constants/cardBrands'
 import type { Transaction } from '../types/transaction'
@@ -105,7 +105,7 @@ export function ExpenseCategoryBreakdown({
             'overflow-hidden rounded-lg border transition-colors',
             isOn
               ? 'border-green-accent bg-green-light/60 shadow-[inset_0_0_0_1px_rgba(0,117,74,0.12)]'
-              : 'border-black/[0.06] bg-white',
+              : 'border-border-muted bg-surface-raised',
           ].join(' ')
 
           return (
@@ -122,7 +122,7 @@ export function ExpenseCategoryBreakdown({
                   ].join(' ')}
                 >
                   <div className="flex items-baseline justify-between gap-2">
-                    <span className="min-w-0 shrink text-sm font-medium text-[rgba(0,0,0,0.87)]">
+                    <span className="min-w-0 shrink text-sm font-medium text-text-primary">
                       {key}
                     </span>
                     <span className="shrink-0 text-sm font-semibold tabular-nums text-semantic-expense">
@@ -143,12 +143,12 @@ export function ExpenseCategoryBreakdown({
                     id={detailId}
                     role="region"
                     aria-label={`${key} 분류 상세`}
-                    className="border-t border-black/[0.08] bg-white/80 px-3 py-3"
+                    className="border-t border-border-subtle bg-surface-raised/80 px-3 py-3"
                   >
                     <p className="text-[0.7rem] font-medium uppercase tracking-wide text-text-soft">
                       이번 달 이 분류
                     </p>
-                    <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-[rgba(0,0,0,0.78)]">
+                    <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-text-secondary">
                       <span className="font-semibold tabular-nums text-semantic-expense">
                         {fmtKrw.format(sum)}
                       </span>
@@ -185,7 +185,7 @@ export function ExpenseCategoryBreakdown({
                               </div>
                               <div className="mt-0.5 flex min-w-0 flex-wrap gap-x-2 text-xs leading-snug text-text-soft">
                                 {t.memo?.trim() ? (
-                                  <span className="min-w-0 break-words text-[rgba(0,0,0,0.65)]">
+                                  <span className="min-w-0 break-words text-text-muted">
                                     {t.memo.trim()}
                                   </span>
                                 ) : (

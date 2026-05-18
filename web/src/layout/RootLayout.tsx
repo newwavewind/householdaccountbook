@@ -5,9 +5,10 @@ import {
   useCommunityBackendReadyMessage,
 } from '../community/CommunityAuthContext'
 import { communityBackendMode } from '../lib/communityBackend'
+import { ThemeToggle } from '../theme/ThemeToggle'
 
 const navCls = ({ isActive }: { isActive: boolean }) =>
-  `shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${isActive ? 'bg-green-accent text-white' : 'text-starbucks-green hover:bg-green-light/50'}`
+  `shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${isActive ? 'bg-green-accent text-white' : 'text-starbucks-green hover:bg-green-light/40 dark:hover:bg-green-light/25'}`
 
 export default function RootLayout() {
   const nav = useNavigate()
@@ -75,7 +76,7 @@ export default function RootLayout() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-black/[0.06] bg-neutral-warm/95 backdrop-blur-sm">
+      <header className="sticky top-0 z-40 border-b border-border-muted bg-neutral-warm/95 backdrop-blur-sm">
         <div className="relative mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 py-2 md:flex-wrap md:px-6 md:py-3">
           <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden pr-[5.25rem] md:min-w-0 md:flex-initial md:flex-wrap md:gap-4 md:overflow-visible md:pr-0">
             <nav
@@ -99,11 +100,12 @@ export default function RootLayout() {
             </nav>
           </div>
           <div className="absolute right-3 top-1/2 z-10 flex -translate-y-1/2 flex-nowrap items-center justify-end gap-1 md:static md:z-0 md:translate-y-0 md:gap-2">
+            <ThemeToggle />
             {authControls}
           </div>
         </div>
         {backendMsg ? (
-          <p className="border-t border-dashed border-black/[0.08] px-4 py-2 text-center text-xs text-warning">
+          <p className="border-t border-dashed border-border-subtle px-4 py-2 text-center text-xs text-warning">
             {backendMsg}
           </p>
         ) : null}

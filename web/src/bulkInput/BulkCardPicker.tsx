@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+﻿import { useMemo } from 'react'
 import type { KeyboardEvent } from 'react'
 import { CARD_BRANDS } from '../constants/cardBrands'
 import { BulkListPicker, type BulkListPickerRow } from './BulkListPicker'
@@ -50,7 +50,7 @@ export function BulkCardPicker({
       onPick={onPick}
       onFieldKeyDown={onFieldKeyDown}
       onNavigateAfterPick={onNavigateAfterPick}
-      triggerClassName="max-w-[10rem] min-h-[42px] w-full truncate rounded-lg border border-input-border bg-white px-2 py-1.5 text-left text-xs outline-none focus:border-green-accent disabled:opacity-40"
+      triggerClassName="max-w-[10rem] min-h-[42px] w-full truncate rounded-lg border border-input-border bg-surface-raised px-2 py-1.5 text-left text-xs outline-none focus:border-green-accent disabled:opacity-40"
     />
   )
 }

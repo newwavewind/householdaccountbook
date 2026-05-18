@@ -1,4 +1,4 @@
-/** 일정 제목·메모 글자색 (Tailwind 클래스로 매핑) */
+﻿/** 일정 제목·메모 글자색 (Tailwind 클래스로 매핑) */
 export const CALENDAR_EVENT_INK_IDS = [
   'default',
   'blue',
@@ -44,7 +44,7 @@ export function calendarEventInkTextClass(
     case 'slate':
       return 'text-slate-600'
     default:
-      return 'text-[rgba(0,0,0,0.87)]'
+      return 'text-text-primary'
   }
 }
 
@@ -54,7 +54,12 @@ export const CALENDAR_EVENT_INK_SWATCHES: {
   ring: string
   dot: string
 }[] = [
-  { id: 'default', label: '검정', ring: 'ring-black/40', dot: 'bg-[rgba(0,0,0,0.75)]' },
+  {
+    id: 'default',
+    label: '검정',
+    ring: 'ring-text-primary/35',
+    dot: 'bg-text-primary',
+  },
   { id: 'blue', label: '파랑', ring: 'ring-blue-600', dot: 'bg-blue-600' },
   { id: 'sky', label: '하늘', ring: 'ring-sky-500', dot: 'bg-sky-500' },
   { id: 'emerald', label: '초록', ring: 'ring-emerald-600', dot: 'bg-emerald-600' },

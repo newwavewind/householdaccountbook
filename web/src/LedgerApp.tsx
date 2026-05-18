@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink } from 'react-router-dom'
 import { Button } from './components/ui/Button'
@@ -108,14 +108,14 @@ function TransactionListSummaryBanner({
           건수
         </span>
         <span className="flex items-baseline gap-1 tabular-nums">
-          <span className="text-xl font-semibold tracking-tight text-[rgba(0,0,0,0.88)] sm:text-[1.3rem]">
+          <span className="text-xl font-semibold tracking-tight text-text-primary sm:text-[1.3rem]">
             {count}
           </span>
           <span className="text-xs font-medium text-text-soft">건</span>
         </span>
       </div>
       <div
-        className="hidden w-px shrink-0 bg-black/[0.08] sm:block sm:self-stretch sm:mx-0.5"
+        className="hidden w-px shrink-0 bg-border-subtle sm:block sm:self-stretch sm:mx-0.5"
         aria-hidden
       />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-2 md:flex-none md:justify-end">
@@ -534,16 +534,16 @@ export default function LedgerApp() {
       <div className="min-h-dvh bg-neutral-warm pb-28">
       {syncState.mode === 'cloud' && syncState.status === 'loading' ? (
         <div
-          className="fixed inset-0 z-[55] flex items-center justify-center bg-white/75 backdrop-blur-[1px]"
+          className="fixed inset-0 z-[55] flex items-center justify-center bg-surface-raised/75 backdrop-blur-[1px]"
           aria-busy
           aria-live="polite"
         >
-          <p className="rounded-[var(--radius-card)] border border-black/[0.08] bg-white px-5 py-4 text-sm text-[rgba(0,0,0,0.87)] shadow-[var(--shadow-card)]">
+          <p className="rounded-[var(--radius-card)] border border-border-subtle bg-surface-raised px-5 py-4 text-sm text-text-primary shadow-[var(--shadow-card)]">
             서버와 동기화하는 중…
           </p>
         </div>
       ) : null}
-      <header className="relative z-10 border-b border-black/[0.08] bg-white">
+      <header className="relative z-10 border-b border-border-subtle bg-surface-raised">
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-3 px-4 md:h-[4.5rem] md:px-6 lg:h-[5.2rem]">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <p className="truncate text-lg font-semibold tracking-[-0.16px] text-starbucks-green md:text-xl">
@@ -599,7 +599,7 @@ export default function LedgerApp() {
                 공유코드
               </Button>
               {settingsOpen ? (
-                <div className="absolute right-0 top-full z-50 mt-2 w-64 rounded-[var(--radius-card)] border border-black/[0.08] bg-white p-3 shadow-[var(--shadow-card)]">
+                <div className="absolute right-0 top-full z-50 mt-2 w-64 rounded-[var(--radius-card)] border border-border-subtle bg-surface-raised p-3 shadow-[var(--shadow-card)]">
                   <p className="px-3 py-1 text-xs font-medium text-text-soft">가족 코드</p>
                   <div className="flex items-center gap-2 px-3 py-1">
                     <span className="flex-1 rounded-lg bg-emerald-50 px-3 py-2 text-center text-base font-bold tracking-[0.25em] text-emerald-700">
@@ -607,7 +607,7 @@ export default function LedgerApp() {
                     </span>
                     <button
                       type="button"
-                      className="rounded-lg border border-black/[0.08] px-3 py-2 text-xs text-text-soft hover:bg-neutral-cool"
+                      className="rounded-lg border border-border-subtle px-3 py-2 text-xs text-text-soft hover:bg-neutral-cool"
                       onClick={() => {
                         void navigator.clipboard.writeText(householdCode)
                         alert('코드를 복사했어요!')
@@ -671,7 +671,7 @@ export default function LedgerApp() {
               <button
                 type="button"
                 onClick={() => setSelectedMember(null)}
-                className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${selectedMember === null ? 'border-starbucks-green bg-starbucks-green text-white' : 'border-black/20 text-text-soft hover:bg-neutral-cool'}`}
+                className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${selectedMember === null ? 'border-starbucks-green bg-starbucks-green text-white' : 'border-border-pill text-text-soft hover:bg-neutral-cool'}`}
               >
                 전체
               </button>
@@ -684,7 +684,7 @@ export default function LedgerApp() {
                     e.preventDefault()
                     setDeleteConfirm({ member: m, step: 1 })
                   }}
-                  className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${selectedMember === m ? 'border-starbucks-green bg-starbucks-green text-white' : 'border-black/20 text-[rgba(0,0,0,0.87)] hover:bg-neutral-cool'}`}
+                  className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${selectedMember === m ? 'border-starbucks-green bg-starbucks-green text-white' : 'border-border-pill text-text-primary hover:bg-neutral-cool'}`}
                 >
                   {m}
                 </button>
@@ -694,12 +694,12 @@ export default function LedgerApp() {
             <div className="mt-4 rounded-[var(--radius-card)] border border-gold/30 bg-gold-lightest/50 px-3 py-3 md:px-4 md:py-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-text-soft">
                 {cursor.y}년 누적 · 전체{' '}
-                <span className="font-semibold tabular-nums text-[rgba(0,0,0,0.82)]">
+                <span className="font-semibold tabular-nums text-text-secondary">
                   {yearTxCount}건
                 </span>
               </p>
               <div className="mt-3 grid grid-cols-3 gap-2 sm:gap-3">
-                <div className="min-w-0 rounded-lg border border-black/[0.06] bg-white px-2 py-2 sm:px-3 sm:py-2.5">
+                <div className="min-w-0 rounded-lg border border-border-muted bg-surface-raised px-2 py-2 sm:px-3 sm:py-2.5">
                   <p className="text-[0.65rem] font-medium text-text-soft sm:text-xs">
                     연 수입
                   </p>
@@ -707,7 +707,7 @@ export default function LedgerApp() {
                     {fmtKrw.format(yearIncomeTotal)}
                   </p>
                 </div>
-                <div className="min-w-0 rounded-lg border border-black/[0.06] bg-white px-2 py-2 sm:px-3 sm:py-2.5">
+                <div className="min-w-0 rounded-lg border border-border-muted bg-surface-raised px-2 py-2 sm:px-3 sm:py-2.5">
                   <p className="text-[0.65rem] font-medium text-text-soft sm:text-xs">
                     연 지출
                   </p>
@@ -715,7 +715,7 @@ export default function LedgerApp() {
                     {fmtKrw.format(yearExpenseTotal)}
                   </p>
                 </div>
-                <div className="min-w-0 rounded-lg border border-black/[0.06] bg-white px-2 py-2 sm:px-3 sm:py-2.5">
+                <div className="min-w-0 rounded-lg border border-border-muted bg-surface-raised px-2 py-2 sm:px-3 sm:py-2.5">
                   <p className="text-[0.65rem] font-medium text-text-soft sm:text-xs">
                     연 순액
                   </p>
@@ -741,12 +741,12 @@ export default function LedgerApp() {
             onClick={() => setDeleteConfirm(null)}
           >
             <div
-              className="w-72 rounded-[var(--radius-card)] bg-white p-6 shadow-[var(--shadow-card)]"
+              className="w-72 rounded-[var(--radius-card)] bg-surface-raised p-6 shadow-[var(--shadow-card)]"
               onClick={(e) => e.stopPropagation()}
             >
               {deleteConfirm.step === 1 ? (
                 <>
-                  <p className="text-center text-base font-semibold text-[rgba(0,0,0,0.87)]">
+                  <p className="text-center text-base font-semibold text-text-primary">
                     「{deleteConfirm.member}」을(를)<br />삭제하시겠습니까?
                   </p>
                   <div className="mt-5 flex gap-3">
@@ -796,7 +796,7 @@ export default function LedgerApp() {
                 >
                   ‹
                 </Button>
-                <p className="min-w-[10rem] flex-1 text-center text-base font-semibold text-[rgba(0,0,0,0.87)] md:text-lg">
+                <p className="min-w-[10rem] flex-1 text-center text-base font-semibold text-text-primary md:text-lg">
                   {formatMonthLabel(cursor.y, cursor.m)}
                 </p>
                 <Button
@@ -820,19 +820,19 @@ export default function LedgerApp() {
             </div>
 
             <div className="mb-4 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-[var(--radius-card)] border border-black/[0.06] border-l-4 border-l-green-light bg-white px-3 py-3 md:px-4 md:py-4">
+              <div className="rounded-[var(--radius-card)] border border-border-muted border-l-4 border-l-green-light bg-surface-raised px-3 py-3 md:px-4 md:py-4">
                 <p className="text-sm font-medium text-text-soft">수입</p>
                 <p className="mt-1 text-xl font-semibold tabular-nums text-semantic-income md:text-2xl">
                   {fmtKrw.format(incomeTotal)}
                 </p>
               </div>
-              <div className="rounded-[var(--radius-card)] border border-black/[0.06] border-l-4 border-l-[rgba(200,32,20,0.35)] bg-white px-3 py-3 ring-1 ring-inset ring-[#c82014]/10 md:px-4 md:py-4">
+              <div className="rounded-[var(--radius-card)] border border-border-muted border-l-4 border-l-[rgba(200,32,20,0.35)] bg-surface-raised px-3 py-3 ring-1 ring-inset ring-[#c82014]/10 md:px-4 md:py-4">
                 <p className="text-sm font-medium text-text-soft">지출</p>
                 <p className="mt-1 text-xl font-semibold tabular-nums text-semantic-expense md:text-2xl">
                   {fmtKrw.format(expenseTotal)}
                 </p>
               </div>
-              <div className="rounded-[var(--radius-card)] border border-black/[0.06] border-l-4 border-l-starbucks-green bg-white px-3 py-3 md:px-4 md:py-4">
+              <div className="rounded-[var(--radius-card)] border border-border-muted border-l-4 border-l-starbucks-green bg-surface-raised px-3 py-3 md:px-4 md:py-4">
                 <p className="text-sm font-medium text-text-soft">이달 순액</p>
                 <p
                   className={`mt-1 text-xl font-semibold tabular-nums md:text-2xl ${
@@ -906,7 +906,7 @@ export default function LedgerApp() {
                           {t.category ? ` · ${t.category}` : ''}
                         </span>
                         {t.memo ? (
-                          <span className="mt-0.5 block truncate text-sm text-[rgba(0,0,0,0.87)]">
+                          <span className="mt-0.5 block truncate text-sm text-text-primary">
                             {t.memo}
                           </span>
                         ) : null}
@@ -946,7 +946,7 @@ export default function LedgerApp() {
                       className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                         expensePayFilter === 'all'
                           ? 'border-starbucks-green bg-starbucks-green text-white'
-                          : 'border-black/20 text-[rgba(0,0,0,0.87)] hover:bg-neutral-cool'
+                          : 'border-border-pill text-text-primary hover:bg-neutral-cool'
                       }`}
                     >
                       전체
@@ -961,7 +961,7 @@ export default function LedgerApp() {
                       className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                         expensePayFilter === 'cash'
                           ? 'border-starbucks-green bg-starbucks-green text-white'
-                          : 'border-black/20 text-[rgba(0,0,0,0.87)] hover:bg-neutral-cool'
+                          : 'border-border-pill text-text-primary hover:bg-neutral-cool'
                       }`}
                     >
                       현금
@@ -976,7 +976,7 @@ export default function LedgerApp() {
                       className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                         expensePayFilter === 'ieum'
                           ? 'border-starbucks-green bg-starbucks-green text-white'
-                          : 'border-black/20 text-[rgba(0,0,0,0.87)] hover:bg-neutral-cool'
+                          : 'border-border-pill text-text-primary hover:bg-neutral-cool'
                       }`}
                     >
                       이음카드
@@ -990,18 +990,18 @@ export default function LedgerApp() {
                       className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                         expensePayFilter === 'card'
                           ? 'border-starbucks-green bg-starbucks-green text-white'
-                          : 'border-black/20 text-[rgba(0,0,0,0.87)] hover:bg-neutral-cool'
+                          : 'border-border-pill text-text-primary hover:bg-neutral-cool'
                       }`}
                     >
                       신용카드
                     </button>
                     {expensePayFilter === 'card' ? (
-                      <label className="flex flex-wrap items-center gap-2 rounded-full border border-black/[0.12] bg-ceramic/60 px-3 py-1.5">
+                      <label className="flex flex-wrap items-center gap-2 rounded-full border border-border-strong bg-ceramic/60 px-3 py-1.5">
                         <span className="text-xs font-medium text-text-soft md:text-[0.8rem]">
                           카드사
                         </span>
                         <select
-                          className="max-w-[11rem] min-w-[9rem] cursor-pointer rounded-md border border-black/[0.08] bg-white px-2 py-1 text-xs outline-none ring-green-accent/25 focus:ring-2 md:text-sm"
+                          className="max-w-[11rem] min-w-[9rem] cursor-pointer rounded-md border border-border-subtle bg-surface-raised px-2 py-1 text-xs outline-none ring-green-accent/25 focus:ring-2 md:text-sm"
                           aria-label="신용 카드사 선택"
                           value={expenseCardBrandFilter ?? ''}
                           onChange={(e) =>
@@ -1058,7 +1058,7 @@ export default function LedgerApp() {
                         {t.category ? ` · ${t.category}` : ''}
                       </span>
                       {t.memo ? (
-                        <span className="mt-0.5 block truncate text-sm text-[rgba(0,0,0,0.87)]">
+                        <span className="mt-0.5 block truncate text-sm text-text-primary">
                           {t.memo}
                         </span>
                       ) : null}

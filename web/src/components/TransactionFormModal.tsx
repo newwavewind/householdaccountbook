@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+﻿import { useEffect, useState, type FormEvent } from 'react'
 import { Button } from './ui/Button'
 import { CARD_BRANDS } from '../constants/cardBrands'
 import {
@@ -116,7 +116,7 @@ export function TransactionFormModal({
         role="dialog"
         aria-modal
         aria-labelledby="tx-form-title"
-        className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-[var(--radius-card)] bg-white p-6 shadow-[var(--shadow-card)] sm:rounded-[var(--radius-card)]"
+        className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-[var(--radius-card)] bg-surface-raised p-6 shadow-[var(--shadow-card)] sm:rounded-[var(--radius-card)]"
         onClick={(e) => e.stopPropagation()}
       >
         <h2
@@ -147,7 +147,7 @@ export function TransactionFormModal({
             </Button>
           </fieldset>
 
-          <label className="flex flex-col gap-1 text-sm font-medium text-[rgba(0,0,0,0.87)]">
+          <label className="flex flex-col gap-1 text-sm font-medium text-text-primary">
             금액 (원)
             <input
               required
@@ -175,7 +175,7 @@ export function TransactionFormModal({
           <label className="flex flex-col gap-1 text-sm font-medium text-[rgba(0, 0, 0, 0.87)]">
             분류
             <select
-              className="rounded-lg border border-input-border bg-white px-3 py-2.5 text-base outline-none focus:border-green-accent"
+              className="rounded-lg border border-input-border bg-surface-raised px-3 py-2.5 text-base outline-none focus:border-green-accent"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             >
@@ -233,7 +233,7 @@ export function TransactionFormModal({
                   카드사
                   <select
                     required
-                    className="rounded-lg border border-input-border bg-white px-3 py-2.5 text-base outline-none focus:border-green-accent"
+                    className="rounded-lg border border-input-border bg-surface-raised px-3 py-2.5 text-base outline-none focus:border-green-accent"
                     value={cardBrand}
                     onChange={(e) => setCardBrand(e.target.value)}
                   >
@@ -251,12 +251,12 @@ export function TransactionFormModal({
 
           {members.length > 0 && (
             <div className="flex flex-col gap-1">
-              <span className="text-sm font-medium text-[rgba(0,0,0,0.87)]">구성원 (선택)</span>
+              <span className="text-sm font-medium text-text-primary">구성원 (선택)</span>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => setMemberName('')}
-                  className={`rounded-full border px-3 py-1 text-sm transition-colors ${memberName === '' ? 'border-starbucks-green bg-starbucks-green text-white' : 'border-black/20 text-text-soft hover:bg-neutral-cool'}`}
+                  className={`rounded-full border px-3 py-1 text-sm transition-colors ${memberName === '' ? 'border-starbucks-green bg-starbucks-green text-white' : 'border-border-pill text-text-soft hover:bg-neutral-cool'}`}
                 >
                   전체
                 </button>
@@ -265,7 +265,7 @@ export function TransactionFormModal({
                     key={m}
                     type="button"
                     onClick={() => setMemberName(m === memberName ? '' : m)}
-                    className={`rounded-full border px-3 py-1 text-sm transition-colors ${memberName === m ? 'border-starbucks-green bg-starbucks-green text-white' : 'border-black/20 text-text-soft hover:bg-neutral-cool'}`}
+                    className={`rounded-full border px-3 py-1 text-sm transition-colors ${memberName === m ? 'border-starbucks-green bg-starbucks-green text-white' : 'border-border-pill text-text-soft hover:bg-neutral-cool'}`}
                   >
                     {m}
                   </button>

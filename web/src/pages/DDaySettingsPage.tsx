@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+﻿import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -25,7 +25,7 @@ const basisBtn = (active: boolean) =>
     'min-h-[3.25rem] flex-1 rounded-xl border-2 px-3 py-2.5 text-left text-sm transition-colors md:min-h-0 md:py-3',
     active
       ? 'border-green-accent bg-green-light/40 text-starbucks-green shadow-sm'
-      : 'border-black/[0.1] bg-white text-[rgba(0,0,0,0.75)] hover:border-green-accent/50',
+      : 'border-border-default bg-surface-raised text-text-secondary hover:border-green-accent/50',
   ].join(' ')
 
 export default function DDaySettingsPage() {
@@ -234,14 +234,14 @@ export default function DDaySettingsPage() {
       ) : null}
 
       <Card className="mb-6 p-4 md:p-5">
-        <h2 className="text-base font-semibold text-[rgba(0,0,0,0.87)]">
+        <h2 className="text-base font-semibold text-text-primary">
           새로 추가
         </h2>
         <div className="mt-4 space-y-4">
           <label className="block text-sm font-medium text-text-soft">
             종류
             <select
-              className="mt-1 w-full rounded-lg border border-black/[0.12] bg-white px-3 py-2 text-base text-[rgba(0,0,0,0.87)] outline-none ring-green-accent/30 focus:ring-2 md:max-w-md"
+              className="mt-1 w-full rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-base text-text-primary outline-none ring-green-accent/30 focus:ring-2 md:max-w-md"
               value={kind}
               onChange={(e) => setKind(e.target.value as DdayKind)}
             >
@@ -257,7 +257,7 @@ export default function DDaySettingsPage() {
             이름
             <input
               type="text"
-              className="mt-1 w-full rounded-lg border border-black/[0.12] bg-white px-3 py-2 text-base text-[rgba(0,0,0,0.87)] outline-none ring-green-accent/30 focus:ring-2"
+              className="mt-1 w-full rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-base text-text-primary outline-none ring-green-accent/30 focus:ring-2"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="예: 아버지, 엄마, 결혼기념일"
@@ -266,12 +266,12 @@ export default function DDaySettingsPage() {
           </label>
 
           {showAnnualControls ? (
-            <fieldset className="space-y-2 rounded-xl border border-black/[0.08] bg-ceramic/50 p-3 md:p-4">
-              <legend className="px-1 text-sm font-semibold text-[rgba(0,0,0,0.87)]">
+            <fieldset className="space-y-2 rounded-xl border border-border-subtle bg-ceramic/50 p-3 md:p-4">
+              <legend className="px-1 text-sm font-semibold text-text-primary">
                 기념일 · 생일 — 양력 vs 음력
               </legend>
               <p className="text-xs leading-relaxed text-text-soft md:text-sm">
-                부모 <strong className="text-[rgba(0,0,0,0.78)]">음력 생신</strong>
+                부모 <strong className="text-text-secondary">음력 생신</strong>
                 이면 반드시{' '}
                 <strong className="text-starbucks-green">음력</strong>을 누른 뒤 음력
                 월·일을 넣으세요. 양력이면 달력에서 날짜만 고르면 됩니다.
@@ -302,8 +302,8 @@ export default function DDaySettingsPage() {
           ) : null}
 
           {showBabyControls ? (
-            <fieldset className="space-y-2 rounded-xl border border-black/[0.08] bg-ceramic/50 p-3 md:p-4">
-              <legend className="px-1 text-sm font-semibold text-[rgba(0,0,0,0.87)]">
+            <fieldset className="space-y-2 rounded-xl border border-border-subtle bg-ceramic/50 p-3 md:p-4">
+              <legend className="px-1 text-sm font-semibold text-text-primary">
                 출생일 — 양력 vs 음력
               </legend>
               <div className="flex flex-col gap-2 sm:flex-row">
@@ -347,7 +347,7 @@ export default function DDaySettingsPage() {
                     type="number"
                     min={1}
                     max={12}
-                    className="mt-1 block w-24 rounded-lg border border-black/[0.12] bg-white px-2 py-2 text-base text-[rgba(0,0,0,0.87)] outline-none ring-green-accent/30 focus:ring-2"
+                    className="mt-1 block w-24 rounded-lg border border-border-strong bg-surface-raised px-2 py-2 text-base text-text-primary outline-none ring-green-accent/30 focus:ring-2"
                     value={annualLunarMonth}
                     onChange={(e) => setAnnualLunarMonth(Number(e.target.value))}
                   />
@@ -358,7 +358,7 @@ export default function DDaySettingsPage() {
                     type="number"
                     min={1}
                     max={30}
-                    className="mt-1 block w-24 rounded-lg border border-black/[0.12] bg-white px-2 py-2 text-base text-[rgba(0,0,0,0.87)] outline-none ring-green-accent/30 focus:ring-2"
+                    className="mt-1 block w-24 rounded-lg border border-border-strong bg-surface-raised px-2 py-2 text-base text-text-primary outline-none ring-green-accent/30 focus:ring-2"
                     value={annualLunarDay}
                     onChange={(e) => setAnnualLunarDay(Number(e.target.value))}
                   />
@@ -383,7 +383,7 @@ export default function DDaySettingsPage() {
                   type="number"
                   min={1900}
                   max={2100}
-                  className="mt-1 w-full max-w-[12rem] rounded-lg border border-black/[0.12] bg-white px-3 py-2 text-base text-[rgba(0,0,0,0.87)] outline-none ring-green-accent/30 focus:ring-2"
+                  className="mt-1 w-full max-w-[12rem] rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-base text-text-primary outline-none ring-green-accent/30 focus:ring-2"
                   value={birthLunarYear}
                   onChange={(e) => setBirthLunarYear(Number(e.target.value))}
                 />
@@ -399,7 +399,7 @@ export default function DDaySettingsPage() {
                       type="number"
                       min={1}
                       max={12}
-                      className="mt-1 block w-24 rounded-lg border border-black/[0.12] bg-white px-2 py-2 text-base"
+                      className="mt-1 block w-24 rounded-lg border border-border-strong bg-surface-raised px-2 py-2 text-base"
                       value={babyLunarMonth}
                       onChange={(e) => setBabyLunarMonth(Number(e.target.value))}
                     />
@@ -410,7 +410,7 @@ export default function DDaySettingsPage() {
                       type="number"
                       min={1}
                       max={30}
-                      className="mt-1 block w-24 rounded-lg border border-black/[0.12] bg-white px-2 py-2 text-base"
+                      className="mt-1 block w-24 rounded-lg border border-border-strong bg-surface-raised px-2 py-2 text-base"
                       value={babyLunarDay}
                       onChange={(e) => setBabyLunarDay(Number(e.target.value))}
                     />
@@ -433,7 +433,7 @@ export default function DDaySettingsPage() {
               {dateLabel}
               <input
                 type="date"
-                className="mt-1 w-full max-w-[14rem] rounded-lg border border-black/[0.12] bg-white px-3 py-2 text-base text-[rgba(0,0,0,0.87)] outline-none ring-green-accent/30 focus:ring-2"
+                className="mt-1 w-full max-w-[14rem] rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-base text-text-primary outline-none ring-green-accent/30 focus:ring-2"
                 value={dateInput}
                 onChange={(e) => setDateInput(e.target.value)}
               />
@@ -452,7 +452,7 @@ export default function DDaySettingsPage() {
       </Card>
 
       <Card className="p-4 md:p-5">
-        <h2 className="text-base font-semibold text-[rgba(0,0,0,0.87)]">
+        <h2 className="text-base font-semibold text-text-primary">
           등록된 디데이 ({events.length})
         </h2>
         {events.length === 0 ? (
@@ -469,7 +469,7 @@ export default function DDaySettingsPage() {
                   className="flex flex-col gap-2 py-3 first:pt-0 md:flex-row md:items-center md:justify-between"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-[rgba(0,0,0,0.87)]">
+                    <p className="font-medium text-text-primary">
                       {e.title}
                     </p>
                     <p className="text-xs text-text-soft">{eventSubtitle(e)}</p>

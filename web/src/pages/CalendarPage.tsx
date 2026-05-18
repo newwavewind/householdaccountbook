@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
@@ -183,7 +183,7 @@ function CalendarInkPopover({
         aria-haspopup="dialog"
         aria-label={`글자 색: ${current.label}`}
         onClick={onToggle}
-        className="mt-1.5 inline-flex max-w-full items-center gap-1.5 rounded-lg border border-black/[0.12] bg-white py-1.5 pl-2 pr-2 text-left text-xs font-medium outline-none ring-green-accent/0 transition-colors hover:bg-ceramic/40 focus-visible:ring-2"
+        className="mt-1.5 inline-flex max-w-full items-center gap-1.5 rounded-lg border border-border-strong bg-surface-raised py-1.5 pl-2 pr-2 text-left text-xs font-medium outline-none ring-green-accent/0 transition-colors hover:bg-ceramic/40 focus-visible:ring-2"
       >
         <span
           className={`block h-4 w-4 shrink-0 rounded-full ring-2 ring-black/10 ${current.dot}`}
@@ -200,7 +200,7 @@ function CalendarInkPopover({
         <div
           role="dialog"
           aria-label="글자 색 선택"
-          className="absolute left-0 z-[55] mt-1 max-h-[14rem] w-[min(100%,13rem)] overflow-y-auto rounded-lg border border-black/[0.1] bg-white py-1 shadow-xl"
+          className="absolute left-0 z-[55] mt-1 max-h-[14rem] w-[min(100%,13rem)] overflow-y-auto rounded-lg border border-border-default bg-surface-raised py-1 shadow-xl"
         >
           {CALENDAR_EVENT_INK_SWATCHES.map((s) => {
             const active = (ink ?? 'default') === s.id
@@ -259,7 +259,7 @@ function DayMemoPanel({
       id="calendar-day-detail"
       className="scroll-mt-24 p-0"
     >
-      <div className="border-b border-black/[0.06] px-4 py-3 md:px-5 md:py-4">
+      <div className="border-b border-border-muted px-4 py-3 md:px-5 md:py-4">
         <p className="text-base font-semibold text-starbucks-green">
           {formatSelectedHeading(iso)}
         </p>
@@ -281,13 +281,13 @@ function DayMemoPanel({
 
       <div className="space-y-3 px-4 py-3 md:px-5">
         <div
-          className="rounded-lg border border-black/[0.08] bg-ceramic/60 px-3 py-2.5"
+          className="rounded-lg border border-border-subtle bg-ceramic/60 px-3 py-2.5"
           aria-label="이 날 일정 요약"
         >
           <p className="text-xs font-semibold uppercase tracking-wide text-text-soft">
             이 날 요약
           </p>
-          <ul className="mt-1.5 space-y-1 text-sm text-[rgba(0,0,0,0.87)]">
+          <ul className="mt-1.5 space-y-1 text-sm text-text-primary">
             {summaryLines.length > 0 ? (
               summaryLines.map((e) => (
                 <li key={e.id}>
@@ -343,7 +343,7 @@ function DayMemoPanel({
 
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-medium text-[rgba(0,0,0,0.87)]">
+            <p className="text-sm font-medium text-text-primary">
               일정 · 메모
             </p>
             <Button
@@ -361,7 +361,7 @@ function DayMemoPanel({
           {events.map((ev, i) => (
             <div
               key={ev.id}
-              className="rounded-lg border border-black/[0.1] bg-white p-3 shadow-sm"
+              className="rounded-lg border border-border-default bg-surface-raised p-3 shadow-sm"
             >
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-text-soft">
@@ -440,7 +440,7 @@ function DayMemoPanel({
                       return next
                     })
                   }}
-                  className={`mt-1 max-w-[10rem] rounded-lg border border-black/[0.12] bg-white px-2 py-1.5 text-sm outline-none ring-green-accent/30 focus:ring-2 ${calendarEventInkTextClass(ev.ink)}`}
+                  className={`mt-1 max-w-[10rem] rounded-lg border border-border-strong bg-surface-raised px-2 py-1.5 text-sm outline-none ring-green-accent/30 focus:ring-2 ${calendarEventInkTextClass(ev.ink)}`}
                 />
               </label>
               <div className="mt-2">
@@ -488,7 +488,7 @@ function DayMemoPanel({
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 border-t border-black/[0.06] p-4">
+      <div className="flex flex-wrap gap-2 border-t border-border-muted p-4">
         <Button
           type="button"
           variant="darkOutlined"
@@ -541,10 +541,10 @@ function CalendarDayPeekSheet({
         role="dialog"
         aria-modal="true"
         aria-labelledby="calendar-peek-heading"
-        className="max-h-[min(88vh,36rem)] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-black/[0.12] bg-ceramic/95 shadow-2xl sm:max-h-[min(82vh,32rem)] sm:rounded-2xl"
+        className="max-h-[min(88vh,36rem)] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-border-strong bg-ceramic/95 shadow-2xl sm:max-h-[min(82vh,32rem)] sm:rounded-2xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 z-[1] border-b border-black/[0.08] bg-ceramic/95 px-4 py-3 backdrop-blur-[6px]">
+        <div className="sticky top-0 z-[1] border-b border-border-subtle bg-ceramic/95 px-4 py-3 backdrop-blur-[6px]">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p
@@ -571,7 +571,7 @@ function CalendarDayPeekSheet({
             <button
               type="button"
               aria-label="닫기"
-              className="shrink-0 rounded-full border border-black/[0.1] bg-white px-3 py-1.5 text-xs font-semibold text-[rgba(0,0,0,0.75)] hover:bg-green-light/50"
+              className="shrink-0 rounded-full border border-border-default bg-surface-raised px-3 py-1.5 text-xs font-semibold text-text-secondary hover:bg-green-light/50"
               onClick={onClose}
             >
               닫기
@@ -589,7 +589,7 @@ function CalendarDayPeekSheet({
                 {events.map((e) => (
                   <li
                     key={e.id}
-                    className="rounded-lg border border-black/[0.08] bg-white px-3 py-2"
+                    className="rounded-lg border border-border-subtle bg-surface-raised px-3 py-2"
                   >
                     <div className="flex flex-wrap items-center gap-2">
                       {e.time?.trim() ? (
@@ -621,7 +621,7 @@ function CalendarDayPeekSheet({
                     </div>
                     {(e.note?.trim() || htmlToPlain(e.noteHtml)) ? (
                       <div
-                        className={`mt-1.5 border-t border-black/[0.06] pt-2 text-xs [&_*]:leading-snug [&_strong]:font-semibold ${calendarEventInkTextClass(e.ink)}`}
+                        className={`mt-1.5 border-t border-border-muted pt-2 text-xs [&_*]:leading-snug [&_strong]:font-semibold ${calendarEventInkTextClass(e.ink)}`}
                       >
                         {e.noteHtml?.trim() ? (
                           <span
@@ -648,7 +648,7 @@ function CalendarDayPeekSheet({
               <p className="text-xs font-semibold uppercase tracking-wide text-text-soft">
                 디데이
               </p>
-              <ul className="mt-2 space-y-1 rounded-lg border border-amber-200/70 bg-amber-50/50 px-3 py-2 text-xs font-semibold text-gold md:text-sm">
+              <ul className="mt-2 space-y-1 rounded-lg border border-amber-200/70 bg-amber-50/50 px-3 py-2 text-xs font-semibold text-gold dark:border-amber-800/50 dark:bg-amber-950/35 md:text-sm">
                 {ddaysThisDay.map((d) => (
                   <li key={d.id}>{d.title}</li>
                 ))}
@@ -660,7 +660,7 @@ function CalendarDayPeekSheet({
             <p className="text-xs font-semibold uppercase tracking-wide text-text-soft">
               장부
             </p>
-            <p className="mt-1 text-[rgba(0,0,0,0.87)]">
+            <p className="mt-1 text-text-primary">
               이 날 거래 <span className="font-semibold tabular-nums">{ledgerTxCount}</span>건
             </p>
             <p className="mt-3 text-xs text-text-soft">
@@ -797,7 +797,7 @@ export default function CalendarPage() {
                 {ddaySummaryLines.map((line) => (
                   <span
                     key={line.id}
-                    className="inline-flex max-w-[min(100%,18rem)] items-center rounded-full border border-black/[0.08] bg-ceramic/90 px-2.5 py-1 text-xs text-[rgba(0,0,0,0.82)] md:max-w-md md:text-sm"
+                    className="inline-flex max-w-[min(100%,18rem)] items-center rounded-full border border-border-subtle bg-ceramic/90 px-2.5 py-1 text-xs text-text-secondary md:max-w-md md:text-sm"
                   >
                     <span className="truncate">{line.text}</span>
                   </span>
@@ -817,7 +817,7 @@ export default function CalendarPage() {
           </div>
           <Link
             to="/calendar/dday"
-            className="shrink-0 self-start rounded-full border border-black/[0.12] bg-white px-3 py-1.5 text-sm font-semibold text-starbucks-green transition-colors hover:bg-green-light/40"
+            className="shrink-0 self-start rounded-full border border-border-strong bg-surface-raised px-3 py-1.5 text-sm font-semibold text-starbucks-green transition-colors hover:bg-green-light/40"
           >
             디데이 설정
           </Link>
@@ -825,7 +825,7 @@ export default function CalendarPage() {
         {backend === 'supabase' && cloudConfigured ? (
           <div className="mt-4 space-y-2">
             {!userId ? null : !householdId ? (
-              <div className="rounded-[var(--radius-card)] border border-black/[0.08] bg-amber-50/90 px-4 py-3 text-sm text-[rgba(0,0,0,0.87)]">
+              <div className="rounded-[var(--radius-card)] border border-amber-200/70 bg-alert-surface px-4 py-3 text-sm text-text-primary dark:border-amber-800/45">
                 아직 가구에 연결되지 않았어요. 장부 화면에서 가구를 만들거나
                 공유코드를 입력하면 일정도 함께 공유돼요.
                 <Button
@@ -838,9 +838,9 @@ export default function CalendarPage() {
                 </Button>
               </div>
             ) : cloudStatus === 'error' && cloudMessage ? (
-              <div className="rounded-[var(--radius-card)] border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-danger">
+              <div className="rounded-[var(--radius-card)] border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-danger dark:border-red-900/55 dark:bg-red-950/35">
                 <p className="font-medium">동기화 오류: {cloudMessage}</p>
-                <p className="mt-2 text-xs text-[rgba(0,0,0,0.65)]">
+                <p className="mt-2 text-xs text-text-muted">
                   로컬 메모는 이 기기에 저장·편집할 수 있어요. 테이블을 방금
                   만들었었다면 PostgREST 스키마 반영까지 잠시 걸릴 수 있어요.
                   새로고침 후에도 같으면 Supabase 프로젝트 URL이 이 앱의 환경
@@ -869,7 +869,7 @@ export default function CalendarPage() {
               >
                 ‹
               </Button>
-              <p className="min-w-[10rem] flex-1 text-center text-base font-semibold text-[rgba(0,0,0,0.87)] md:text-lg">
+              <p className="min-w-[10rem] flex-1 text-center text-base font-semibold text-text-primary md:text-lg">
                 {formatMonthLabel(cursorY, cursorM)}
               </p>
               <Button
@@ -934,7 +934,7 @@ export default function CalendarPage() {
                   className={[
                     'relative flex min-h-[4.5rem] w-full cursor-pointer flex-col overflow-hidden rounded-lg border px-1 py-1.5 text-left transition-colors active:scale-[0.98] md:min-h-[6rem] md:px-1.5 md:py-2',
                     inMonth
-                      ? 'border-black/[0.08] bg-white hover:border-green-accent/45 hover:bg-green-light/35'
+                      ? 'border-border-subtle bg-surface-raised hover:border-green-accent/45 hover:bg-green-light/35'
                       : 'border-transparent bg-neutral-cool/50 text-text-soft/60 hover:bg-neutral-cool',
                     hol && inMonth ? 'ring-1 ring-inset ring-red-300/60' : '',
                     hasLedger && inMonth
@@ -963,7 +963,7 @@ export default function CalendarPage() {
                       inMonth && isRedDay
                         ? 'text-red-500/[0.11]'
                         : inMonth
-                          ? 'text-black/[0.06]'
+                          ? 'text-text-primary/[0.08]'
                           : 'text-text-soft/[0.14]',
                     ].join(' ')}
                   >

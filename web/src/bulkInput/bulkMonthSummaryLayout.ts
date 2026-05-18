@@ -1,7 +1,7 @@
-/** 입력 탭 월별 요약 트윈 스트립 — 헤더 행과 각 월 줄이 같은 비율·정렬을 쓰도록 공통 클래스 */
+﻿/** 입력 탭 월별 요약 트윈 스트립 — 헤더 행과 각 월 줄이 같은 비율·정렬을 쓰도록 공통 클래스 */
 
 export const BULK_MONTH_SUMMARY_TWIN_SHELL =
-  'flex min-w-0 w-full overflow-hidden rounded-lg border border-black/[0.12] bg-[rgba(0,0,0,0.02)] shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]'
+  'flex min-w-0 w-full overflow-hidden rounded-lg border border-border-strong bg-well shadow-[inset_0_1px_0_var(--color-inset-highlight)]'
 
 export const BULK_MONTH_SUMMARY_HALF =
   'flex min-w-0 flex-[1_1_0%] flex-col justify-center px-3 py-2 sm:px-4 sm:py-2.5'
@@ -13,10 +13,10 @@ export const BULK_MONTH_SUMMARY_LABEL =
   'min-w-0 text-center text-xs font-bold uppercase tracking-[0.04em] text-text-soft tabular-nums leading-none'
 
 export const BULK_MONTH_SUMMARY_AMT_L =
-  'min-w-0 text-center text-[0.8125rem] font-semibold tabular-nums leading-tight text-[rgba(0,0,0,0.82)]'
+  'min-w-0 text-center text-[0.8125rem] font-semibold tabular-nums leading-tight text-text-secondary'
 
 export const BULK_MONTH_SUMMARY_AMT_R =
-  'min-w-0 text-center text-[0.8125rem] font-semibold tabular-nums leading-tight text-[rgba(0,0,0,0.72)]'
+  'min-w-0 text-center text-[0.8125rem] font-semibold tabular-nums leading-tight text-text-secondary'
 
 export const BULK_MONTH_SUMMARY_AMT_R_MUTED =
   'min-w-0 text-center text-[0.8125rem] font-semibold tabular-nums leading-tight text-text-soft opacity-45'

@@ -1,4 +1,4 @@
-import { Button } from '../components/ui/Button'
+﻿import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { Link } from 'react-router-dom'
 import { useCommunityPosts } from '../community/useCommunityPosts'
@@ -40,7 +40,7 @@ export default function AdminModerationPage() {
         <ul className="mt-8 flex flex-col gap-3">
           {posts.map((p) => (
             <li key={p.id}>
-              <Card className="border border-black/[0.06] bg-white">
+              <Card className="border border-border-muted bg-surface-raised">
                 <div className="flex flex-col gap-3 p-4 md:flex-row md:items-start md:justify-between">
                   <div>
                     <p className="text-xs uppercase tracking-wide text-text-soft">

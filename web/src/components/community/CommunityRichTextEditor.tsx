@@ -1,4 +1,4 @@
-import Image from '@tiptap/extension-image'
+﻿import Image from '@tiptap/extension-image'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import { EditorContent, Node, mergeAttributes, useEditor } from '@tiptap/react'
@@ -146,11 +146,11 @@ export function CommunityRichTextEditor({
 
   return (
     <div
-      className="mt-1 flex min-h-[14rem] flex-col overflow-hidden rounded-[var(--radius-card)] border border-input-border text-[rgba(0,0,0,0.87)] focus-within:border-green-accent"
+      className="mt-1 flex min-h-[14rem] flex-col overflow-hidden rounded-[var(--radius-card)] border border-input-border text-text-primary focus-within:border-green-accent"
       aria-labelledby={ariaLabelledBy}
     >
       <div
-        className="flex flex-wrap gap-1 border-b border-black/[0.06] bg-neutral-warm/60 px-2 py-1.5"
+        className="flex flex-wrap gap-1 border-b border-border-muted bg-neutral-warm/60 px-2 py-1.5"
         role="toolbar"
         aria-label="서식"
       >

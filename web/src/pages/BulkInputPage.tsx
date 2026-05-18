@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+﻿import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLedger } from '../hooks/useLedger'
 import type { BulkDraftRow } from '../bulkInput/draftRow'
 import { emptyDraftRow } from '../bulkInput/draftRow'
@@ -173,7 +173,7 @@ export default function BulkInputPage() {
   return (
     <main className="mx-auto max-w-5xl px-3 pb-20 pt-4 sm:px-4 md:px-6">
       <div
-        className="mb-4 flex items-center gap-2 border-b border-black/[0.06] pb-3"
+        className="mb-4 flex items-center gap-2 border-b border-border-muted pb-3"
         role="group"
         aria-label="연도 선택"
         id="bulk-year-control"
@@ -184,7 +184,7 @@ export default function BulkInputPage() {
             disabled={!canGoOlder}
             aria-label={`한 해 이전(${year - 1}년)`}
             title="한 해 이전"
-            className="inline-flex h-10 w-9 shrink-0 items-center justify-center rounded-lg border border-input-border bg-white text-lg leading-none text-starbucks-green outline-none transition-colors hover:bg-neutral-cool/50 disabled:pointer-events-none disabled:opacity-35"
+            className="inline-flex h-10 w-9 shrink-0 items-center justify-center rounded-lg border border-input-border bg-surface-raised text-lg leading-none text-starbucks-green outline-none transition-colors hover:bg-neutral-cool/50 disabled:pointer-events-none disabled:opacity-35"
             onClick={() => applyYearChoice(year - 1)}
           >
             ‹
@@ -197,7 +197,7 @@ export default function BulkInputPage() {
             disabled={!canGoNewer}
             aria-label={`한 해 다음(${year + 1}년)`}
             title="한 해 다음"
-            className="inline-flex h-10 w-9 shrink-0 items-center justify-center rounded-lg border border-input-border bg-white text-lg leading-none text-starbucks-green outline-none transition-colors hover:bg-neutral-cool/50 disabled:pointer-events-none disabled:opacity-35"
+            className="inline-flex h-10 w-9 shrink-0 items-center justify-center rounded-lg border border-input-border bg-surface-raised text-lg leading-none text-starbucks-green outline-none transition-colors hover:bg-neutral-cool/50 disabled:pointer-events-none disabled:opacity-35"
             onClick={() => applyYearChoice(year + 1)}
           >
             ›
@@ -222,7 +222,7 @@ export default function BulkInputPage() {
                   className={`rounded-[var(--radius-card)] border px-3 py-2.5 text-left transition-colors ${
                     selected
                       ? 'border-starbucks-green bg-green-light/50 ring-2 ring-starbucks-green/35'
-                      : 'border-black/[0.08] bg-white hover:border-black/[0.12] hover:bg-neutral-cool/30'
+                      : 'border-border-subtle bg-surface-raised hover:border-border-strong hover:bg-neutral-cool/30'
                   }`}
                   onClick={() => {
                     setActiveMonthIndex(monthIndex)
@@ -238,11 +238,11 @@ export default function BulkInputPage() {
                     {monthLabel(monthIndex)}
                   </div>
                   <div className="mt-1 text-[0.65rem] leading-tight text-text-soft">
-                    <span className="tabular-nums text-[rgba(0,0,0,0.75)]">
+                    <span className="tabular-nums text-text-secondary">
                       {won(dTotals.income)}
                     </span>
-                    <span className="mx-0.5 text-black/25">/</span>
-                    <span className="tabular-nums text-[rgba(0,0,0,0.75)]">
+                    <span className="mx-0.5 text-text-muted/80">/</span>
+                    <span className="tabular-nums text-text-secondary">
                       {won(dTotals.expense)}
                     </span>
                   </div>

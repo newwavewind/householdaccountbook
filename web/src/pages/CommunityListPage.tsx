@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom'
+﻿import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { useCommunityAuth } from '../community/CommunityAuthContext'
@@ -53,16 +53,16 @@ export default function CommunityListPage() {
       {busy ? (
         <p className="text-center text-sm text-text-soft">불러오는 중…</p>
       ) : error ? (
-        <Card className="border border-danger/30 bg-white p-6 text-danger">{error}</Card>
+        <Card className="border border-danger/30 bg-surface-raised p-6 text-danger">{error}</Card>
       ) : posts.length === 0 ? (
-        <Card className="border border-black/[0.06] bg-white p-10 text-center text-text-soft">
+        <Card className="border border-border-muted bg-surface-raised p-10 text-center text-text-soft">
           아직 글이 없습니다. 첫 글을 남겨 보세요.
         </Card>
       ) : (
         <ul className="flex flex-col gap-3">
           {posts.map((p) => (
             <li key={p.id}>
-              <Card className="border border-black/[0.06] bg-white transition-shadow hover:shadow-md">
+              <Card className="border border-border-muted bg-surface-raised transition-shadow hover:shadow-md">
                 <Link to={`/community/${p.id}`} className="flex gap-4 p-4 no-underline text-inherit">
                   {/* 썸네일 */}
                   {(() => {
@@ -80,7 +80,7 @@ export default function CommunityListPage() {
                     <span className="text-xs font-medium uppercase tracking-wide text-text-soft">
                       {p.authorDisplayName} · {fmtDate(p.createdAt)}
                     </span>
-                    <h2 className="mt-1 text-lg font-semibold text-[rgba(0,0,0,0.87)]">
+                    <h2 className="mt-1 text-lg font-semibold text-text-primary">
                       {p.title}
                     </h2>
                     <p className="mt-1 line-clamp-2 text-sm text-text-soft">
@@ -92,7 +92,7 @@ export default function CommunityListPage() {
                       <span>👁 오늘 {p.todayViewCount} · 전체 {p.viewCount}</span>
                     </div>
                     {p.hidden ? (
-                      <span className="mt-2 inline-block rounded-full bg-black/[0.06] px-2 py-0.5 text-xs text-text-soft">
+                      <span className="mt-2 inline-block rounded-full bg-well px-2 py-0.5 text-xs text-text-soft ring-1 ring-border-muted">
                         숨김(본인/관리자만 보임)
                       </span>
                     ) : null}

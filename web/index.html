@@ -19,9 +19,27 @@
       name="description"
       content="MJ가계부 — 수입·지출을 간편하게 기록하는 가계부 앱입니다."
     />
+    <script>
+      (function () {
+        try {
+          var k = 'mj-gaegyeobu-theme-v1';
+          var p = localStorage.getItem(k);
+          var systemDark = window.matchMedia(
+            '(prefers-color-scheme: dark)',
+          ).matches;
+          var dark = p === 'dark' || (p !== 'light' && systemDark);
+          if (dark) {
+            document.documentElement.classList.add('dark');
+            document.documentElement.style.colorScheme = 'dark';
+          } else {
+            document.documentElement.style.colorScheme = 'light';
+          }
+        } catch (e) {}
+      })();
+    </script>
     <meta name="application-name" content="MJ가계부" />
     <meta name="theme-color" content="#f2f0eb" />
-    <meta name="color-scheme" content="light" />
+    <meta name="color-scheme" content="light dark" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />

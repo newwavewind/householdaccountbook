@@ -2,6 +2,9 @@
 @import url('https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
 @import "tailwindcss";
 
+/* class 기반 다크 모드 (html.dark) — dark: 유틸도 동일 기준 */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /*
   Design tokens from DESIGN.MD (Starbucks-inspired).
   Root 16px — spacing uses Tailwind defaults where 4 = 16px ≈ --space-3.
@@ -46,8 +49,76 @@
   --color-semantic-income: #00754a;
   --color-semantic-expense: #c82014;
 
+  /* Surfaces & borders (라이트 기본 → .dark 에서 덮어씀) */
+  --color-surface-raised: #ffffff;
+  --color-border-subtle: rgb(0 0 0 / 0.08);
+  --color-border-muted: rgb(0 0 0 / 0.06);
+  --color-border-default: rgb(0 0 0 / 0.1);
+  --color-border-strong: rgb(0 0 0 / 0.12);
+  --color-border-pill: rgb(0 0 0 / 0.2);
+
+  --color-text-secondary: rgb(0 0 0 / 0.75);
+  --color-text-muted: rgb(0 0 0 / 0.65);
+  --color-text-faint: rgb(0 0 0 / 0.55);
+
+  --color-auth-gradient-from: #f7f5f0;
+  --color-auth-gradient-via: #f2f0eb;
+  --color-auth-gradient-to: #ffffff;
+
+  --color-alert-surface: rgb(255 251 235 / 0.92);
+
+  --color-well: rgb(0 0 0 / 0.02);
+  --color-inset-highlight: rgb(255 255 255 / 0.85);
+
   --radius-card: 12px;
   --radius-pill: 50px;
+}
+
+.dark {
+  --color-starbucks-green: #5cba8f;
+  --color-green-accent: #4adea8;
+  --color-house-green: #b8d4ca;
+  --color-green-uplift: #5a9080;
+  --color-green-light: #1e3d34;
+
+  --color-gold-lightest: #221f18;
+
+  --color-neutral-warm: #141816;
+  --color-neutral-cool: #1a211d;
+  --color-ceramic: #2a322d;
+
+  --color-surface-raised: #222826;
+  --color-border-subtle: rgb(255 255 255 / 0.1);
+  --color-border-muted: rgb(255 255 255 / 0.08);
+  --color-border-default: rgb(255 255 255 / 0.12);
+  --color-border-strong: rgb(255 255 255 / 0.16);
+  --color-border-pill: rgb(255 255 255 / 0.18);
+
+  --color-text-primary: rgb(255 255 255 / 0.92);
+  --color-text-soft: rgb(255 255 255 / 0.62);
+  --color-text-secondary: rgb(255 255 255 / 0.78);
+  --color-text-muted: rgb(255 255 255 / 0.6);
+  --color-text-faint: rgb(255 255 255 / 0.48);
+
+  --color-input-border: #4f5c56;
+
+  --color-auth-gradient-from: #1a1e1c;
+  --color-auth-gradient-via: #141816;
+  --color-auth-gradient-to: #0f1210;
+
+  --color-alert-surface: rgb(120 53 15 / 0.38);
+
+  --color-well: rgb(255 255 255 / 0.04);
+  --color-inset-highlight: rgb(255 255 255 / 0.08);
+
+  --shadow-card:
+    0 0 0.5px rgb(255 255 255 / 0.1), 0 1px 2px rgb(0 0 0 / 0.45);
+  --shadow-nav:
+    0 1px 3px rgb(0 0 0 / 0.35), 0 2px 2px rgb(0 0 0 / 0.22),
+    0 0 2px rgb(0 0 0 / 0.2);
+  --shadow-frap-base: 0 0 6px rgb(0 0 0 / 0.45);
+  --shadow-frap-stack:
+    var(--shadow-frap-base), 0 8px 12px rgb(0 0 0 / 0.35);
 }
 
 @layer base {
@@ -89,6 +160,10 @@
     font-weight: 600;
     letter-spacing: -0.025em;
     color: var(--color-text-primary);
+  }
+
+  .dark h1 {
+    color: var(--color-green-accent);
   }
 
   b,
@@ -161,6 +236,11 @@
   border-radius: 8px;
   background: var(--color-neutral-cool);
   font-size: 0.9em;
+}
+
+.dark .community-post-body pre {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-subtle);
 }
 
 .community-post-body code {

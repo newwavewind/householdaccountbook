@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { getSupabase } from '../lib/supabaseClient'
 import { useLedger } from '../hooks/useLedger'
 
@@ -50,7 +50,7 @@ export default function HouseholdSetupModal() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl">
+      <div className="w-full max-w-sm rounded-2xl bg-surface-raised shadow-2xl">
         <div className="p-6">
           <h2 className="text-lg font-bold text-gray-900">가계부 가구 설정</h2>
           <p className="mt-1 text-sm text-gray-500">
@@ -59,13 +59,13 @@ export default function HouseholdSetupModal() {
 
           <div className="mt-5 flex rounded-xl bg-gray-100 p-1">
             <button
-              className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${tab === 'create' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
+              className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${tab === 'create' ? 'bg-surface-raised text-gray-900 shadow-sm' : 'text-gray-500'}`}
               onClick={() => { setTab('create'); setError(null) }}
             >
               새 가구 만들기
             </button>
             <button
-              className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${tab === 'join' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
+              className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${tab === 'join' ? 'bg-surface-raised text-gray-900 shadow-sm' : 'text-gray-500'}`}
               onClick={() => { setTab('join'); setError(null) }}
             >
               코드로 참여

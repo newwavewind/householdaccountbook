@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -49,13 +49,13 @@ function ImageLightbox({ src, onClose }: { src: string; onClose: () => void }) {
       <button
         type="button"
         onClick={onClose}
-        className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/30"
+        className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-surface-raised/20 text-white hover:bg-surface-raised/30"
         aria-label="닫기"
       >
         ✕
       </button>
       {/* 줌 컨트롤 */}
-      <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-white backdrop-blur-sm">
+      <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-surface-raised/15 px-3 py-1.5 text-white backdrop-blur-sm">
         <button type="button" onClick={(e) => { e.stopPropagation(); setScale((s) => Math.max(0.5, s - 0.25)) }} className="text-lg leading-none px-1">−</button>
         <span className="text-xs tabular-nums w-10 text-center">{Math.round(scale * 100)}%</span>
         <button type="button" onClick={(e) => { e.stopPropagation(); setScale((s) => Math.min(5, s + 0.25)) }} className="text-lg leading-none px-1">+</button>
@@ -205,9 +205,9 @@ export default function CommunityPostDetailPage() {
       {busy ? (
         <p className="text-center text-sm text-text-soft">불러오는 중…</p>
       ) : error ? (
-        <Card className="border border-danger/30 bg-white p-6 text-danger">{error}</Card>
+        <Card className="border border-danger/30 bg-surface-raised p-6 text-danger">{error}</Card>
       ) : !post ? (
-        <Card className="border border-black/[0.06] bg-white p-10 text-center text-text-soft">
+        <Card className="border border-border-muted bg-surface-raised p-10 text-center text-text-soft">
           글을 찾을 수 없습니다.
           <div className="mt-6">
             <Button type="button" variant="outlined" onClick={() => nav('/community')}>
@@ -256,7 +256,7 @@ export default function CommunityPostDetailPage() {
           </div>
 
           {/* 본문 카드 */}
-          <Card className="border border-black/[0.06] bg-white">
+          <Card className="border border-border-muted bg-surface-raised">
             <div className="p-6 md:p-8">
               <p className="text-xs font-medium uppercase tracking-wide text-text-soft">
                 {post.authorDisplayName} · {fmtDate(post.updatedAt)}
@@ -269,7 +269,7 @@ export default function CommunityPostDetailPage() {
               {isProbablyRichHtml(post.body) ? (
                 <div
                   ref={postBodyRef}
-                  className="community-post-body mt-6 text-base leading-relaxed text-[rgba(0,0,0,0.87)]"
+                  className="community-post-body mt-6 text-base leading-relaxed text-text-primary"
                   dangerouslySetInnerHTML={{ __html: sanitizeCommunityPostHtml(post.body) }}
                   onClick={(e) => {
                     const target = e.target as HTMLElement
@@ -280,13 +280,13 @@ export default function CommunityPostDetailPage() {
                   }}
                 />
               ) : (
-                <div className="mt-6 whitespace-pre-wrap text-base leading-relaxed text-[rgba(0,0,0,0.87)]">
+                <div className="mt-6 whitespace-pre-wrap text-base leading-relaxed text-text-primary">
                   {post.body}
                 </div>
               )}
 
               {/* 좋아요 버튼 */}
-              <div className="mt-6 flex items-center gap-3 border-t border-black/[0.06] pt-4">
+              <div className="mt-6 flex items-center gap-3 border-t border-border-muted pt-4">
                 <button
                   type="button"
                   onClick={handleToggleLike}
@@ -318,7 +318,7 @@ export default function CommunityPostDetailPage() {
             ) : (
               <ul className="mb-4 space-y-3">
                 {comments.map((c) => (
-                  <li key={c.id} className="rounded-xl border border-black/[0.06] bg-white p-4">
+                  <li key={c.id} className="rounded-xl border border-border-muted bg-surface-raised p-4">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <span className="text-xs font-medium text-gray-700">{c.authorDisplayName}</span>
@@ -342,7 +342,7 @@ export default function CommunityPostDetailPage() {
 
             {/* 댓글 작성 */}
             {auth.user ? (
-              <div className="rounded-xl border border-black/[0.06] bg-white p-4">
+              <div className="rounded-xl border border-border-muted bg-surface-raised p-4">
                 <textarea
                   ref={commentInputRef}
                   value={commentBody}
@@ -364,7 +364,7 @@ export default function CommunityPostDetailPage() {
                 </div>
               </div>
             ) : (
-              <p className="rounded-xl border border-black/[0.06] bg-white p-4 text-center text-sm text-text-soft">
+              <p className="rounded-xl border border-border-muted bg-surface-raised p-4 text-center text-sm text-text-soft">
                 댓글을 작성하려면 로그인하세요.
               </p>
             )}

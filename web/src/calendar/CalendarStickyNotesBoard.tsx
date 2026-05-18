@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '../components/ui/Button'
 import { CalendarStickyMemoCard } from './CalendarStickyMemoCard'
 import {
@@ -87,7 +87,7 @@ export default function CalendarStickyNotesBoard() {
   return (
     <section
       aria-label="스티커 메모"
-      className="rounded-[var(--radius-card)] border border-black/[0.08] bg-gradient-to-b from-ceramic/60 to-white px-3 py-3 md:px-5 md:py-4"
+      className="rounded-[var(--radius-card)] border border-border-subtle bg-gradient-to-b from-ceramic/60 to-surface-raised px-3 py-3 md:px-5 md:py-4"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -97,7 +97,7 @@ export default function CalendarStickyNotesBoard() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div
-            className="inline-flex rounded-full border border-black/[0.1] bg-white p-0.5 text-xs font-semibold shadow-sm"
+            className="inline-flex rounded-full border border-border-default bg-surface-raised p-0.5 text-xs font-semibold shadow-sm"
             role="group"
             aria-label="보기 방식"
           >
@@ -136,7 +136,7 @@ export default function CalendarStickyNotesBoard() {
       </div>
 
       {notes.length === 0 ? (
-        <p className="mt-4 rounded-lg border border-dashed border-black/[0.1] bg-white/60 px-4 py-6 text-center text-sm text-text-soft">
+        <p className="mt-4 rounded-lg border border-dashed border-border-default bg-surface-raised/60 px-4 py-6 text-center text-sm text-text-soft">
           + 메모를 눌러 스티커를 추가해 보세요.
         </p>
       ) : compact ? (

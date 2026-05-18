@@ -1,4 +1,4 @@
-import Image from '@tiptap/extension-image'
+﻿import Image from '@tiptap/extension-image'
 import Placeholder from '@tiptap/extension-placeholder'
 import Underline from '@tiptap/extension-underline'
 import { EditorContent, useEditor } from '@tiptap/react'
@@ -65,7 +65,7 @@ function StickyMemoCompactPreview({ note }: { note: CalendarStickyNote }) {
       ) : (
         <div
           className={`sticky-compact-preview min-h-0 flex-1 overflow-hidden p-2 text-[0.72rem] leading-snug sm:p-2.5 sm:text-[0.76rem] ${
-            note.tint === 'charcoal' ? 'text-white/90' : 'text-[rgba(0,0,0,0.88)]'
+            note.tint === 'charcoal' ? 'text-white/90' : 'text-text-primary'
           } [&_img]:max-h-16 [&_img]:w-auto [&_img]:max-w-full [&_img]:rounded [&_ul]:list-disc [&_ul]:pl-3.5`}
           // sanitizeStickyNoteHtml 로 정제된 HTML
           dangerouslySetInnerHTML={{ __html: safe }}
@@ -143,7 +143,7 @@ function StickyMemoExpandedCard({
         class: `max-w-none min-h-[inherit] px-3 py-2 text-sm leading-relaxed outline-none [&_.ProseMirror]:outline-none [&_img]:max-h-48 [&_img]:w-auto [&_img]:max-w-full [&_img]:rounded ${
           note.tint === 'charcoal'
             ? 'text-white/92 [&_.ProseMirror]:text-white/92'
-            : 'text-[rgba(0,0,0,0.88)]'
+            : 'text-text-primary'
         }`,
       },
     },
@@ -179,7 +179,7 @@ function StickyMemoExpandedCard({
     const ink =
       note.tint === 'charcoal'
         ? 'text-white/92 [&_.ProseMirror]:text-white/92'
-        : 'text-[rgba(0,0,0,0.88)]'
+        : 'text-text-primary'
     const prevProps = editor.options.editorProps ?? {}
     editor.setOptions({
       editorProps: {
@@ -249,7 +249,7 @@ function StickyMemoExpandedCard({
           </button>
           {paletteOpen ? (
             <div
-              className={`absolute right-0 top-full z-50 mt-1 w-52 rounded-lg border bg-white p-2 shadow-lg ${isCharcoal ? 'border-white/20' : 'border-black/10'}`}
+              className={`absolute right-0 top-full z-50 mt-1 w-52 rounded-lg border bg-surface-raised p-2 shadow-lg ${isCharcoal ? 'border-white/20' : 'border-black/10'}`}
               role="listbox"
               aria-label="노트 색"
             >

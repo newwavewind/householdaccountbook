@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react'
+﻿import { memo, useMemo } from 'react'
 import { holidayLabel } from '../lib/holidays'
 import type { DayRollup } from '../lib/dayTotals'
 
@@ -96,7 +96,7 @@ export const LedgerCalendar = memo(function LedgerCalendar({
                 'relative flex w-full flex-col rounded-lg border px-0.5 py-1.5 text-left md:py-2',
                 cellMinH,
                 inMonth
-                  ? 'border-black/[0.08] bg-white'
+                  ? 'border-border-subtle bg-surface-raised'
                   : 'border-transparent bg-neutral-cool/50 text-text-soft/60',
                 hol && inMonth ? 'ring-1 ring-inset ring-red-300/60' : '',
                 hasTx && inMonth
@@ -115,7 +115,7 @@ export const LedgerCalendar = memo(function LedgerCalendar({
                   <span
                     className={[
                       'text-base font-semibold tabular-nums md:text-lg',
-                      inMonth && !isRedDay ? 'text-[rgba(0,0,0,0.87)]' : '',
+                      inMonth && !isRedDay ? 'text-text-primary' : '',
                       isRedDay ? 'text-red-500' : '',
                       !inMonth ? 'text-text-soft/60' : '',
                     ]
@@ -162,7 +162,7 @@ export const LedgerCalendar = memo(function LedgerCalendar({
               <div
                 className={[
                   'mt-auto flex min-h-[2rem] w-full shrink-0 flex-col justify-start border-t pt-1 text-[0.5625rem] leading-snug text-text-soft md:min-h-[2.25rem] md:text-[0.625rem]',
-                  inMonth ? 'border-black/[0.08]' : 'border-black/[0.05]',
+                  inMonth ? 'border-border-subtle' : 'border-border-muted/80',
                 ].join(' ')}
               >
                 {memoLines[0] ? (

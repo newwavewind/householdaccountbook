@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import {
@@ -272,19 +272,19 @@ export function MonthInputSection({
   )
 
   return (
-    <Card className="rounded-[var(--radius-card)] border border-black/[0.08] bg-white p-4 shadow-[var(--shadow-card)] md:p-6">
-      <div className="mb-3 flex flex-col gap-2 border-b border-black/[0.06] pb-3 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
+    <Card className="rounded-[var(--radius-card)] border border-border-subtle bg-surface-raised p-4 shadow-[var(--shadow-card)] md:p-6">
+      <div className="mb-3 flex flex-col gap-2 border-b border-border-muted pb-3 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
         <h2 className="text-lg font-semibold tabular-nums text-starbucks-green">
           {year}년 {title}
         </h2>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5 text-xs text-text-soft sm:items-end">
           <p className="tabular-nums">
-            <span className="font-semibold text-[rgba(0,0,0,0.5)]">입력 표</span>{' '}
-            <span className="font-semibold text-[rgba(0,0,0,0.82)]">
+            <span className="font-semibold text-text-muted">입력 표</span>{' '}
+            <span className="font-semibold text-text-secondary">
               수입 {won(draftMonthTotals.income)}
             </span>
-            <span className="mx-1 text-black/20">·</span>
-            <span className="font-semibold text-[rgba(0,0,0,0.82)]">
+            <span className="mx-1 text-text-muted/70">·</span>
+            <span className="font-semibold text-text-secondary">
               지출 {won(draftMonthTotals.expense)}
             </span>
           </p>
@@ -300,7 +300,7 @@ export function MonthInputSection({
       <div className="mb-2 overflow-x-auto">
           <table className="w-full min-w-[520px] border-collapse text-sm">
             <thead>
-              <tr className="border-b border-black/[0.08] text-left text-xs uppercase text-text-soft">
+              <tr className="border-b border-border-subtle text-left text-xs uppercase text-text-soft">
                 <th className="py-2 pr-2 font-medium">일</th>
                 <th className="py-2 pr-2 font-medium">구분</th>
                 <th className="py-2 pr-2 font-medium">금액</th>
@@ -315,7 +315,7 @@ export function MonthInputSection({
             </thead>
             <tbody ref={tbodyRef}>
               {rows.map((r, i) => (
-                <tr key={r.localKey} data-bulk-row={r.localKey} className="border-b border-black/[0.05] align-middle">
+                <tr key={r.localKey} data-bulk-row={r.localKey} className="border-b border-border-muted/80 align-middle">
                   <td className="py-2 pr-2">
                     <input
                       aria-label={`${monthIndex + 1}월 일`}
@@ -552,8 +552,8 @@ export function MonthInputSection({
         <div
           className={`mt-2 rounded-lg border px-3 py-2 text-xs leading-relaxed ${
             draftLedgerCompare.multisetMatch
-              ? 'border-green-accent/35 bg-green-light/40 text-[rgba(0,0,0,0.78)]'
-              : 'border-amber-400/45 bg-amber-50/90 text-[rgba(0,0,0,0.82)]'
+              ? 'border-green-accent/35 bg-green-light/40 text-text-secondary dark:border-green-accent/25 dark:bg-green-light/25'
+              : 'border-amber-400/45 bg-amber-50/90 text-text-secondary dark:border-amber-700/50 dark:bg-amber-950/45'
           }`}
           role="status"
           aria-label="장부와 입력 크로스체크"
@@ -594,12 +594,12 @@ export function MonthInputSection({
             onClick={() => setBulkRowDeleteKey(null)}
           >
             <div
-              className="w-full max-w-[18rem] rounded-[var(--radius-card)] bg-white p-6 shadow-[var(--shadow-card)]"
+              className="w-full max-w-[18rem] rounded-[var(--radius-card)] bg-surface-raised p-6 shadow-[var(--shadow-card)]"
               onClick={(e) => e.stopPropagation()}
             >
               <p
                 id="bulk-row-delete-title"
-                className="text-center text-base font-semibold text-[rgba(0,0,0,0.87)]"
+                className="text-center text-base font-semibold text-text-primary"
               >
                 정말로 삭제할까요?
               </p>
@@ -640,11 +640,11 @@ export function MonthInputSection({
         <p className="mt-3 text-xs text-text-soft">
           일 칸에는 1부터 {maxDay}까지 숫자만 넣습니다. 금액은 숫자만 입력하면 되고, 다른 칸으로
           넘어가면 천 단위 콤마로 보입니다.{' '}
-          <kbd className="rounded border border-black/15 bg-neutral-cool px-1 py-px text-[0.65rem]">
+          <kbd className="rounded border border-border-default bg-neutral-cool px-1 py-px text-[0.65rem]">
             Enter
           </kbd>
           로 다음 칸,{' '}
-          <kbd className="rounded border border-black/15 bg-neutral-cool px-1 py-px text-[0.65rem]">
+          <kbd className="rounded border border-border-default bg-neutral-cool px-1 py-px text-[0.65rem]">
             Shift+Enter
           </kbd>
           로 이전 칸으로 이동합니다.{' '}

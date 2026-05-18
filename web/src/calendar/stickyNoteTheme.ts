@@ -1,4 +1,4 @@
-import type { StickyTint } from './calendarStickyNotesStorage'
+﻿import type { StickyTint } from './calendarStickyNotesStorage'
 
 /** MS 스티커 메모 느낌: 헤더/푸터(진하게) · 본문(연하게) */
 export type StickyTheme = {
@@ -17,9 +17,9 @@ export const STICKY_THEMES: Record<StickyTint, StickyTheme> = {
     bodyClass: 'bg-[#fffef5]',
     footerClass: 'bg-[#e8d78a] border-t border-[#c9b86a]/90',
     headerBtnClass:
-      'rounded p-1 text-[rgba(0,0,0,0.72)] hover:bg-black/10 focus-visible:outline focus-visible:ring-2 focus-visible:ring-black/20',
+      'rounded p-1 text-text-secondary hover:bg-black/10 focus-visible:outline focus-visible:ring-2 focus-visible:ring-black/20',
     toolbarBtnClass:
-      'rounded px-2 py-1 text-[0.75rem] font-semibold text-[rgba(0,0,0,0.65)] hover:bg-black/10',
+      'rounded px-2 py-1 text-[0.75rem] font-semibold text-text-muted hover:bg-black/10',
     toolbarBtnActiveClass: 'bg-black/15 text-black',
     placeholderClass: 'text-black/40',
   },
@@ -28,9 +28,9 @@ export const STICKY_THEMES: Record<StickyTint, StickyTheme> = {
     bodyClass: 'bg-[#eef8ef]',
     footerClass: 'bg-[#8fbf96] border-t border-[#6fa378]/95',
     headerBtnClass:
-      'rounded p-1 text-[rgba(0,0,0,0.72)] hover:bg-black/10 focus-visible:outline focus-visible:ring-2 focus-visible:ring-black/20',
+      'rounded p-1 text-text-secondary hover:bg-black/10 focus-visible:outline focus-visible:ring-2 focus-visible:ring-black/20',
     toolbarBtnClass:
-      'rounded px-2 py-1 text-[0.75rem] font-semibold text-[rgba(0,0,0,0.65)] hover:bg-black/10',
+      'rounded px-2 py-1 text-[0.75rem] font-semibold text-text-muted hover:bg-black/10',
     toolbarBtnActiveClass: 'bg-black/15 text-black',
     placeholderClass: 'text-black/40',
   },
@@ -39,9 +39,9 @@ export const STICKY_THEMES: Record<StickyTint, StickyTheme> = {
     bodyClass: 'bg-[#fff5f8]',
     footerClass: 'bg-[#e8a0b8] border-t border-[#d0809a]/90',
     headerBtnClass:
-      'rounded p-1 text-[rgba(0,0,0,0.72)] hover:bg-black/10 focus-visible:outline focus-visible:ring-2 focus-visible:ring-black/20',
+      'rounded p-1 text-text-secondary hover:bg-black/10 focus-visible:outline focus-visible:ring-2 focus-visible:ring-black/20',
     toolbarBtnClass:
-      'rounded px-2 py-1 text-[0.75rem] font-semibold text-[rgba(0,0,0,0.65)] hover:bg-black/10',
+      'rounded px-2 py-1 text-[0.75rem] font-semibold text-text-muted hover:bg-black/10',
     toolbarBtnActiveClass: 'bg-black/15 text-black',
     placeholderClass: 'text-black/40',
   },
@@ -50,9 +50,9 @@ export const STICKY_THEMES: Record<StickyTint, StickyTheme> = {
     bodyClass: 'bg-[#f7f2ff]',
     footerClass: 'bg-[#b9a3d4] border-t border-[#9a82b8]/90',
     headerBtnClass:
-      'rounded p-1 text-[rgba(0,0,0,0.72)] hover:bg-black/10 focus-visible:outline focus-visible:ring-2 focus-visible:ring-black/20',
+      'rounded p-1 text-text-secondary hover:bg-black/10 focus-visible:outline focus-visible:ring-2 focus-visible:ring-black/20',
     toolbarBtnClass:
-      'rounded px-2 py-1 text-[0.75rem] font-semibold text-[rgba(0,0,0,0.65)] hover:bg-black/10',
+      'rounded px-2 py-1 text-[0.75rem] font-semibold text-text-muted hover:bg-black/10',
     toolbarBtnActiveClass: 'bg-black/15 text-black',
     placeholderClass: 'text-black/40',
   },
@@ -61,9 +61,9 @@ export const STICKY_THEMES: Record<StickyTint, StickyTheme> = {
     bodyClass: 'bg-[#f3f8ff]',
     footerClass: 'bg-[#92b8e0] border-t border-[#7098c8]/90',
     headerBtnClass:
-      'rounded p-1 text-[rgba(0,0,0,0.72)] hover:bg-black/10 focus-visible:outline focus-visible:ring-2 focus-visible:ring-black/20',
+      'rounded p-1 text-text-secondary hover:bg-black/10 focus-visible:outline focus-visible:ring-2 focus-visible:ring-black/20',
     toolbarBtnClass:
-      'rounded px-2 py-1 text-[0.75rem] font-semibold text-[rgba(0,0,0,0.65)] hover:bg-black/10',
+      'rounded px-2 py-1 text-[0.75rem] font-semibold text-text-muted hover:bg-black/10',
     toolbarBtnActiveClass: 'bg-black/15 text-black',
     placeholderClass: 'text-black/40',
   },
@@ -72,9 +72,9 @@ export const STICKY_THEMES: Record<StickyTint, StickyTheme> = {
     bodyClass: 'bg-[#f5f5f5]',
     footerClass: 'bg-[#bdbdbd] border-t border-[#9e9e9e]/95',
     headerBtnClass:
-      'rounded p-1 text-[rgba(0,0,0,0.72)] hover:bg-black/10 focus-visible:outline focus-visible:ring-2 focus-visible:ring-black/20',
+      'rounded p-1 text-text-secondary hover:bg-black/10 focus-visible:outline focus-visible:ring-2 focus-visible:ring-black/20',
     toolbarBtnClass:
-      'rounded px-2 py-1 text-[0.75rem] font-semibold text-[rgba(0,0,0,0.65)] hover:bg-black/10',
+      'rounded px-2 py-1 text-[0.75rem] font-semibold text-text-muted hover:bg-black/10',
     toolbarBtnActiveClass: 'bg-black/15 text-black',
     placeholderClass: 'text-black/40',
   },
@@ -83,10 +83,10 @@ export const STICKY_THEMES: Record<StickyTint, StickyTheme> = {
     bodyClass: 'bg-[#3d3d3d]',
     footerClass: 'bg-[#2d2d2d] border-t border-black/40',
     headerBtnClass:
-      'rounded p-1 text-white/85 hover:bg-white/15 focus-visible:outline focus-visible:ring-2 focus-visible:ring-white/30',
+      'rounded p-1 text-white/85 hover:bg-surface-raised/15 focus-visible:outline focus-visible:ring-2 focus-visible:ring-white/30',
     toolbarBtnClass:
-      'rounded px-2 py-1 text-[0.75rem] font-semibold text-white/75 hover:bg-white/10',
-    toolbarBtnActiveClass: 'bg-white/20 text-white',
+      'rounded px-2 py-1 text-[0.75rem] font-semibold text-white/75 hover:bg-surface-raised/10',
+    toolbarBtnActiveClass: 'bg-surface-raised/20 text-white',
     placeholderClass: 'text-white/45',
   },
 }

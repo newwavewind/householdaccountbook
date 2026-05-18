@@ -1,4 +1,4 @@
-import { holidayLabel } from '../lib/holidays'
+﻿import { holidayLabel } from '../lib/holidays'
 import type { DayRollup } from '../lib/dayTotals'
 
 export function CalendarHoverTooltip({
@@ -36,7 +36,7 @@ export function CalendarHoverTooltip({
   return (
     <div
       role="tooltip"
-      className="pointer-events-none fixed z-[60] max-w-[14rem] rounded-[var(--radius-card)] border border-black/[0.1] bg-white px-3 py-2.5 text-left text-sm shadow-[var(--shadow-card)]"
+      className="pointer-events-none fixed z-[60] max-w-[14rem] rounded-[var(--radius-card)] border border-border-default bg-surface-raised px-3 py-2.5 text-left text-sm shadow-[var(--shadow-card)]"
       style={{ left, top }}
     >
       <p className="font-semibold text-starbucks-green">{label}</p>

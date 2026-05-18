@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -78,7 +78,7 @@ function SupabaseLoginScreen() {
   }
 
   return (
-    <main className="min-h-[calc(100dvh-3.5rem)] bg-gradient-to-b from-[#f7f5f0] via-neutral-warm to-white">
+    <main className="min-h-[calc(100dvh-3.5rem)] bg-gradient-to-b from-auth-gradient-from via-auth-gradient-via to-auth-gradient-to">
       <div className="mx-auto max-w-lg px-4 py-10 md:px-6 md:py-14">
         <p className="text-center text-xs font-semibold uppercase tracking-[0.12em] text-green-accent">
           Community
@@ -87,8 +87,8 @@ function SupabaseLoginScreen() {
           로그인 · 가입
         </h1>
         <p className="mx-auto mt-3 max-w-md text-center text-sm leading-relaxed text-text-soft">
-          Google 계정으로 <strong className="font-medium text-[rgba(0,0,0,0.55)]">로그인</strong>과{' '}
-          <strong className="font-medium text-[rgba(0,0,0,0.55)]">첫 방문 시 자동 가입</strong>이 한 번에
+          Google 계정으로 <strong className="font-medium text-text-faint">로그인</strong>과{' '}
+          <strong className="font-medium text-text-faint">첫 방문 시 자동 가입</strong>이 한 번에
           처리됩니다. 별도 회원가입 양식은 없습니다.
         </p>
 
@@ -125,7 +125,7 @@ function SupabaseLoginScreen() {
                       아래 한 줄만 복사합니다. «당신의», 〈 〉, (프로젝트) 같은 설명 글자는
                       URI에 넣지 마세요.
                     </span>
-                    <code className="mt-1 block rounded bg-white/80 px-2 py-1 text-xs break-all">
+                    <code className="mt-1 block rounded bg-surface-raised/80 px-2 py-1 text-xs break-all">
                       {googleOAuthRedirectUri}
                     </code>
                   </>
@@ -133,10 +133,10 @@ function SupabaseLoginScreen() {
                   <span className="mt-1 block text-xs leading-relaxed text-text-soft">
                     Supabase 대시보드 → Project Settings → API의{' '}
                     <strong className="font-medium">Project URL</strong> 값을{' '}
-                    <code className="rounded bg-white/80 px-1 py-0.5 font-mono text-[rgba(0,0,0,0.75)]">
+                    <code className="rounded bg-surface-raised/80 px-1 py-0.5 font-mono text-text-secondary">
                       VITE_SUPABASE_URL
                     </code>
-                    로 <code className="font-mono text-[rgba(0,0,0,0.75)]">web/.env.local</code>에
+                    로 <code className="font-mono text-text-secondary">web/.env.local</code>에
                     넣고 개발 서버를 다시 띄우면, 여기에 복사용 주소가 나타납니다. Google에는
                     그때 표시되는 주소만 등록하세요.
                   </span>
@@ -145,7 +145,7 @@ function SupabaseLoginScreen() {
               <li>
                 Supabase → Authentication → <strong>URL Configuration</strong> → Redirect URLs 에
                 아래 주소가 있어야 합니다(개발 서버는 포트 <strong>5173</strong> 고정).
-                <code className="mt-1 block rounded bg-white/80 px-2 py-1 text-xs">{callbackHint}</code>
+                <code className="mt-1 block rounded bg-surface-raised/80 px-2 py-1 text-xs">{callbackHint}</code>
               </li>
             </ol>
             {oauthProbe === 'other' ? (
@@ -157,7 +157,7 @@ function SupabaseLoginScreen() {
         ) : null}
 
         {auth.loading ? (
-          <Card className="mt-10 border border-black/[0.06] bg-white p-10 text-center shadow-[var(--shadow-card)]">
+          <Card className="mt-10 border border-border-muted bg-surface-raised p-10 text-center shadow-[var(--shadow-card)]">
             <div
               className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-green-accent border-t-transparent"
               aria-hidden
@@ -165,12 +165,12 @@ function SupabaseLoginScreen() {
             <p className="mt-4 text-sm text-text-soft">세션 확인 중…</p>
           </Card>
         ) : auth.user ? (
-          <Card className="mt-10 border border-black/[0.06] bg-white p-8 shadow-[var(--shadow-card)]">
+          <Card className="mt-10 border border-border-muted bg-surface-raised p-8 shadow-[var(--shadow-card)]">
             <p className="text-center text-xs font-medium uppercase tracking-wide text-text-soft">
               로그인됨
             </p>
             <div className="mt-4 flex flex-col items-center gap-1 text-center">
-              <p className="text-lg font-semibold text-[rgba(0,0,0,0.87)]">
+              <p className="text-lg font-semibold text-text-primary">
                 {auth.user.displayName}
               </p>
               {auth.user.email ? (
@@ -197,13 +197,13 @@ function SupabaseLoginScreen() {
             </div>
           </Card>
         ) : (
-          <Card className="mt-10 space-y-6 border border-black/[0.08] bg-white p-8 shadow-[var(--shadow-card)] md:p-9">
+          <Card className="mt-10 space-y-6 border border-border-subtle bg-surface-raised p-8 shadow-[var(--shadow-card)] md:p-9">
             <div>
               <button
                 type="button"
                 disabled={busy}
                 onClick={() => void onGoogle()}
-                className="flex w-full items-center justify-center gap-3 rounded-full border border-[#dadce0] bg-white py-3.5 pl-4 pr-5 text-sm font-semibold text-[#3c4043] shadow-sm transition hover:bg-[#f8f9fa] disabled:opacity-60"
+                className="flex w-full items-center justify-center gap-3 rounded-full border border-border-strong bg-surface-raised py-3.5 pl-4 pr-5 text-sm font-semibold text-text-primary shadow-sm transition hover:bg-neutral-cool/55 disabled:opacity-60 dark:border-white/15 dark:hover:bg-white/8"
               >
                 <GoogleMark />
                 {busy ? 'Google로 이동 중…' : 'Google로 계속하기'}
@@ -214,7 +214,7 @@ function SupabaseLoginScreen() {
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 border-t border-black/[0.06] pt-6 text-sm">
+            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 border-t border-border-muted pt-6 text-sm">
               <Link
                 to="/community"
                 className="font-medium text-green-accent underline underline-offset-2 hover:text-starbucks-green"
@@ -303,7 +303,7 @@ export default function AuthSetupPage() {
       ) : null}
 
       {mode === 'supabase' && !client ? (
-        <Card className="mt-8 border border-warning/40 bg-white p-6">
+        <Card className="mt-8 border border-warning/40 bg-surface-raised p-6">
           <p className="text-sm text-text-primary">
             환경 변수 이름은 맞지만 값이 비어 있거나 잘못되었을 수 있습니다.{' '}
             <code className="rounded bg-ceramic px-1 py-0.5 text-xs">VITE_SUPABASE_URL</code>,{' '}
@@ -359,7 +359,7 @@ VITE_SUPABASE_ANON_KEY=eyJhbG...`}
           </Card>
 
           {import.meta.env.DEV ? (
-            <Card className="mt-10 border border-dashed border-black/[0.12] bg-neutral-cool/50 p-5">
+            <Card className="mt-10 border border-dashed border-border-strong bg-neutral-cool/50 p-5">
               <p className="text-xs font-semibold text-text-soft">개발 전용 · 목업</p>
               <p className="mt-2 text-xs text-text-soft">
                 서버 없이 UI만 돌려볼 때만 사용하세요. 실제글/계정과 무관합니다.
