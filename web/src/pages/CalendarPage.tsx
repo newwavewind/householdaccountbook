@@ -824,20 +824,7 @@ export default function CalendarPage() {
         </div>
         {backend === 'supabase' && cloudConfigured ? (
           <div className="mt-4 space-y-2">
-            {!userId ? (
-              <div className="rounded-[var(--radius-card)] border border-black/[0.08] bg-ceramic/80 px-4 py-3 text-sm text-[rgba(0,0,0,0.87)]">
-                Google 로그인 후 가구에 참여하면 일정이 다른 기기·가족과
-                맞춰집니다.
-                <Button
-                  type="button"
-                  variant="outlined"
-                  className="mt-2 w-full min-h-11 sm:w-auto"
-                  onClick={() => nav('/auth/setup')}
-                >
-                  로그인 안내로 이동
-                </Button>
-              </div>
-            ) : !householdId ? (
+            {!userId ? null : !householdId ? (
               <div className="rounded-[var(--radius-card)] border border-black/[0.08] bg-amber-50/90 px-4 py-3 text-sm text-[rgba(0,0,0,0.87)]">
                 아직 가구에 연결되지 않았어요. 장부 화면에서 가구를 만들거나
                 공유코드를 입력하면 일정도 함께 공유돼요.
