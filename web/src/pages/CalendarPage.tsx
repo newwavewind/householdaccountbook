@@ -802,12 +802,20 @@ export default function CalendarPage() {
               </p>
             )}
           </div>
-          <Link
-            to="/calendar/dday"
-            className="shrink-0 self-center rounded-full border border-border-strong bg-surface-raised px-3 py-1.5 text-sm font-semibold text-starbucks-green transition-colors hover:bg-green-light/40"
-          >
-            디데이 설정
-          </Link>
+          <div className="flex shrink-0 flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+            <Link
+              to="/calendar/recovery"
+              className="self-center text-center text-xs font-medium text-text-soft underline-offset-2 hover:text-starbucks-green hover:underline"
+            >
+              데이터 복구·백업
+            </Link>
+            <Link
+              to="/calendar/dday"
+              className="self-center rounded-full border border-border-strong bg-surface-raised px-3 py-1.5 text-center text-sm font-semibold text-starbucks-green transition-colors hover:bg-green-light/40"
+            >
+              디데이 설정
+            </Link>
+          </div>
         </div>
         {backend === 'supabase' && cloudConfigured ? (
           <div className="mt-4 space-y-2">

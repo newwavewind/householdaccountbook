@@ -57,27 +57,32 @@ function normalizeTint(v: unknown): StickyTint {
   return 'yellow'
 }
 
+/** localStorage·붙여넣기 복구용 — JSON 배열을 스티커 목록으로 검증 */
+export function parseStickyNotesPayload(raw: unknown): CalendarStickyNote[] {
+  if (!Array.isArray(raw)) return []
+  const out: CalendarStickyNote[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue
+    const o = item as Record<string, unknown>
+    const id = typeof o.id === 'string' && o.id ? o.id : crypto.randomUUID()
+    const body = typeof o.body === 'string' ? o.body : ''
+    const bodyHtml =
+      typeof o.bodyHtml === 'string' && o.bodyHtml.trim() ? o.bodyHtml : undefined
+    const tint = normalizeTint(o.tint)
+    const updatedAt =
+      typeof o.updatedAt === 'string' ? o.updatedAt : new Date().toISOString()
+    out.push({ id, body, bodyHtml, tint, updatedAt })
+  }
+  return out
+}
+
 export function loadStickyNotes(): CalendarStickyNote[] {
   if (typeof localStorage === 'undefined') return []
   try {
     const raw = localStorage.getItem(CALENDAR_STICKY_NOTES_KEY)
     if (!raw) return []
     const parsed = JSON.parse(raw) as unknown
-    if (!Array.isArray(parsed)) return []
-    const out: CalendarStickyNote[] = []
-    for (const item of parsed) {
-      if (!item || typeof item !== 'object' || Array.isArray(item)) continue
-      const o = item as Record<string, unknown>
-      const id = typeof o.id === 'string' && o.id ? o.id : crypto.randomUUID()
-      const body = typeof o.body === 'string' ? o.body : ''
-      const bodyHtml =
-        typeof o.bodyHtml === 'string' && o.bodyHtml.trim() ? o.bodyHtml : undefined
-      const tint = normalizeTint(o.tint)
-      const updatedAt =
-        typeof o.updatedAt === 'string' ? o.updatedAt : new Date().toISOString()
-      out.push({ id, body, bodyHtml, tint, updatedAt })
-    }
-    return out
+    return parseStickyNotesPayload(parsed)
   } catch {
     return []
   }

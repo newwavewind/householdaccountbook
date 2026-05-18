@@ -12,6 +12,7 @@ import CommunityListPage from './pages/CommunityListPage'
 import CommunityPostDetailPage from './pages/CommunityPostDetailPage'
 import CommunityPostEditorPage from './pages/CommunityPostEditorPage'
 import AuthSetupPage from './pages/AuthSetupPage'
+import DiaryRecoveryPage from './pages/DiaryRecoveryPage'
 import { RequireAdmin, RequireAuth } from './routes/RouteGuards'
 
 export default function App() {
@@ -21,6 +22,7 @@ export default function App() {
         <Routes>
         <Route element={<RootLayout />}>
           <Route path="/calendar" element={<CalendarPage />} />
+          <Route path="/calendar/recovery" element={<DiaryRecoveryPage />} />
           <Route path="/calendar/dday" element={<DDaySettingsPage />} />
           <Route path="/input" element={<BulkInputPage />} />
           <Route path="/" element={<LedgerApp />} />
