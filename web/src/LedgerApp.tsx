@@ -552,10 +552,10 @@ export default function LedgerApp() {
             <NavLink
               to="/input"
               className={({ isActive }) =>
-                `shrink-0 rounded-full border border-green-accent px-2.5 py-1 text-xs font-semibold transition-colors active:scale-[0.98] design2:rounded-md md:px-3 md:py-1.5 md:text-sm ${
+                `shrink-0 rounded-full border border-green-accent px-2.5 py-1 text-xs font-semibold transition-colors active:scale-[0.98] theme2:rounded-md md:px-3 md:py-1.5 md:text-sm ${
                   isActive
-                    ? 'bg-green-accent text-on-accent design2:border-charcoal-border design2:shadow-[var(--shadow-frap-base)]'
-                    : 'text-green-accent hover:bg-green-light/60 design2:hover:bg-green-light/70'
+                    ? 'bg-green-accent text-on-accent theme2:border-charcoal-border theme2:shadow-[var(--shadow-frap-base)]'
+                    : 'text-green-accent hover:bg-green-light/60 theme2:hover:bg-green-light/70'
                 }`
               }
             >

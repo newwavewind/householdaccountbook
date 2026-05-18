@@ -24,30 +24,15 @@
         try {
           var k = 'mj-gaegyeobu-theme-v1';
           var p = localStorage.getItem(k);
-          var systemDark = window.matchMedia(
-            '(prefers-color-scheme: dark)',
-          ).matches;
-          if (p === 'design2') {
-            document.documentElement.classList.add('design2');
-            document.documentElement.classList.remove('dark');
-            document.documentElement.style.colorScheme = 'light';
-          } else {
-            document.documentElement.classList.remove('design2');
-            var dark = p === 'dark' || (p !== 'light' && systemDark);
-            if (dark) {
-              document.documentElement.classList.add('dark');
-              document.documentElement.style.colorScheme = 'dark';
-            } else {
-              document.documentElement.classList.remove('dark');
-              document.documentElement.style.colorScheme = 'light';
-            }
-          }
+          var t2 = p === 'theme2' || p === 'design2';
+          document.documentElement.classList.toggle('theme2', t2);
+          document.documentElement.style.colorScheme = 'light';
         } catch (e) {}
       })();
     </script>
     <meta name="application-name" content="MJ가계부" />
     <meta name="theme-color" content="#f2f0eb" />
-    <meta name="color-scheme" content="light dark" />
+    <meta name="color-scheme" content="light" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />

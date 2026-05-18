@@ -203,7 +203,7 @@ function SupabaseLoginScreen() {
                 type="button"
                 disabled={busy}
                 onClick={() => void onGoogle()}
-                className="flex w-full items-center justify-center gap-3 rounded-full border border-border-strong bg-surface-raised py-3.5 pl-4 pr-5 text-sm font-semibold text-text-primary shadow-sm transition hover:bg-neutral-cool/55 disabled:opacity-60 dark:border-white/15 dark:hover:bg-white/8"
+                className="flex w-full items-center justify-center gap-3 rounded-full border border-border-strong bg-surface-raised py-3.5 pl-4 pr-5 text-sm font-semibold text-text-primary shadow-sm transition hover:bg-neutral-cool/55 disabled:opacity-60"
               >
                 <GoogleMark />
                 {busy ? 'Google로 이동 중…' : 'Google로 계속하기'}

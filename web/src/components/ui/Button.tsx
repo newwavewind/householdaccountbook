@@ -5,7 +5,7 @@ const base =
 
 const variants = {
   primary:
-    'border-green-accent bg-green-accent text-on-accent design2:border-charcoal-border design2:shadow-[var(--shadow-frap-base)]',
+    'border-green-accent bg-green-accent text-on-accent theme2:border-charcoal-border theme2:shadow-[var(--shadow-frap-base)]',
   outlined: 'border-green-accent bg-transparent text-green-accent',
   black: 'border-black bg-black text-sm text-white',
   darkOutlined:

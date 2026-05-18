@@ -2,11 +2,11 @@ import { useThemePreference } from './ThemeContext'
 import type { ThemePreference } from './themePreference'
 
 const labels: Record<ThemePreference, string> = {
-  light: '라이트',
-  dark: '다크',
-  system: '시스템',
-  design2: '디자인2',
+  theme1: '테마1',
+  theme2: '테마2',
 }
+
+const ordered: ThemePreference[] = ['theme1', 'theme2']
 
 export function ThemeToggle() {
   const { preference, setPreference } = useThemePreference()
@@ -20,9 +20,9 @@ export function ThemeToggle() {
         onChange={(e) =>
           setPreference(e.target.value as ThemePreference)
         }
-        className="max-w-[6.25rem] cursor-pointer rounded-full border border-border-subtle bg-surface-raised py-0.5 pl-2 pr-1 text-[10px] font-semibold text-text-primary shadow-sm outline-none ring-green-accent/0 focus-visible:ring-2 md:max-w-none md:py-1 md:pl-2.5 md:pr-2 md:text-xs design2:rounded-md design2:border-charcoal-border design2:shadow-[var(--shadow-frap-base)]"
+        className="max-w-[5.5rem] cursor-pointer rounded-full border border-border-subtle bg-surface-raised py-0.5 pl-2 pr-1 text-[10px] font-semibold text-text-primary shadow-sm outline-none ring-green-accent/0 focus-visible:ring-2 md:max-w-none md:py-1 md:pl-2.5 md:pr-2 md:text-xs theme2:rounded-md theme2:border-charcoal-border theme2:shadow-[var(--shadow-frap-base)]"
       >
-        {(Object.keys(labels) as ThemePreference[]).map((k) => (
+        {ordered.map((k) => (
           <option key={k} value={k}>
             {labels[k]}
           </option>

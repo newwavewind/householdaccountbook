@@ -648,7 +648,7 @@ function CalendarDayPeekSheet({
               <p className="text-xs font-semibold uppercase tracking-wide text-text-soft">
                 디데이
               </p>
-              <ul className="mt-2 space-y-1 rounded-lg border border-amber-200/70 bg-amber-50/50 px-3 py-2 text-xs font-semibold text-gold dark:border-amber-800/50 dark:bg-amber-950/35 md:text-sm">
+              <ul className="mt-2 space-y-1 rounded-lg border border-amber-200/70 bg-amber-50/50 px-3 py-2 text-xs font-semibold text-gold md:text-sm">
                 {ddaysThisDay.map((d) => (
                   <li key={d.id}>{d.title}</li>
                 ))}
@@ -822,7 +822,7 @@ export default function CalendarPage() {
         {backend === 'supabase' && cloudConfigured ? (
           <div className="mt-4 space-y-2">
             {!userId ? null : !householdId ? (
-              <div className="rounded-[var(--radius-card)] border border-amber-200/70 bg-alert-surface px-4 py-3 text-sm text-text-primary dark:border-amber-800/45">
+              <div className="rounded-[var(--radius-card)] border border-amber-200/70 bg-alert-surface px-4 py-3 text-sm text-text-primary">
                 아직 가구에 연결되지 않았어요. 장부 화면에서 가구를 만들거나
                 공유코드를 입력하면 일정도 함께 공유돼요.
                 <Button
@@ -835,7 +835,7 @@ export default function CalendarPage() {
                 </Button>
               </div>
             ) : cloudStatus === 'error' && cloudMessage ? (
-              <div className="rounded-[var(--radius-card)] border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-danger dark:border-red-900/55 dark:bg-red-950/35">
+              <div className="rounded-[var(--radius-card)] border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-danger">
                 <p className="font-medium">동기화 오류: {cloudMessage}</p>
                 <p className="mt-2 text-xs text-text-muted">
                   로컬 메모는 이 기기에 저장·편집할 수 있어요. 테이블을 방금

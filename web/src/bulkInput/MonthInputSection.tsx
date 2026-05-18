@@ -552,8 +552,8 @@ export function MonthInputSection({
         <div
           className={`mt-2 rounded-lg border px-3 py-2 text-xs leading-relaxed ${
             draftLedgerCompare.multisetMatch
-              ? 'border-green-accent/35 bg-green-light/40 text-text-secondary dark:border-green-accent/25 dark:bg-green-light/25'
-              : 'border-amber-400/45 bg-amber-50/90 text-text-secondary dark:border-amber-700/50 dark:bg-amber-950/45'
+              ? 'border-green-accent/35 bg-green-light/40 text-text-secondary'
+              : 'border-amber-400/45 bg-amber-50/90 text-text-secondary'
           }`}
           role="status"
           aria-label="장부와 입력 크로스체크"

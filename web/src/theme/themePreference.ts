@@ -1,23 +1,21 @@
-export type ThemePreference = 'light' | 'dark' | 'system' | 'design2'
+export type ThemePreference = 'theme1' | 'theme2'
 
 export const THEME_STORAGE_KEY = 'mj-gaegyeobu-theme-v1'
 
+function normalizeStoredTheme(raw: string | null): ThemePreference {
+  if (raw === 'theme2' || raw === 'design2') return 'theme2'
+  if (raw === 'theme1') return 'theme1'
+  /* 이전: light / dark / system 등 → 테마1 */
+  return 'theme1'
+}
+
 export function readThemePreference(): ThemePreference {
-  if (typeof localStorage === 'undefined') return 'system'
+  if (typeof localStorage === 'undefined') return 'theme1'
   try {
-    const raw = localStorage.getItem(THEME_STORAGE_KEY)
-    if (
-      raw === 'light' ||
-      raw === 'dark' ||
-      raw === 'system' ||
-      raw === 'design2'
-    ) {
-      return raw
-    }
+    return normalizeStoredTheme(localStorage.getItem(THEME_STORAGE_KEY))
   } catch {
-    /* private mode */
+    return 'theme1'
   }
-  return 'system'
 }
 
 export function writeThemePreference(pref: ThemePreference): void {
@@ -29,43 +27,15 @@ export function writeThemePreference(pref: ThemePreference): void {
   }
 }
 
-/** 라이트/다크 해석 — 디자인2는 항상 라이트 UI (DESIGN2.MD) */
-export function resolveTheme(
-  pref: ThemePreference,
-  systemDark: boolean,
-): 'light' | 'dark' {
-  if (pref === 'design2') return 'light'
-  if (pref === 'light' || pref === 'dark') return pref
-  return systemDark ? 'dark' : 'light'
-}
-
-export function applyThemeToDocument(
-  pref: ThemePreference,
-  systemDark: boolean,
-): void {
+export function applyThemeToDocument(pref: ThemePreference): void {
   const root = document.documentElement
-  const resolved = resolveTheme(pref, systemDark)
-  const isDesign2 = pref === 'design2'
+  const isT2 = pref === 'theme2'
 
-  root.classList.toggle('design2', isDesign2)
-
-  if (isDesign2) {
-    root.classList.remove('dark')
-    root.style.colorScheme = 'light'
-  } else {
-    root.classList.toggle('dark', resolved === 'dark')
-    root.style.colorScheme = resolved === 'dark' ? 'dark' : 'light'
-  }
+  root.classList.toggle('theme2', isT2)
+  root.style.colorScheme = 'light'
 
   const themeMeta = document.querySelector('meta[name="theme-color"]')
   if (themeMeta) {
-    if (isDesign2) {
-      themeMeta.setAttribute('content', '#f5f5f5')
-    } else {
-      themeMeta.setAttribute(
-        'content',
-        resolved === 'dark' ? '#141816' : '#f2f0eb',
-      )
-    }
+    themeMeta.setAttribute('content', isT2 ? '#f5f5f5' : '#f2f0eb')
   }
 }
