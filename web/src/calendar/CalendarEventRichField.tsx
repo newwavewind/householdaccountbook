@@ -6,6 +6,7 @@ import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { sanitizeCalendarEventHtml } from './calendarHtmlSanitize'
+import { STICKY_THEMES } from './stickyNoteTheme'
 
 function deriveContent(html: string | undefined, plain: string): string {
   const h = html?.trim()
@@ -65,6 +66,8 @@ type Props = {
   plain: string
   onChange: (next: { html: string; plain: string }) => void
   minHeightClass?: string
+  /** 스티커 메모와 같은 본문·하단 툴바 배치 */
+  variant?: 'card' | 'sticky'
 }
 
 export function CalendarEventRichField({
@@ -74,6 +77,7 @@ export function CalendarEventRichField({
   plain,
   onChange,
   minHeightClass = 'min-h-[5rem]',
+  variant = 'card',
 }: Props) {
   const [fontSel, setFontSel] = useState('')
   const [highlightOpen, setHighlightOpen] = useState(false)
@@ -130,12 +134,195 @@ export function CalendarEventRichField({
   if (!editor) return null
 
   const highlightOn = editor.isActive('highlight')
+  const isSticky = variant === 'sticky'
+  const st = STICKY_THEMES.yellow
 
   function pushChange() {
     onChange({
       html: sanitizeCalendarEventHtml(editor.getHTML()),
       plain: editor.getText().trim(),
     })
+  }
+
+  const highlightPanel = highlightOpen ? (
+    <div
+      role="dialog"
+      aria-label="형광 색 선택"
+      className={`absolute ${isSticky ? 'bottom-full left-0 mb-1' : 'right-0 top-full mt-1'} z-[60] w-[min(100vw-2rem,11.5rem)] rounded-[var(--radius-card)] border border-border-subtle bg-surface-raised p-2 shadow-[var(--shadow-frap-stack)]`}
+    >
+      <div className="grid grid-cols-5 gap-1">
+        {HIGHLIGHT_PALETTE.map((opt) => {
+          const pressed = editor.isActive('highlight', { color: opt.hex })
+          return (
+            <button
+              key={opt.hex}
+              type="button"
+              title={opt.label}
+              aria-label={opt.label}
+              aria-pressed={pressed}
+              className={[
+                'aspect-square w-full rounded-md border outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-green-accent/40',
+                pressed
+                  ? 'ring-2 ring-green-accent ring-offset-1 ring-offset-surface-raised'
+                  : 'border-border-default hover:border-border-strong',
+              ].join(' ')}
+              style={{ backgroundColor: opt.hex }}
+              onClick={() => {
+                if (editor.isActive('highlight', { color: opt.hex })) {
+                  editor.chain().focus().unsetHighlight().run()
+                } else {
+                  editor.chain().focus().setHighlight({ color: opt.hex }).run()
+                }
+                pushChange()
+              }}
+            />
+          )
+        })}
+      </div>
+      <button
+        type="button"
+        className="mt-2 w-full rounded-md border border-border-muted py-1 text-[10px] text-text-soft transition-colors hover:bg-well"
+        onClick={() => {
+          editor.chain().focus().unsetHighlight().run()
+          pushChange()
+        }}
+      >
+        형광 모두 해제
+      </button>
+    </div>
+  ) : null
+
+  const toolbar = (
+    <>
+      <label className="sr-only" htmlFor={`cal-font-${encodeURIComponent(ariaLabel)}`}>
+        글꼴
+      </label>
+      <select
+        id={`cal-font-${encodeURIComponent(ariaLabel)}`}
+        value={FONTS.some((f) => f.value === fontSel) ? fontSel : ''}
+        onChange={(e) => {
+          const v = e.target.value
+          const chain = editor.chain().focus()
+          if (!v) {
+            chain.unsetFontFamily().run()
+          } else {
+            chain.setFontFamily(v).run()
+          }
+          setFontSel(v)
+          pushChange()
+        }}
+        className={
+          isSticky
+            ? `${st.toolbarBtnClass} h-7 max-w-[5.25rem] shrink-0 rounded border border-black/10 bg-white/80 px-1 text-[10px]`
+            : 'h-8 max-w-[6.25rem] shrink-0 rounded-md border border-border-default bg-surface-raised px-2 text-[11px] text-text-primary outline-none transition-colors focus-visible:ring-2 focus-visible:ring-green-accent/35'
+        }
+      >
+        {FONTS.map((f) => (
+          <option key={f.label} value={f.value}>
+            {f.label}
+          </option>
+        ))}
+      </select>
+      {!isSticky ? (
+        <span
+          className="mx-0.5 hidden h-5 w-px shrink-0 bg-border-muted sm:block"
+          aria-hidden
+        />
+      ) : null}
+      <button
+        type="button"
+        onClick={() => {
+          editor.chain().focus().toggleBold().run()
+          pushChange()
+        }}
+        className={
+          isSticky
+            ? `${st.toolbarBtnClass} ${editor.isActive('bold') ? st.toolbarBtnActiveClass : ''}`
+            : `h-8 min-w-8 shrink-0 rounded-md border px-2 text-[11px] font-bold transition-colors ${
+                editor.isActive('bold')
+                  ? 'border-green-accent bg-green-light/50 text-text-primary'
+                  : 'border-transparent bg-surface-raised text-text-secondary hover:bg-well'
+              }`
+        }
+        aria-label="굵게"
+      >
+        {isSticky ? <strong>B</strong> : '굵게'}
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          editor.chain().focus().toggleItalic().run()
+          pushChange()
+        }}
+        className={
+          isSticky
+            ? `${st.toolbarBtnClass} ${editor.isActive('italic') ? st.toolbarBtnActiveClass : ''}`
+            : `h-8 min-w-8 shrink-0 rounded-md border px-2 text-[11px] italic transition-colors ${
+                editor.isActive('italic')
+                  ? 'border-green-accent bg-green-light/50 text-text-primary'
+                  : 'border-transparent bg-surface-raised text-text-secondary hover:bg-well'
+              }`
+        }
+        aria-label="기울임"
+      >
+        {isSticky ? <em>I</em> : '기울임'}
+      </button>
+      {!isSticky ? (
+        <span
+          className="mx-0.5 hidden h-5 w-px shrink-0 bg-border-muted sm:block"
+          aria-hidden
+        />
+      ) : null}
+      <div
+        ref={hlWrapRef}
+        className={`relative flex min-w-0 items-center ${isSticky ? '' : 'flex-1 sm:flex-initial'}`}
+      >
+        <button
+          type="button"
+          aria-expanded={highlightOpen}
+          aria-haspopup="dialog"
+          onClick={() => setHighlightOpen((o) => !o)}
+          className={
+            isSticky
+              ? [
+                  st.toolbarBtnClass,
+                  highlightOpen || highlightOn ? st.toolbarBtnActiveClass : '',
+                ].join(' ')
+              : [
+                  'h-8 shrink-0 rounded-md border px-2 text-[11px] font-medium transition-colors',
+                  highlightOpen || highlightOn
+                    ? 'border-green-accent/60 bg-green-light/40 text-text-primary'
+                    : 'border-transparent bg-surface-raised text-text-secondary hover:bg-well',
+                ].join(' ')
+          }
+        >
+          {isSticky ? <span className="text-xs">형광</span> : '형광'}
+        </button>
+        {highlightPanel}
+      </div>
+    </>
+  )
+
+  if (isSticky) {
+    return (
+      <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-transparent">
+        <div
+          className={`min-h-0 flex-1 overflow-y-auto ${st.placeholderClass} [&_.ProseMirror]:px-3 [&_.ProseMirror]:py-2`}
+        >
+          <EditorContent
+            editor={editor}
+            className="min-h-[inherit] [&_.ProseMirror]:min-h-[11rem]"
+          />
+        </div>
+        <div
+          className={`flex shrink-0 flex-wrap items-center gap-0.5 px-1.5 py-1 ${st.footerClass}`}
+          role="toolbar"
+          aria-label={`${ariaLabel} 서식`}
+        >
+          {toolbar}
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -145,132 +332,7 @@ export function CalendarEventRichField({
         role="toolbar"
         aria-label={`${ariaLabel} 서식`}
       >
-        <label className="sr-only" htmlFor={`cal-font-${encodeURIComponent(ariaLabel)}`}>
-          글꼴
-        </label>
-        <select
-          id={`cal-font-${encodeURIComponent(ariaLabel)}`}
-          value={FONTS.some((f) => f.value === fontSel) ? fontSel : ''}
-          onChange={(e) => {
-            const v = e.target.value
-            const chain = editor.chain().focus()
-            if (!v) {
-              chain.unsetFontFamily().run()
-            } else {
-              chain.setFontFamily(v).run()
-            }
-            setFontSel(v)
-            pushChange()
-          }}
-          className="h-8 max-w-[6.25rem] shrink-0 rounded-md border border-border-default bg-surface-raised px-2 text-[11px] text-text-primary outline-none transition-colors focus-visible:ring-2 focus-visible:ring-green-accent/35"
-        >
-          {FONTS.map((f) => (
-            <option key={f.label} value={f.value}>
-              {f.label}
-            </option>
-          ))}
-        </select>
-        <span
-          className="mx-0.5 hidden h-5 w-px shrink-0 bg-border-muted sm:block"
-          aria-hidden
-        />
-        <button
-          type="button"
-          onClick={() => {
-            editor.chain().focus().toggleBold().run()
-            pushChange()
-          }}
-          className={`h-8 min-w-8 shrink-0 rounded-md border px-2 text-[11px] font-bold transition-colors ${
-            editor.isActive('bold')
-              ? 'border-green-accent bg-green-light/50 text-text-primary'
-              : 'border-transparent bg-surface-raised text-text-secondary hover:bg-well'
-          }`}
-        >
-          굵게
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            editor.chain().focus().toggleItalic().run()
-            pushChange()
-          }}
-          className={`h-8 min-w-8 shrink-0 rounded-md border px-2 text-[11px] italic transition-colors ${
-            editor.isActive('italic')
-              ? 'border-green-accent bg-green-light/50 text-text-primary'
-              : 'border-transparent bg-surface-raised text-text-secondary hover:bg-well'
-          }`}
-        >
-          기울임
-        </button>
-        <span
-          className="mx-0.5 hidden h-5 w-px shrink-0 bg-border-muted sm:block"
-          aria-hidden
-        />
-        <div ref={hlWrapRef} className="relative flex min-w-0 flex-1 items-center sm:flex-initial">
-          <button
-            type="button"
-            aria-expanded={highlightOpen}
-            aria-haspopup="dialog"
-            onClick={() => setHighlightOpen((o) => !o)}
-            className={[
-              'h-8 shrink-0 rounded-md border px-2 text-[11px] font-medium transition-colors',
-              highlightOpen || highlightOn
-                ? 'border-green-accent/60 bg-green-light/40 text-text-primary'
-                : 'border-transparent bg-surface-raised text-text-secondary hover:bg-well',
-            ].join(' ')}
-          >
-            형광
-          </button>
-          {highlightOpen ? (
-            <div
-              role="dialog"
-              aria-label="형광 색 선택"
-              className="absolute right-0 top-full z-[60] mt-1 w-[min(100vw-2rem,11.5rem)] rounded-[var(--radius-card)] border border-border-subtle bg-surface-raised p-2 shadow-[var(--shadow-frap-stack)]"
-            >
-              <div className="grid grid-cols-5 gap-1">
-                {HIGHLIGHT_PALETTE.map((opt) => {
-                  const pressed = editor.isActive('highlight', { color: opt.hex })
-                  return (
-                    <button
-                      key={opt.hex}
-                      type="button"
-                      title={opt.label}
-                      aria-label={opt.label}
-                      aria-pressed={pressed}
-                      className={[
-                        'aspect-square w-full rounded-md border outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-green-accent/40',
-                        pressed
-                          ? 'ring-2 ring-green-accent ring-offset-1 ring-offset-surface-raised'
-                          : 'border-border-default hover:border-border-strong',
-                      ].join(' ')}
-                      style={{ backgroundColor: opt.hex }}
-                      onClick={() => {
-                        if (
-                          editor.isActive('highlight', { color: opt.hex })
-                        ) {
-                          editor.chain().focus().unsetHighlight().run()
-                        } else {
-                          editor.chain().focus().setHighlight({ color: opt.hex }).run()
-                        }
-                        pushChange()
-                      }}
-                    />
-                  )
-                })}
-              </div>
-              <button
-                type="button"
-                className="mt-2 w-full rounded-md border border-border-muted py-1 text-[10px] text-text-soft transition-colors hover:bg-well"
-                onClick={() => {
-                  editor.chain().focus().unsetHighlight().run()
-                  pushChange()
-                }}
-              >
-                형광 모두 해제
-              </button>
-            </div>
-          ) : null}
-        </div>
+        {toolbar}
       </div>
       <EditorContent editor={editor} />
     </div>

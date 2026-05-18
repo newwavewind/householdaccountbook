@@ -44,6 +44,20 @@ export function resolveCalendarEventNoteInk(e: {
   return b && b !== 'default' ? b : undefined
 }
 
+/** 제목·내용 색 필드를 통합했을 때 사용하는 표시용 색 */
+export function resolveCalendarEventMemoInk(e: {
+  noteInk?: CalendarEventInkId
+  labelInk?: CalendarEventInkId
+  ink?: CalendarEventInkId
+}): CalendarEventInkId | undefined {
+  const a = normalizeCalendarEventInk(e.noteInk)
+  if (a && a !== 'default') return a
+  const b = normalizeCalendarEventInk(e.labelInk)
+  if (b && b !== 'default') return b
+  const c = normalizeCalendarEventInk(e.ink)
+  return c && c !== 'default' ? c : undefined
+}
+
 /** 달력 칸·요약·입력란 공통 — 클래스 문자열은 여기서만 조합 (Tailwind가 수집하도록) */
 export function calendarEventInkTextClass(
   ink: CalendarEventInkId | undefined,

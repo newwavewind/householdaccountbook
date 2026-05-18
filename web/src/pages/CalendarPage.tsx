@@ -22,11 +22,11 @@ import { ledgerBackendMode } from '../lib/ledgerBackend'
 import {
   CALENDAR_EVENT_INK_SWATCHES,
   calendarEventInkTextClass,
-  resolveCalendarEventLabelInk,
-  resolveCalendarEventNoteInk,
+  resolveCalendarEventMemoInk,
   type CalendarEventInkId,
 } from '../calendar/calendarEventInk'
 import { CalendarEventRichField } from '../calendar/CalendarEventRichField'
+import { STICKY_THEMES } from '../calendar/stickyNoteTheme'
 import {
   htmlToPlain,
   sanitizeCalendarEventHtml,
@@ -91,14 +91,50 @@ function formatTimeKo(hhmm: string): string {
   return `${m[1]}:${m[2]}`
 }
 
-function eventHasListingContent(e: CalendarDayEvent): boolean {
-  return !!(
-    e.label.trim() ||
-    htmlToPlain(e.labelHtml) ||
-    e.note?.trim() ||
-    htmlToPlain(e.noteHtml) ||
-    e.time?.trim()
-  )
+function mergeCalendarEventToUnifiedMemo(e: CalendarDayEvent): CalendarDayEvent {
+  const lhRaw = e.labelHtml?.trim()
+  const nhRaw = e.noteHtml?.trim()
+  const lh = lhRaw ? sanitizeCalendarEventHtml(lhRaw) : ''
+  const nh = nhRaw ? sanitizeCalendarEventHtml(nhRaw) : ''
+  const lp = e.label.trim()
+  const np = (e.note ?? '').trim()
+
+  const hasLh = !!(lh && htmlToPlain(lh))
+  const hasNh = !!(nh && htmlToPlain(nh))
+  const hasLp = !!lp
+  const hasNp = !!np
+
+  let noteHtml: string | undefined
+  let notePlain: string | undefined
+
+  if (hasLh && hasNh) {
+    noteHtml = sanitizeCalendarEventHtml(`${lh}${nh}`)
+    notePlain = htmlToPlain(noteHtml) || undefined
+  } else if (hasLh) {
+    noteHtml = lh
+    notePlain = htmlToPlain(lh) || undefined
+  } else if (hasNh) {
+    noteHtml = nh
+    notePlain = htmlToPlain(nh) || undefined
+  } else if (hasLp && hasNp) {
+    notePlain = `${lp}\n\n${np}`
+  } else if (hasLp) {
+    notePlain = lp
+  } else if (hasNp) {
+    notePlain = np
+  }
+
+  const memoInk = resolveCalendarEventMemoInk(e)
+
+  return {
+    ...e,
+    label: '',
+    labelHtml: undefined,
+    labelInk: undefined,
+    note: notePlain,
+    noteHtml: noteHtml?.trim() ? noteHtml : undefined,
+    noteInk: memoInk && memoInk !== 'default' ? memoInk : undefined,
+  }
 }
 
 function calendarCellPreviewContent(
@@ -107,26 +143,25 @@ function calendarCellPreviewContent(
   | { kind: 'html'; html: string; ink: CalendarEventInkId | undefined }
   | { kind: 'plain'; text: string; ink: CalendarEventInkId | undefined }
   | null {
-  const labelInk = resolveCalendarEventLabelInk(e)
-  const noteInk = resolveCalendarEventNoteInk(e)
-  const labelSan =
-    e.labelHtml?.trim() ? sanitizeCalendarEventHtml(e.labelHtml) : ''
-  if (labelSan && htmlToPlain(labelSan)) {
-    return { kind: 'html', html: labelSan, ink: labelInk }
-  }
-  const lt = e.label.trim()
-  if (lt) return { kind: 'plain', text: lt, ink: labelInk }
-
+  const ink = resolveCalendarEventMemoInk(e)
   const noteSan =
     e.noteHtml?.trim() ? sanitizeCalendarEventHtml(e.noteHtml) : ''
   if (noteSan && htmlToPlain(noteSan)) {
-    return { kind: 'html', html: noteSan, ink: noteInk }
+    return { kind: 'html', html: noteSan, ink }
   }
   const nt = e.note?.trim()
-  if (nt) return { kind: 'plain', text: nt, ink: noteInk }
+  if (nt) return { kind: 'plain', text: nt, ink }
+
+  const labelSan =
+    e.labelHtml?.trim() ? sanitizeCalendarEventHtml(e.labelHtml) : ''
+  if (labelSan && htmlToPlain(labelSan)) {
+    return { kind: 'html', html: labelSan, ink }
+  }
+  const lt = e.label.trim()
+  if (lt) return { kind: 'plain', text: lt, ink }
 
   const t = e.time?.trim()
-  if (t) return { kind: 'plain', text: formatTimeKo(t), ink: labelInk }
+  if (t) return { kind: 'plain', text: formatTimeKo(t), ink }
 
   return null
 }
@@ -134,7 +169,6 @@ function calendarCellPreviewContent(
 type DayMemoPanelProps = {
   iso: string
   initial: CalendarDayMemo | undefined
-  ledgerTxCount: number
   onPersist: (events: CalendarDayEvent[]) => void
   onDelete: () => void
 }
@@ -143,72 +177,109 @@ function emptyEventRow(): CalendarDayEvent {
   return { id: crypto.randomUUID(), label: '' }
 }
 
-function CalendarInkSelect({
-  value,
-  onChange,
+function CalendarInkColorDropdown({
   id,
-  label,
+  'aria-label': ariaLabel,
+  ink,
+  onPick,
+  triggerClassName,
+  menuAlign = 'left',
 }: {
-  value: CalendarEventInkId | undefined
-  onChange: (id: CalendarEventInkId | undefined) => void
   id: string
-  label: string
+  'aria-label': string
+  ink: CalendarEventInkId | undefined
+  onPick: (id: CalendarEventInkId | undefined) => void
+  /** 트리거 버튼에 추가 클래스 (스티커 헤더 톤 등) */
+  triggerClassName?: string
+  menuAlign?: 'left' | 'right'
 }) {
-  const current: CalendarEventInkId =
-    value && value !== 'default' ? value : 'default'
-  return (
-    <div className="w-full min-w-0">
-      <label
-        htmlFor={id}
-        className="mb-1 block text-[10px] font-medium tracking-wide text-text-soft"
-      >
-        {label}
-      </label>
-      <select
-        id={id}
-        value={current}
-        onChange={(e) => {
-          const v = e.target.value as CalendarEventInkId
-          onChange(v === 'default' ? undefined : v)
-        }}
-        className="min-h-11 w-full max-w-full touch-manipulation rounded-[var(--radius-card)] border border-border-default bg-surface-raised px-3 py-2.5 text-sm text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-green-accent/35"
-      >
-        {CALENDAR_EVENT_INK_SWATCHES.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.label}
-          </option>
-        ))}
-      </select>
-    </div>
-  )
-}
+  const [open, setOpen] = useState(false)
+  const wrapRef = useRef<HTMLDivElement>(null)
 
-function CalendarRichPreview({
-  html,
-  plain,
-  inkClass,
-}: {
-  html?: string
-  plain: string
-  inkClass: string
-}) {
-  const shell =
-    `min-h-11 rounded-[var(--radius-card)] border border-border-muted bg-well/25 px-3 py-2.5 text-sm leading-relaxed theme3:bg-neutral-cool/25 ${inkClass}`
-  if (html?.trim()) {
-    return (
-      <div
-        className={`${shell} [&_*]:leading-snug [&_p]:m-0 [&_strong]:font-semibold`}
-        // eslint-disable-next-line react/no-danger
-        dangerouslySetInnerHTML={{
-          __html: sanitizeCalendarEventHtml(html),
-        }}
-      />
-    )
-  }
-  const t = plain.trim()
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e: MouseEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc, true)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDoc, true)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  const current =
+    CALENDAR_EVENT_INK_SWATCHES.find((s) => s.id === (ink ?? 'default')) ??
+    CALENDAR_EVENT_INK_SWATCHES[0]
+
   return (
-    <div className={shell}>
-      {t ? t : <span className="text-text-soft">비어 있음</span>}
+    <div ref={wrapRef} className="relative w-fit min-w-0 shrink-0">
+      <button
+        id={id}
+        type="button"
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        aria-label={`${ariaLabel} — ${current.label}`}
+        onClick={() => setOpen((o) => !o)}
+        className={
+          [
+            'flex min-h-11 w-[7.25rem] max-w-full touch-manipulation items-center justify-between gap-2 rounded-[var(--radius-card)] border border-border-default bg-surface-raised px-2.5 py-2 text-left shadow-sm outline-none transition-colors hover:bg-well focus-visible:ring-2 focus-visible:ring-green-accent/35',
+            triggerClassName ?? '',
+          ]
+            .filter(Boolean)
+            .join(' ')
+        }
+      >
+        <span
+          className={`block h-5 w-5 shrink-0 rounded-full ${current.dot} shadow-[inset_0_0_0_1px_rgb(0_0_0/0.12)] ring-1 ring-black/10`}
+          aria-hidden
+        />
+        <span className="text-[0.7rem] leading-none text-text-soft" aria-hidden>
+          ▾
+        </span>
+      </button>
+      {open ? (
+        <div
+          role="listbox"
+          aria-label={ariaLabel}
+          className={`absolute ${menuAlign === 'right' ? 'right-0' : 'left-0'} top-full z-[55] mt-1 w-[min(100vw-1.5rem,10.75rem)] rounded-[var(--radius-card)] border border-border-subtle bg-surface-raised p-2 shadow-[var(--shadow-card)]`}
+        >
+          <div className="grid grid-cols-3 gap-2">
+            {CALENDAR_EVENT_INK_SWATCHES.map((s) => {
+              const sel = (ink ?? 'default') === s.id
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  role="option"
+                  aria-selected={sel}
+                  title={s.label}
+                  aria-label={s.label}
+                  onClick={() => {
+                    onPick(s.id === 'default' ? undefined : s.id)
+                    setOpen(false)
+                  }}
+                  className={[
+                    'flex aspect-square w-full touch-manipulation items-center justify-center rounded-lg border bg-surface-raised outline-none focus-visible:ring-2 focus-visible:ring-green-accent/40',
+                    sel
+                      ? `ring-2 ring-offset-1 ring-offset-surface-raised ${s.ring} border-border-strong`
+                      : 'border-border-muted hover:border-border-strong',
+                  ].join(' ')}
+                >
+                  <span
+                    className={`block h-6 w-6 rounded-full ${s.dot} shadow-[inset_0_0_0_1px_rgb(0_0_0/0.12)]`}
+                    aria-hidden
+                  />
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -216,25 +287,19 @@ function CalendarRichPreview({
 function DayMemoPanel({
   iso,
   initial,
-  ledgerTxCount,
   onPersist,
   onDelete,
 }: DayMemoPanelProps) {
   const [events, setEvents] = useState<CalendarDayEvent[]>([emptyEventRow()])
-  const [editTitle, setEditTitle] = useState<Record<string, boolean>>({})
-  const [editBody, setEditBody] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
-    const list = getDayEvents(initial)
+    const raw = getDayEvents(initial)
+    const list = raw.map(mergeCalendarEventToUnifiedMemo)
     setEvents(list.length > 0 ? list : [emptyEventRow()])
-    setEditTitle({})
-    setEditBody({})
   }, [iso, initial?.updatedAt])
 
   const hol = holidayLabel(iso)
   const lunar = lunarCellInfo(iso, hol)
-
-  const summaryLines = events.filter(eventHasListingContent)
 
   return (
     <Card
@@ -262,73 +327,6 @@ function DayMemoPanel({
       </div>
 
       <div className="space-y-3 px-4 py-3 md:px-5">
-        <div
-          className="rounded-lg border border-border-subtle bg-ceramic/60 px-3 py-2.5"
-          aria-label="이 날 일정 요약"
-        >
-          <p className="text-xs font-semibold uppercase tracking-wide text-text-soft">
-            이 날 요약
-          </p>
-          <ul className="mt-1.5 space-y-1 text-sm text-text-primary">
-            {summaryLines.length > 0 ? (
-              summaryLines.map((e) => (
-                <li key={e.id}>
-                  <div
-                    className={`font-medium ${calendarEventInkTextClass(
-                      resolveCalendarEventLabelInk(e),
-                    )}`}
-                  >
-                    {e.labelHtml?.trim() ? (
-                      <span
-                        className="inline-block [&_*]:leading-snug [&_strong]:font-semibold"
-                        // eslint-disable-next-line react/no-danger
-                        dangerouslySetInnerHTML={{
-                          __html: sanitizeCalendarEventHtml(e.labelHtml ?? ''),
-                        }}
-                      />
-                    ) : (
-                      <span>{e.label.trim() || '일정'}</span>
-                    )}
-                  </div>
-                  {e.time?.trim() ? (
-                    <span className="text-text-soft">
-                      {' '}
-                      · {formatTimeKo(e.time.trim())}
-                    </span>
-                  ) : null}
-                  {(e.note?.trim() || htmlToPlain(e.noteHtml)) ? (
-                    <div
-                      className={`mt-0.5 text-xs [&_*]:leading-snug ${calendarEventInkTextClass(
-                        resolveCalendarEventNoteInk(e),
-                      )}`}
-                    >
-                      {e.noteHtml?.trim() ? (
-                        <span
-                          className="inline-block [&_strong]:font-semibold"
-                          // eslint-disable-next-line react/no-danger
-                          dangerouslySetInnerHTML={{
-                            __html: sanitizeCalendarEventHtml(e.noteHtml ?? ''),
-                          }}
-                        />
-                      ) : (
-                        <span>{e.note?.trim()}</span>
-                      )}
-                    </div>
-                  ) : null}
-                </li>
-              ))
-            ) : (
-              <li className="text-text-soft">
-                아직 일정 없음 · 아래에서 추가 후 저장
-              </li>
-            )}
-            <li>
-              <span className="text-text-soft">장부 · </span>
-              거래 {ledgerTxCount}건
-            </li>
-          </ul>
-        </div>
-
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-semibold text-text-primary">
@@ -346,104 +344,36 @@ function DayMemoPanel({
             </Button>
           </div>
 
-          {events.map((ev, i) => (
-            <div
-              key={ev.id}
-              className="overflow-hidden rounded-[var(--radius-card)] border border-border-subtle bg-surface-raised shadow-[var(--shadow-card)]"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border-muted bg-well/50 px-3 py-2.5 theme2:bg-well/65 theme3:bg-neutral-cool/35">
-                <span className="text-xs font-semibold tabular-nums text-text-primary">
-                  일정 {i + 1}
-                </span>
-                <label className="flex cursor-pointer items-center gap-2 text-xs text-text-secondary">
-                  <input
-                    type="checkbox"
-                    checked={ev.important === true}
-                    onChange={(e) => {
-                      const checked = e.target.checked
-                      setEvents((prev) => {
-                        const next = [...prev]
-                        next[i] = { ...ev, important: checked }
-                        return next
-                      })
-                    }}
-                    className="size-3.5 rounded border-input-border text-green-accent focus:ring-green-accent/30"
-                  />
-                  중요
-                </label>
-              </div>
-
-              <div className="space-y-4 px-3 py-3 pb-1">
-                <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_7.5rem] md:items-start">
-                  <div className="min-w-0 space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-semibold text-text-soft">
-                        제목
-                      </span>
-                      <button
-                        type="button"
-                        className="min-h-11 shrink-0 touch-manipulation rounded-[var(--radius-card)] border border-border-default bg-surface-raised px-3 text-xs font-semibold text-text-primary shadow-sm transition-colors active:scale-[0.99] hover:bg-well focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-accent/35"
-                        onClick={() =>
-                          setEditTitle((prev) => ({
-                            ...prev,
-                            [ev.id]: !prev[ev.id],
-                          }))
-                        }
-                      >
-                        {editTitle[ev.id] ? '완료' : '편집'}
-                      </button>
-                    </div>
-                    <CalendarInkSelect
-                      id={`cal-ink-title-${ev.id}`}
-                      label="글자색"
-                      value={ev.labelInk}
-                      onChange={(next) => {
-                        setEvents((prev) => {
-                          const nextRows = [...prev]
-                          nextRows[i] = {
-                            ...ev,
-                            labelInk: next,
-                          }
-                          return nextRows
-                        })
-                      }}
-                    />
-                    {editTitle[ev.id] ? (
-                      <CalendarEventRichField
-                        aria-label={`일정 ${i + 1} 제목`}
-                        placeholder="예: 조동친구, 장보기"
-                        key={`${ev.id}-label-edit`}
-                        html={ev.labelHtml}
-                        plain={ev.label}
-                        minHeightClass="min-h-[6.5rem] [&_.ProseMirror]:text-[15px] [&_.ProseMirror]:leading-snug"
-                        onChange={({ html, plain }) => {
+          {events.map((ev, i) => {
+            const stickyTheme = STICKY_THEMES.yellow
+            return (
+              <div
+                key={ev.id}
+                className="flex min-h-[18rem] flex-col overflow-hidden rounded-md border border-black/15 shadow-[3px_5px_18px_rgba(0,0,0,0.14)]"
+              >
+                <header
+                  className={`flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1.5 px-1.5 py-1 ${stickyTheme.headerClass}`}
+                >
+                  <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                    <span className="text-[0.72rem] font-semibold tabular-nums text-text-secondary">
+                      일정 {i + 1}
+                    </span>
+                    <label className="flex cursor-pointer items-center gap-1 text-[0.65rem] font-medium text-text-secondary">
+                      <input
+                        type="checkbox"
+                        checked={ev.important === true}
+                        onChange={(e) => {
+                          const checked = e.target.checked
                           setEvents((prev) => {
                             const next = [...prev]
-                            next[i] = {
-                              ...ev,
-                              label: plain,
-                              labelHtml: html.trim()
-                                ? html
-                                : undefined,
-                            }
+                            next[i] = { ...ev, important: checked }
                             return next
                           })
                         }}
+                        className="size-3.5 rounded border-black/25 text-text-primary"
                       />
-                    ) : (
-                      <CalendarRichPreview
-                        html={ev.labelHtml}
-                        plain={ev.label}
-                        inkClass={calendarEventInkTextClass(
-                          resolveCalendarEventLabelInk(ev),
-                        )}
-                      />
-                    )}
-                  </div>
-                  <div className="min-w-0 space-y-2 md:pt-0">
-                    <span className="block text-[11px] font-semibold text-text-soft">
-                      시간
-                    </span>
+                      중요
+                    </label>
                     <input
                       type="time"
                       value={ev.time ?? ''}
@@ -455,106 +385,76 @@ function DayMemoPanel({
                           return next
                         })
                       }}
-                      className={`min-h-11 w-full touch-manipulation rounded-[var(--radius-card)] border border-border-default bg-surface-raised px-2.5 py-2 text-sm outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-green-accent/35 ${calendarEventInkTextClass(
-                        resolveCalendarEventLabelInk(ev),
-                      )}`}
+                      className="h-7 max-w-[7rem] rounded border border-black/20 bg-white/90 px-1.5 text-xs text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-black/20"
+                      aria-label={`일정 ${i + 1} 시간`}
                     />
                   </div>
-                </div>
-
-                <div className="space-y-3 border-t border-border-muted pt-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-semibold text-text-soft">
-                      내용
-                    </span>
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    <CalendarInkColorDropdown
+                      id={`cal-ink-memo-${ev.id}`}
+                      aria-label={`일정 ${i + 1} 메모 글자색`}
+                      ink={ev.noteInk}
+                      menuAlign="right"
+                      triggerClassName={`!min-h-0 h-7 !w-[6.5rem] px-1.5 ${stickyTheme.headerBtnClass} border border-black/15 bg-white/85 shadow-none`}
+                      onPick={(next) => {
+                        setEvents((prev) => {
+                          const nextRows = [...prev]
+                          nextRows[i] = { ...ev, noteInk: next }
+                          return nextRows
+                        })
+                      }}
+                    />
                     <button
                       type="button"
-                      className="min-h-11 shrink-0 touch-manipulation rounded-[var(--radius-card)] border border-border-default bg-surface-raised px-3 text-xs font-semibold text-text-primary shadow-sm transition-colors active:scale-[0.99] hover:bg-well focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-accent/35"
-                      onClick={() =>
-                        setEditBody((prev) => ({
-                          ...prev,
-                          [ev.id]: !prev[ev.id],
-                        }))
-                      }
+                      className={stickyTheme.headerBtnClass}
+                      aria-label="이 일정 삭제"
+                      onClick={() => {
+                        setEvents((prev) => {
+                          const next = prev.filter((_, j) => j !== i)
+                          return next.length > 0 ? next : [emptyEventRow()]
+                        })
+                      }}
                     >
-                      {editBody[ev.id] ? '완료' : '편집'}
+                      <span className="px-1 text-sm leading-none">×</span>
                     </button>
                   </div>
-                  <CalendarInkSelect
-                    id={`cal-ink-body-${ev.id}`}
-                    label="글자색"
-                    value={ev.noteInk}
-                    onChange={(next) => {
-                      setEvents((prev) => {
-                        const nextRows = [...prev]
-                        nextRows[i] = {
-                          ...ev,
-                          noteInk: next,
-                        }
-                        return nextRows
-                      })
-                    }}
-                  />
-                  {editBody[ev.id] ? (
+                </header>
+                <div
+                  className={`flex min-h-0 flex-1 flex-col overflow-hidden ${stickyTheme.bodyClass}`}
+                >
+                  <div
+                    className={`flex min-h-0 flex-1 flex-col ${calendarEventInkTextClass(
+                      resolveCalendarEventMemoInk(ev),
+                    )}`}
+                  >
                     <CalendarEventRichField
-                      aria-label={`일정 ${i + 1} 내용`}
-                      placeholder="내용을 입력하세요"
-                      key={`${ev.id}-note-edit`}
+                      variant="sticky"
+                      aria-label={`일정 ${i + 1} 메모`}
+                      placeholder="메모를 작성하세요…"
+                      key={`${ev.id}-memo`}
                       html={ev.noteHtml}
                       plain={ev.note ?? ''}
-                      minHeightClass="min-h-[8rem]"
+                      minHeightClass="min-h-0"
                       onChange={({ html, plain }) => {
                         setEvents((prev) => {
                           const next = [...prev]
                           next[i] = {
                             ...ev,
-                            note: plain || undefined,
-                            noteHtml: html.trim()
-                              ? html
-                              : undefined,
+                            label: '',
+                            labelHtml: undefined,
+                            labelInk: undefined,
+                            note: plain,
+                            noteHtml: html.trim() ? html : undefined,
                           }
                           return next
                         })
                       }}
                     />
-                  ) : (
-                    <CalendarRichPreview
-                      html={ev.noteHtml}
-                      plain={ev.note ?? ''}
-                      inkClass={calendarEventInkTextClass(
-                        resolveCalendarEventNoteInk(ev),
-                      )}
-                    />
-                  )}
-                </div>
-
-                <div className="flex justify-end border-t border-border-muted pt-3">
-                  <button
-                    type="button"
-                    className="min-h-11 touch-manipulation rounded-lg px-3 text-xs text-danger transition-colors hover:bg-danger/10"
-                    onClick={() => {
-                      setEvents((prev) => {
-                        const next = prev.filter((_, j) => j !== i)
-                        return next.length > 0 ? next : [emptyEventRow()]
-                      })
-                      setEditTitle((p) => {
-                        const q = { ...p }
-                        delete q[ev.id]
-                        return q
-                      })
-                      setEditBody((p) => {
-                        const q = { ...p }
-                        delete q[ev.id]
-                        return q
-                      })
-                    }}
-                  >
-                    이 일정 삭제
-                  </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
@@ -656,7 +556,9 @@ function CalendarDayPeekSheet({
             </p>
             {events.length > 0 ? (
               <ul className="mt-2 space-y-3">
-                {events.map((e) => (
+                {events.map((e) => {
+                  const u = mergeCalendarEventToUnifiedMemo(e)
+                  return (
                   <li
                     key={e.id}
                     className="rounded-lg border border-border-subtle bg-surface-raised px-3 py-2"
@@ -675,42 +577,25 @@ function CalendarDayPeekSheet({
                     </div>
                     <div
                       className={`mt-1 text-[0.95rem] [&_*]:leading-snug [&_strong]:font-semibold ${calendarEventInkTextClass(
-                        resolveCalendarEventLabelInk(e),
+                        resolveCalendarEventMemoInk(u),
                       )}`}
                     >
-                      {e.labelHtml?.trim() ? (
+                      {u.noteHtml?.trim() ? (
                         <span
                           // eslint-disable-next-line react/no-danger
                           dangerouslySetInnerHTML={{
-                            __html: sanitizeCalendarEventHtml(e.labelHtml),
+                            __html: sanitizeCalendarEventHtml(u.noteHtml ?? ''),
                           }}
                         />
                       ) : (
                         <span className="font-medium">
-                          {e.label.trim() || '제목 없음'}
+                          {u.note?.trim() || '메모 없음'}
                         </span>
                       )}
                     </div>
-                    {(e.note?.trim() || htmlToPlain(e.noteHtml)) ? (
-                      <div
-                        className={`mt-1.5 border-t border-border-muted pt-2 text-xs [&_*]:leading-snug [&_strong]:font-semibold ${calendarEventInkTextClass(
-                          resolveCalendarEventNoteInk(e),
-                        )}`}
-                      >
-                        {e.noteHtml?.trim() ? (
-                          <span
-                            // eslint-disable-next-line react/no-danger
-                            dangerouslySetInnerHTML={{
-                              __html: sanitizeCalendarEventHtml(e.noteHtml),
-                            }}
-                          />
-                        ) : (
-                          <span>{e.note?.trim()}</span>
-                        )}
-                      </div>
-                    ) : null}
                   </li>
-                ))}
+                  )
+                })}
               </ul>
             ) : (
               <p className="mt-2 text-text-soft">등록된 일정이 없어요.</p>
@@ -1109,7 +994,6 @@ export default function CalendarPage() {
           <DayMemoPanel
             iso={selectedIso}
             initial={selectedMemo}
-            ledgerTxCount={txCountByDate.get(selectedIso) ?? 0}
             onPersist={persistMemo}
             onDelete={removeMemo}
           />
