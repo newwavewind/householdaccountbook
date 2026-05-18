@@ -22,6 +22,28 @@ export function normalizeCalendarEventInk(
   return INK_SET.has(raw) ? (raw as CalendarEventInkId) : undefined
 }
 
+/** 저장 필드 `ink`(구버전)까지 고려한 제목용 색 */
+export function resolveCalendarEventLabelInk(e: {
+  labelInk?: CalendarEventInkId
+  ink?: CalendarEventInkId
+}): CalendarEventInkId | undefined {
+  const a = normalizeCalendarEventInk(e.labelInk)
+  if (a && a !== 'default') return a
+  const b = normalizeCalendarEventInk(e.ink)
+  return b && b !== 'default' ? b : undefined
+}
+
+/** 저장 필드 `ink`(구버전)까지 고려한 내용(메모)용 색 */
+export function resolveCalendarEventNoteInk(e: {
+  noteInk?: CalendarEventInkId
+  ink?: CalendarEventInkId
+}): CalendarEventInkId | undefined {
+  const a = normalizeCalendarEventInk(e.noteInk)
+  if (a && a !== 'default') return a
+  const b = normalizeCalendarEventInk(e.ink)
+  return b && b !== 'default' ? b : undefined
+}
+
 /** 달력 칸·요약·입력란 공통 — 클래스 문자열은 여기서만 조합 (Tailwind가 수집하도록) */
 export function calendarEventInkTextClass(
   ink: CalendarEventInkId | undefined,

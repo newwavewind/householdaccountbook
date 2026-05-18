@@ -27,7 +27,11 @@ export type CalendarDayEvent = {
   /** HH:mm (선택) */
   time?: string
   important?: boolean
-  /** 제목·메모 글자색 (미지정이면 검정 계열) */
+  /** 제목 글자색 (미지정이면 검정 계열) */
+  labelInk?: CalendarEventInkId
+  /** 내용(메모) 글자색 */
+  noteInk?: CalendarEventInkId
+  /** @deprecated 구버전 단일 글자색 — labelInk·noteInk 없을 때 둘 다에 사용 */
   ink?: CalendarEventInkId
 }
 
@@ -83,6 +87,8 @@ export function parseMemoMapPayload(raw: unknown): MemoMap {
         const evTime = typeof r.time === 'string' ? r.time : undefined
         const evImportant = r.important === true
         const evInk = normalizeCalendarEventInk(r.ink)
+        const evLabelInk = normalizeCalendarEventInk(r.labelInk)
+        const evNoteInk = normalizeCalendarEventInk(r.noteInk)
         const ev: CalendarDayEvent = {
           id,
           label,
@@ -91,6 +97,8 @@ export function parseMemoMapPayload(raw: unknown): MemoMap {
           important: evImportant,
         }
         if (evInk && evInk !== 'default') ev.ink = evInk
+        if (evLabelInk && evLabelInk !== 'default') ev.labelInk = evLabelInk
+        if (evNoteInk && evNoteInk !== 'default') ev.noteInk = evNoteInk
         if (labelHtmlRaw.trim()) {
           ev.labelHtml = sanitizeCalendarEventHtml(labelHtmlRaw)
         }
@@ -223,7 +231,9 @@ export function getDayEvents(
   if (!memo) return []
   if (Array.isArray(memo.events) && memo.events.length > 0) {
     return memo.events.map((e) => {
-      const ink = normalizeCalendarEventInk(e.ink)
+      const legacy = normalizeCalendarEventInk(e.ink)
+      const li = normalizeCalendarEventInk(e.labelInk) ?? legacy
+      const ni = normalizeCalendarEventInk(e.noteInk) ?? legacy
       const base: CalendarDayEvent = {
         id: typeof e.id === 'string' && e.id.trim() ? e.id : crypto.randomUUID(),
         label: typeof e.label === 'string' ? e.label : '',
@@ -243,7 +253,8 @@ export function getDayEvents(
       if (typeof e.noteHtml === 'string' && e.noteHtml.trim()) {
         base.noteHtml = e.noteHtml
       }
-      if (ink && ink !== 'default') base.ink = ink
+      if (li && li !== 'default') base.labelInk = li
+      if (ni && ni !== 'default') base.noteInk = ni
       return base
     })
   }
@@ -258,7 +269,12 @@ export function setCalendarDayEvents(
 ): MemoMap {
   const cleaned = events
     .map((e) => {
-      const ink = normalizeCalendarEventInk(e.ink)
+      const li =
+        normalizeCalendarEventInk(e.labelInk) ??
+        normalizeCalendarEventInk(e.ink)
+      const ni =
+        normalizeCalendarEventInk(e.noteInk) ??
+        normalizeCalendarEventInk(e.ink)
       const labelHtml = e.labelHtml?.trim()
         ? sanitizeCalendarEventHtml(e.labelHtml)
         : undefined
@@ -274,7 +290,10 @@ export function setCalendarDayEvents(
       }
       if (labelHtml) row.labelHtml = labelHtml
       if (noteHtml) row.noteHtml = noteHtml
-      if (ink && ink !== 'default') row.ink = ink
+      const l = li && li !== 'default' ? li : undefined
+      const n = ni && ni !== 'default' ? ni : undefined
+      if (l) row.labelInk = l
+      if (n) row.noteInk = n
       return row
     })
     .filter(

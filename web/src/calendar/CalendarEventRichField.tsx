@@ -100,7 +100,7 @@ export function CalendarEventRichField({
     editorProps: {
       attributes: {
         'aria-label': ariaLabel,
-        class: `mt-1 max-w-full rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-sm outline-none ring-green-accent/30 focus-within:ring-2 ${minHeightClass} [&_.ProseMirror]:min-h-[inherit] [&_.ProseMirror]:outline-none`,
+        class: `max-w-full px-3 py-2.5 text-sm text-text-primary outline-none ring-0 focus-visible:ring-0 ${minHeightClass} [&_.ProseMirror]:min-h-[inherit] [&_.ProseMirror]:outline-none [&_.ProseMirror]:leading-relaxed`,
       },
     },
     onUpdate: ({ editor: ed }) => {
@@ -139,8 +139,12 @@ export function CalendarEventRichField({
   }
 
   return (
-    <div className="w-full">
-      <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+    <div className="w-full overflow-hidden rounded-[var(--radius-card)] border border-border-subtle bg-surface-raised shadow-[var(--shadow-card)]">
+      <div
+        className="flex flex-wrap items-center gap-x-1 gap-y-1 border-b border-border-muted bg-ceramic/35 px-2 py-1.5 theme2:border-border-subtle theme2:bg-well theme2:shadow-none theme3:bg-neutral-cool/40"
+        role="toolbar"
+        aria-label={`${ariaLabel} 서식`}
+      >
         <label className="sr-only" htmlFor={`cal-font-${encodeURIComponent(ariaLabel)}`}>
           글꼴
         </label>
@@ -158,7 +162,7 @@ export function CalendarEventRichField({
             setFontSel(v)
             pushChange()
           }}
-          className="rounded-md border border-border-strong bg-surface-raised px-2 py-1 text-xs outline-none focus:border-green-accent"
+          className="h-8 max-w-[6.25rem] shrink-0 rounded-md border border-border-default bg-surface-raised px-2 text-[11px] text-text-primary outline-none transition-colors focus-visible:ring-2 focus-visible:ring-green-accent/35"
         >
           {FONTS.map((f) => (
             <option key={f.label} value={f.value}>
@@ -166,16 +170,20 @@ export function CalendarEventRichField({
             </option>
           ))}
         </select>
+        <span
+          className="mx-0.5 hidden h-5 w-px shrink-0 bg-border-muted sm:block"
+          aria-hidden
+        />
         <button
           type="button"
           onClick={() => {
             editor.chain().focus().toggleBold().run()
             pushChange()
           }}
-          className={`rounded-md border px-2 py-1 text-xs font-bold ${
+          className={`h-8 min-w-8 shrink-0 rounded-md border px-2 text-[11px] font-bold transition-colors ${
             editor.isActive('bold')
-              ? 'border-starbucks-green bg-green-light'
-              : 'border-border-strong bg-surface-raised'
+              ? 'border-green-accent bg-green-light/50 text-text-primary'
+              : 'border-transparent bg-surface-raised text-text-secondary hover:bg-well'
           }`}
         >
           굵게
@@ -186,26 +194,29 @@ export function CalendarEventRichField({
             editor.chain().focus().toggleItalic().run()
             pushChange()
           }}
-          className={`rounded-md border px-2 py-1 text-xs italic ${
+          className={`h-8 min-w-8 shrink-0 rounded-md border px-2 text-[11px] italic transition-colors ${
             editor.isActive('italic')
-              ? 'border-starbucks-green bg-green-light'
-              : 'border-border-strong bg-surface-raised'
+              ? 'border-green-accent bg-green-light/50 text-text-primary'
+              : 'border-transparent bg-surface-raised text-text-secondary hover:bg-well'
           }`}
         >
           기울임
         </button>
-
-        <div ref={hlWrapRef} className="relative inline-block">
+        <span
+          className="mx-0.5 hidden h-5 w-px shrink-0 bg-border-muted sm:block"
+          aria-hidden
+        />
+        <div ref={hlWrapRef} className="relative flex min-w-0 flex-1 items-center sm:flex-initial">
           <button
             type="button"
             aria-expanded={highlightOpen}
             aria-haspopup="dialog"
             onClick={() => setHighlightOpen((o) => !o)}
             className={[
-              'rounded-md border px-2 py-1 text-xs font-medium transition-colors',
+              'h-8 shrink-0 rounded-md border px-2 text-[11px] font-medium transition-colors',
               highlightOpen || highlightOn
-                ? 'border-starbucks-green bg-green-light text-starbucks-green'
-                : 'border-border-strong bg-surface-raised text-text-secondary',
+                ? 'border-green-accent/60 bg-green-light/40 text-text-primary'
+                : 'border-transparent bg-surface-raised text-text-secondary hover:bg-well',
             ].join(' ')}
           >
             형광
@@ -214,12 +225,9 @@ export function CalendarEventRichField({
             <div
               role="dialog"
               aria-label="형광 색 선택"
-              className="absolute left-0 top-full z-[60] mt-1 w-[min(100vw-2rem,12.5rem)] rounded-lg border border-border-strong bg-surface-raised p-2 shadow-lg"
+              className="absolute right-0 top-full z-[60] mt-1 w-[min(100vw-2rem,11.5rem)] rounded-[var(--radius-card)] border border-border-subtle bg-surface-raised p-2 shadow-[var(--shadow-frap-stack)]"
             >
-              <p className="mb-2 text-[0.65rem] font-semibold uppercase tracking-wide text-text-soft">
-                색 선택
-              </p>
-              <div className="grid grid-cols-5 gap-1.5">
+              <div className="grid grid-cols-5 gap-1">
                 {HIGHLIGHT_PALETTE.map((opt) => {
                   const pressed = editor.isActive('highlight', { color: opt.hex })
                   return (
@@ -230,10 +238,10 @@ export function CalendarEventRichField({
                       aria-label={opt.label}
                       aria-pressed={pressed}
                       className={[
-                        'h-8 w-full rounded-md border shadow-inner outline-none ring-green-accent/0 transition-shadow focus-visible:ring-2',
+                        'aspect-square w-full rounded-md border outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-green-accent/40',
                         pressed
-                          ? 'ring-2 ring-starbucks-green ring-offset-1'
-                          : 'border-black/15 hover:border-black/30',
+                          ? 'ring-2 ring-green-accent ring-offset-1 ring-offset-surface-raised'
+                          : 'border-border-default hover:border-border-strong',
                       ].join(' ')}
                       style={{ backgroundColor: opt.hex }}
                       onClick={() => {
@@ -252,13 +260,13 @@ export function CalendarEventRichField({
               </div>
               <button
                 type="button"
-                className="mt-2 w-full rounded-md border border-border-default px-2 py-1 text-[0.7rem] text-text-soft underline decoration-black/20"
+                className="mt-2 w-full rounded-md border border-border-muted py-1 text-[10px] text-text-soft transition-colors hover:bg-well"
                 onClick={() => {
                   editor.chain().focus().unsetHighlight().run()
                   pushChange()
                 }}
               >
-                형광 해제
+                형광 모두 해제
               </button>
             </div>
           ) : null}
