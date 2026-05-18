@@ -27,12 +27,20 @@
           var systemDark = window.matchMedia(
             '(prefers-color-scheme: dark)',
           ).matches;
-          var dark = p === 'dark' || (p !== 'light' && systemDark);
-          if (dark) {
-            document.documentElement.classList.add('dark');
-            document.documentElement.style.colorScheme = 'dark';
-          } else {
+          if (p === 'design2') {
+            document.documentElement.classList.add('design2');
+            document.documentElement.classList.remove('dark');
             document.documentElement.style.colorScheme = 'light';
+          } else {
+            document.documentElement.classList.remove('design2');
+            var dark = p === 'dark' || (p !== 'light' && systemDark);
+            if (dark) {
+              document.documentElement.classList.add('dark');
+              document.documentElement.style.colorScheme = 'dark';
+            } else {
+              document.documentElement.classList.remove('dark');
+              document.documentElement.style.colorScheme = 'light';
+            }
           }
         } catch (e) {}
       })();

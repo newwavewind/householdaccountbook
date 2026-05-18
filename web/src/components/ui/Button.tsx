@@ -4,7 +4,8 @@ const base =
   'inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border px-4 py-[7px] text-base font-semibold tracking-tight transition-all duration-200 ease-in-out active:scale-[0.95] disabled:pointer-events-none disabled:opacity-50'
 
 const variants = {
-  primary: 'border-green-accent bg-green-accent text-white',
+  primary:
+    'border-green-accent bg-green-accent text-on-accent design2:border-charcoal-border design2:shadow-[var(--shadow-frap-base)]',
   outlined: 'border-green-accent bg-transparent text-green-accent',
   black: 'border-black bg-black text-sm text-white',
   darkOutlined:

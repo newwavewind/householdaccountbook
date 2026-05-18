@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import {
-  applyResolvedTheme,
+  applyThemeToDocument,
   readThemePreference,
   resolveTheme,
   writeThemePreference,
@@ -39,8 +39,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   )
 
   useEffect(() => {
-    applyResolvedTheme(resolved)
-  }, [resolved])
+    applyThemeToDocument(preference, systemDark)
+  }, [preference, systemDark])
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)')

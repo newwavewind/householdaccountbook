@@ -8,7 +8,7 @@ import { communityBackendMode } from '../lib/communityBackend'
 import { ThemeToggle } from '../theme/ThemeToggle'
 
 const navCls = ({ isActive }: { isActive: boolean }) =>
-  `shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${isActive ? 'bg-green-accent text-white' : 'text-starbucks-green hover:bg-green-light/40 dark:hover:bg-green-light/25'}`
+  `shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors design2:rounded-md ${isActive ? 'bg-green-accent text-on-accent design2:border design2:border-charcoal-border design2:shadow-[var(--shadow-frap-base)]' : 'text-starbucks-green hover:bg-green-light/40 dark:hover:bg-green-light/25 design2:hover:bg-green-light/50'}`
 
 export default function RootLayout() {
   const nav = useNavigate()
