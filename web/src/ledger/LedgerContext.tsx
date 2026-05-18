@@ -6,7 +6,9 @@ import {
   useMemo,
   useRef,
   useState,
+  type Dispatch,
   type ReactNode,
+  type SetStateAction,
 } from 'react'
 import type { Transaction } from '../types/transaction'
 import { isValidTx, parseTransactionsPayload } from '../lib/ledgerValidation'
@@ -68,7 +70,7 @@ type LedgerContextValue = {
   setHouseholdId: (id: string | null) => void
   /** 가족 구성원 이름 목록 (Supabase에 저장, 크로스 디바이스 동기화) */
   cloudMembers: string[]
-  setCloudMembers: (members: string[]) => void
+  setCloudMembers: Dispatch<SetStateAction<string[]>>
 }
 
 const LedgerContext = createContext<LedgerContextValue | null>(null)
@@ -494,25 +496,26 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     return Array.from(names).sort((a, b) => a.localeCompare(b, 'ko'))
   }, [])
 
-  const setCloudMembers = useCallback((members: string[]) => {
-    setCloudMembersState(members)
-    saveMembersToStorage(members)
-    const sb = getSupabase()
-    if (!sb || !userId) return
-    // user_family_members에 직접 upsert (RPC 보다 신뢰성 높음)
-    void sb
-      .from('user_family_members')
-      .upsert(
-        { user_id: userId, members, updated_at: new Date().toISOString() },
-        { onConflict: 'user_id' },
-      )
-    // 가구 ID 있으면 household.members에도 저장 (가족 간 공유)
-    if (householdId) {
-      void sb.rpc('set_household_members', {
-        p_household_id: householdId,
-        p_members: members,
-      })
-    }
+  const setCloudMembers = useCallback((update: SetStateAction<string[]>) => {
+    setCloudMembersState((prev) => {
+      const next = typeof update === 'function' ? update(prev) : update
+      saveMembersToStorage(next)
+      const sb = getSupabase()
+      if (!sb || !userId) return next
+      void sb
+        .from('user_family_members')
+        .upsert(
+          { user_id: userId, members: next, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id' },
+        )
+      if (householdId) {
+        void sb.rpc('set_household_members', {
+          p_household_id: householdId,
+          p_members: next,
+        })
+      }
+      return next
+    })
   }, [userId, householdId])
 
   /** Supabase에서 구성원 로드. 재로그인 직후 householdId가 잠시 null인 동안 DB만 보고 []로 덮어쓰면

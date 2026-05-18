@@ -11,6 +11,7 @@ import {
   type CalendarDayMemo,
 } from '../calendar/calendarMemoStorage'
 import { lunarCellInfo } from '../calendar/lunarDisplay'
+import CalendarStickyNotesBoard from '../calendar/CalendarStickyNotesBoard'
 import { useHouseholdCalendarMemos } from '../calendar/useHouseholdCalendarMemos'
 import { buildDdaySummaryLines, eventsOnCalendarDay } from '../dday/ddayCompute'
 import { useHouseholdDDays } from '../dday/useHouseholdDDays'
@@ -867,6 +868,8 @@ export default function CalendarPage() {
       </div>
 
       <div className="flex flex-col gap-6">
+        <CalendarStickyNotesBoard />
+
         <Card className="min-w-0 p-3 md:p-5">
           <div className="mb-4 flex flex-col gap-3 rounded-[var(--radius-card)] bg-ceramic/80 p-3 md:flex-row md:items-center md:justify-between md:p-4">
             <div className="flex flex-1 items-center justify-between gap-2 md:justify-start">

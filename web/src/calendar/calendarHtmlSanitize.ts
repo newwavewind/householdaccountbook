@@ -21,6 +21,30 @@ export function sanitizeCalendarEventHtml(raw: string): string {
   })
 }
 
+/** 스티커 메모 (리스트·이미지 data URL 허용) */
+export function sanitizeStickyNoteHtml(raw: string): string {
+  const s = raw.trim()
+  if (!s) return ''
+  return DOMPurify.sanitize(s, {
+    ALLOWED_TAGS: [
+      'p',
+      'br',
+      'strong',
+      'b',
+      'em',
+      'i',
+      'u',
+      's',
+      'span',
+      'ul',
+      'ol',
+      'li',
+      'img',
+    ],
+    ALLOWED_ATTR: ['class', 'style', 'src', 'alt'],
+  })
+}
+
 /** 달력 칸·목록용 미리보기(짧게) */
 export function htmlToPlainLine(html: string | undefined): string {
   const t = htmlToPlain(html)

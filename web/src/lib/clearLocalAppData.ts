@@ -1,4 +1,8 @@
 import { CALENDAR_MEMO_STORAGE_KEY } from '../calendar/calendarMemoStorage'
+import {
+  CALENDAR_STICKY_NOTES_KEY,
+  CALENDAR_STICKY_VIEW_KEY,
+} from '../calendar/calendarStickyNotesStorage'
 import { DDAYS_STORAGE_KEY } from '../dday/ddayStorage'
 
 /** LedgerContext와 동일 키 */
@@ -13,6 +17,8 @@ export function clearLocalAppDataOnLogout(): void {
   const keys = [
     LEDGER_STORAGE_KEY,
     CALENDAR_MEMO_STORAGE_KEY,
+    CALENDAR_STICKY_NOTES_KEY,
+    CALENDAR_STICKY_VIEW_KEY,
     DDAYS_STORAGE_KEY,
     HOUSEHOLD_MEMBERS_V1,
     HOUSEHOLD_MEMBERS_LEGACY,

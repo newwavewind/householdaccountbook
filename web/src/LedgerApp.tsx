@@ -647,7 +647,9 @@ export default function LedgerApp() {
                   const trimmed = newMemberName.trim()
                   if (!trimmed) return
                   if (cloudMembers.includes(trimmed)) return
-                  setCloudMembers([...cloudMembers, trimmed])
+                  setCloudMembers((prev) =>
+                    prev.includes(trimmed) ? prev : [...prev, trimmed],
+                  )
                   setNewMemberName('')
                 }}
               >
@@ -767,7 +769,7 @@ export default function LedgerApp() {
                       variant="primary"
                       className="flex-1 !bg-danger !border-danger"
                       onClick={() => {
-                        setCloudMembers(cloudMembers.filter(m => m !== deleteConfirm.member))
+                        setCloudMembers((prev) => prev.filter((m) => m !== deleteConfirm.member))
                         if (selectedMember === deleteConfirm.member) setSelectedMember(null)
                         setDeleteConfirm(null)
                       }}
