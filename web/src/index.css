@@ -397,3 +397,30 @@
 .community-post-body img:hover {
   opacity: 0.88;
 }
+
+/* Calendar — 디데이 뉴스 티커 (뉴스 자막처럼 좌측 이동) */
+@keyframes dday-ticker-marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.dday-ticker-track {
+  display: flex;
+  width: max-content;
+  animation: dday-ticker-marquee linear infinite;
+  will-change: transform;
+}
+
+.dday-ticker-paused {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dday-ticker-track {
+    animation: none;
+  }
+}

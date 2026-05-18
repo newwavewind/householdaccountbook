@@ -1,6 +1,7 @@
 # GitHub Pages 빌드에 Supabase·장부용 Vite 환경 변수를 넣으려면 Repository secrets:
 #   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
 # 선택: VITE_GOOGLE_CLIENT_ID (GIS 팝업 로그인 시)
+# 선택: VITE_KAKAO_JAVASCRIPT_KEY (달력 메모 카카오톡 공유 — 없으면 Web Share/클립보드)
 # 로컬에서 한 번에 올리기: node scripts/push-github-pages-secrets.mjs  (gh auth login 후)
 name: Deploy to GitHub Pages
 
@@ -66,8 +67,7 @@ jobs:
           VITE_LEDGER_BACKEND: supabase
           VITE_COMMUNITY_BACKEND: supabase
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
-
-      - name: Upload Pages artifact
+          VITE_KAKAO_JAVASCRIPT_KEY: ${{ secrets.VITE_KAKAO_JAVASCRIPT_KEY }}
         uses: actions/upload-pages-artifact@v3
         with:
           path: web/dist

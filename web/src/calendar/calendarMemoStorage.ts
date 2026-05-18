@@ -1,5 +1,9 @@
 import { normalizeCalendarEventInk, type CalendarEventInkId } from './calendarEventInk'
 import { htmlToPlain, sanitizeCalendarEventHtml } from './calendarHtmlSanitize'
+import {
+  STICKY_TINT_ORDER,
+  type StickyTint,
+} from './calendarStickyNotesStorage'
 
 export const CALENDAR_MEMO_STORAGE_KEY = 'gaegyeobu-calendar-v1'
 
@@ -12,6 +16,17 @@ function isLegacyPriority(v: unknown): v is LegacyPriority {
     typeof v === 'string' &&
     (LEGACY_PRIORITIES as readonly string[]).includes(v)
   )
+}
+
+const MEMO_TINT_LEGACY: Record<string, StickyTint> = {
+  mint: 'green',
+  lavender: 'purple',
+}
+
+function normalizeCalendarEventMemoTint(v: unknown): StickyTint | undefined {
+  if (typeof v !== 'string') return undefined
+  if ((STICKY_TINT_ORDER as readonly string[]).includes(v)) return v as StickyTint
+  return MEMO_TINT_LEGACY[v]
 }
 
 /** 하루에 여러 개 둘 수 있는 일정·메모 한 줄 */
@@ -31,6 +46,8 @@ export type CalendarDayEvent = {
   labelInk?: CalendarEventInkId
   /** 내용(메모) 글자색 */
   noteInk?: CalendarEventInkId
+  /** 스티커 메모와 같은 메모지(본문) 배경 색 (기본 노랑) */
+  memoTint?: StickyTint
   /** @deprecated 구버전 단일 글자색 — labelInk·noteInk 없을 때 둘 다에 사용 */
   ink?: CalendarEventInkId
 }
@@ -105,6 +122,8 @@ export function parseMemoMapPayload(raw: unknown): MemoMap {
         if (noteHtmlRaw.trim()) {
           ev.noteHtml = sanitizeCalendarEventHtml(noteHtmlRaw)
         }
+        const evMemoTint = normalizeCalendarEventMemoTint(r.memoTint)
+        if (evMemoTint) ev.memoTint = evMemoTint
         parsed.push(ev)
       }
       if (parsed.length > 0) rec.events = parsed
@@ -255,6 +274,8 @@ export function getDayEvents(
       }
       if (li && li !== 'default') base.labelInk = li
       if (ni && ni !== 'default') base.noteInk = ni
+      const mt = normalizeCalendarEventMemoTint(e.memoTint)
+      if (mt) base.memoTint = mt
       return base
     })
   }
@@ -294,6 +315,8 @@ export function setCalendarDayEvents(
       const n = ni && ni !== 'default' ? ni : undefined
       if (l) row.labelInk = l
       if (n) row.noteInk = n
+      const mt = normalizeCalendarEventMemoTint(e.memoTint) ?? 'yellow'
+      if (mt !== 'yellow') row.memoTint = mt
       return row
     })
     .filter(

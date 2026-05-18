@@ -90,3 +90,20 @@ export const STICKY_THEMES: Record<StickyTint, StickyTheme> = {
     placeholderClass: 'text-white/45',
   },
 }
+
+/**
+ * 달력 날짜 칸 배경 — 저장된 일정의 memoTint와 맞춤(본문 톤 기준).
+ * 목탄은 칸 안 가독성을 위해 옅게만 칠함.
+ */
+export function stickyTintCalendarCellBg(
+  tint: StickyTint,
+  inMonth: boolean,
+): string {
+  if (tint === 'charcoal') {
+    return inMonth ? 'bg-[#3d3d3d]/25' : 'bg-[#3d3d3d]/18'
+  }
+  const { bodyClass } = STICKY_THEMES[tint]
+  if (inMonth) return bodyClass
+  const m = /^bg-\[(#[^]]+)\]$/.exec(bodyClass)
+  return m ? `bg-[${m[1]}]/58` : bodyClass
+}

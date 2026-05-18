@@ -10,6 +10,7 @@ import {
   useState,
   type ChangeEvent,
 } from 'react'
+import { KakaoTalkShareIconButton } from '../components/KakaoTalkShareIconButton'
 import {
   htmlToPlain,
   sanitizeStickyNoteHtml,
@@ -283,6 +284,17 @@ function StickyMemoExpandedCard({
               </div>
             </div>
           ) : null}
+          <KakaoTalkShareIconButton
+            className={theme.headerBtnClass}
+            titlePrefix="[달력 스티커 메모]"
+            text={
+              htmlToPlain(
+                sanitizeStickyNoteHtml(deriveEditorHtml(note.bodyHtml, note.body)),
+              ) ||
+              note.body.trim() ||
+              ''
+            }
+          />
           <button
             type="button"
             className={theme.headerBtnClass}

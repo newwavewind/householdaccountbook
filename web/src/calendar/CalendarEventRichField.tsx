@@ -13,7 +13,10 @@ import {
   type ChangeEvent,
   type RefObject,
 } from 'react'
+import { CalendarInkColorDropdown } from './CalendarInkColorDropdown'
 import { sanitizeCalendarEventHtml } from './calendarHtmlSanitize'
+import type { CalendarEventInkId } from './calendarEventInk'
+import type { StickyTint } from './calendarStickyNotesStorage'
 import { STICKY_THEMES } from './stickyNoteTheme'
 
 const IMG_MAX_BYTES = 1_800_000
@@ -78,6 +81,12 @@ type Props = {
   minHeightClass?: string
   /** 스티커 메모와 같은 본문·하단 툴바 배치 */
   variant?: 'card' | 'sticky'
+  /** sticky 변형일 때 메모지 헤더·푸터·본문 톤 */
+  paperTint?: StickyTint
+  /** sticky: 메모 글자색 — 글꼴 선택과 B 사이 */
+  memoInk?: CalendarEventInkId | undefined
+  onMemoInkChange?: (next: CalendarEventInkId | undefined) => void
+  inkControlId?: string
 }
 
 export function CalendarEventRichField({
@@ -88,6 +97,10 @@ export function CalendarEventRichField({
   onChange,
   minHeightClass = 'min-h-[5rem]',
   variant = 'card',
+  paperTint = 'yellow',
+  memoInk,
+  onMemoInkChange,
+  inkControlId,
 }: Props) {
   const [fontSel, setFontSel] = useState('')
   const [highlightOpen, setHighlightOpen] = useState(false)
@@ -165,7 +178,7 @@ export function CalendarEventRichField({
 
   const highlightOn = editor.isActive('highlight')
   const isSticky = variant === 'sticky'
-  const st = STICKY_THEMES.yellow
+  const st = STICKY_THEMES[paperTint]
 
   function pushChange() {
     onChange({
@@ -367,7 +380,7 @@ export function CalendarEventRichField({
   const highlightBlock = (
     <div
       ref={hlWrapRef}
-      className={`relative flex min-w-0 items-center ${isSticky ? 'ml-auto' : 'flex-1 sm:flex-initial'}`}
+      className={`relative flex min-w-0 items-center ${isSticky ? '' : 'flex-1 sm:flex-initial'}`}
     >
       <button
         type="button"
@@ -394,9 +407,22 @@ export function CalendarEventRichField({
     </div>
   )
 
+  const memoInkControl =
+    isSticky && onMemoInkChange ? (
+      <CalendarInkColorDropdown
+        id={inkControlId ?? `cal-ink-${encodeURIComponent(ariaLabel)}`}
+        aria-label={`${ariaLabel} 글자색`}
+        ink={memoInk}
+        density="toolbar"
+        menuAlign="left"
+        onPick={onMemoInkChange}
+      />
+    ) : null
+
   const toolbar = isSticky ? (
     <>
       {fontSelect}
+      {memoInkControl}
       {boldItalic}
       {underlineStrikeListImgSticky}
       {highlightBlock}

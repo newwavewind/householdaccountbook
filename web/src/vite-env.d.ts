@@ -31,6 +31,11 @@ interface ImportMetaEnv {
    * `true`로 두면 Chrome FedCM 경로를 씁니다.
    */
   readonly VITE_GOOGLE_GSI_USE_FEDCM?: string
+  /**
+   * 카카오 JavaScript 키. 달력 스티커·일정 메모 → 카카오톡 텍스트 공유.
+   * Kakao Developers → 앱 키 → JavaScript 키. Web 플랫폼에 도메인 등록 필수.
+   */
+  readonly VITE_KAKAO_JAVASCRIPT_KEY?: string
 }
 
 interface ImportMeta {

@@ -61,6 +61,7 @@ const url = env.VITE_SUPABASE_URL?.trim()
 const anon = env.VITE_SUPABASE_ANON_KEY?.trim()
 const google =
   env.VITE_GOOGLE_CLIENT_ID?.trim() || ''
+const kakao = env.VITE_KAKAO_JAVASCRIPT_KEY?.trim() || ''
 
 if (!url?.startsWith('http')) {
   console.error('web/.env.local 에 VITE_SUPABASE_URL=https://... 형태가 필요합니다.')
@@ -79,6 +80,12 @@ if (google) {
   console.log('  + VITE_GOOGLE_CLIENT_ID')
 } else {
   console.log('  (건너뜀) VITE_GOOGLE_CLIENT_ID 없음 — GIS 팝업만 쓰면 Supabase 리다이렉트만으로도 로그인 가능')
+}
+if (kakao) {
+  ghSecretSet('VITE_KAKAO_JAVASCRIPT_KEY', kakao)
+  console.log('  + VITE_KAKAO_JAVASCRIPT_KEY')
+} else {
+  console.log('  (건너뜀) VITE_KAKAO_JAVASCRIPT_KEY — 카카오톡 공유는 Web Share/클립보드로 대체')
 }
 
 console.log('완료. 이제 main 에 푸시하면 Actions 가 Supabase 환경으로 빌드합니다.')
