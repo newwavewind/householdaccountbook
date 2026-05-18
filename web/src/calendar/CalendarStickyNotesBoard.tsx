@@ -144,7 +144,7 @@ export default function CalendarStickyNotesBoard() {
           {notes.map((n, idx) => (
             <div
               key={n.id}
-              className="w-[min(100%,17.5rem)] shrink-0"
+              className="shrink-0"
               style={{ transform: `rotate(${idx % 2 === 0 ? -0.6 : 0.55}deg)` }}
             >
               <CalendarStickyMemoCard

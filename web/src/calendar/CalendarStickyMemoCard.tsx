@@ -10,7 +10,10 @@ import {
   useState,
   type ChangeEvent,
 } from 'react'
-import { sanitizeStickyNoteHtml } from './calendarHtmlSanitize'
+import {
+  htmlToPlain,
+  sanitizeStickyNoteHtml,
+} from './calendarHtmlSanitize'
 import type { CalendarStickyNote, StickyTint } from './calendarStickyNotesStorage'
 import {
   STICKY_TINT_LABEL,
@@ -32,21 +35,52 @@ function deriveEditorHtml(html: string | undefined, plain: string): string {
 
 const IMG_MAX_BYTES = 1_800_000
 
-type Props = {
+type PatchProps = {
   note: CalendarStickyNote
-  compact: boolean
   onPatch: (id: string, patch: Partial<CalendarStickyNote>) => void
   onRemove: (id: string) => void
   onAddAfter: (afterId: string) => void
 }
 
-export function CalendarStickyMemoCard({
+function StickyMemoCompactPreview({ note }: { note: CalendarStickyNote }) {
+  const theme = STICKY_THEMES[note.tint]
+  const rawHtml = deriveEditorHtml(note.bodyHtml, note.body)
+  const safe = sanitizeStickyNoteHtml(rawHtml)
+  const plain = htmlToPlain(safe)
+  const empty = !plain
+
+  return (
+    <div
+      className={`flex aspect-square w-36 shrink-0 flex-col overflow-hidden rounded-md border border-black/15 shadow-[3px_5px_18px_rgba(0,0,0,0.14)] sm:w-40 ${theme.bodyClass}`}
+      aria-label="스티커 메모 미리보기 — 펼치기에서 편집"
+    >
+      {empty ? (
+        <p
+          className={`m-0 flex flex-1 items-center justify-center p-2 text-center text-[0.7rem] ${
+            note.tint === 'charcoal' ? 'text-white/45' : 'text-black/40'
+          }`}
+        >
+          빈 메모
+        </p>
+      ) : (
+        <div
+          className={`sticky-compact-preview min-h-0 flex-1 overflow-hidden p-2 text-[0.72rem] leading-snug sm:p-2.5 sm:text-[0.76rem] ${
+            note.tint === 'charcoal' ? 'text-white/90' : 'text-[rgba(0,0,0,0.88)]'
+          } [&_img]:max-h-16 [&_img]:w-auto [&_img]:max-w-full [&_img]:rounded [&_ul]:list-disc [&_ul]:pl-3.5`}
+          // sanitizeStickyNoteHtml 로 정제된 HTML
+          dangerouslySetInnerHTML={{ __html: safe }}
+        />
+      )}
+    </div>
+  )
+}
+
+function StickyMemoExpandedCard({
   note,
-  compact,
   onPatch,
   onRemove,
   onAddAfter,
-}: Props) {
+}: PatchProps) {
   const theme = STICKY_THEMES[note.tint]
   const [paletteOpen, setPaletteOpen] = useState(false)
   const paletteRef = useRef<HTMLDivElement>(null)
@@ -191,11 +225,7 @@ export function CalendarStickyMemoCard({
   }
 
   return (
-    <div
-      className={`flex flex-col overflow-hidden rounded-md border border-black/15 shadow-[3px_5px_18px_rgba(0,0,0,0.14)] ${
-        compact ? 'min-h-[7.5rem]' : 'min-h-[18rem]'
-      }`}
-    >
+    <div className="flex min-h-[18rem] flex-col overflow-hidden rounded-md border border-black/15 shadow-[3px_5px_18px_rgba(0,0,0,0.14)]">
       <header
         className={`flex h-9 shrink-0 items-center justify-between px-1.5 ${theme.headerClass}`}
       >
@@ -267,9 +297,7 @@ export function CalendarStickyMemoCard({
       <div className={`min-h-0 flex-1 overflow-y-auto ${theme.bodyClass}`}>
         <EditorContent
           editor={editor}
-          className={`sticky-editor min-h-[inherit] [&_.ProseMirror]:min-h-[4.25rem] ${
-            compact ? '[&_.ProseMirror]:min-h-[3.75rem]' : '[&_.ProseMirror]:min-h-[11rem]'
-          } ${theme.placeholderClass}`}
+          className={`sticky-editor min-h-[inherit] [&_.ProseMirror]:min-h-[11rem] ${theme.placeholderClass}`}
         />
       </div>
 
@@ -282,64 +310,90 @@ export function CalendarStickyMemoCard({
         onChange={onImagePick}
       />
 
-      {!compact ? (
-        <footer
-          className={`flex shrink-0 flex-wrap items-center gap-0.5 px-1.5 py-1 ${theme.footerClass}`}
-        >
-          {editor ? (
-            <>
-              <button
-                type="button"
-                className={`${theme.toolbarBtnClass} ${editor.isActive('bold') ? theme.toolbarBtnActiveClass : ''}`}
-                aria-label="굵게"
-                onClick={() => editor.chain().focus().toggleBold().run()}
-              >
-                <strong>B</strong>
-              </button>
-              <button
-                type="button"
-                className={`${theme.toolbarBtnClass} ${editor.isActive('italic') ? theme.toolbarBtnActiveClass : ''}`}
-                aria-label="기울임"
-                onClick={() => editor.chain().focus().toggleItalic().run()}
-              >
-                <em>I</em>
-              </button>
-              <button
-                type="button"
-                className={`${theme.toolbarBtnClass} ${editor.isActive('underline') ? theme.toolbarBtnActiveClass : ''}`}
-                aria-label="밑줄"
-                onClick={() => editor.chain().focus().toggleUnderline().run()}
-              >
-                <span className="underline">U</span>
-              </button>
-              <button
-                type="button"
-                className={`${theme.toolbarBtnClass} ${editor.isActive('strike') ? theme.toolbarBtnActiveClass : ''}`}
-                aria-label="취소선"
-                onClick={() => editor.chain().focus().toggleStrike().run()}
-              >
-                <s>ab</s>
-              </button>
-              <button
-                type="button"
-                className={`${theme.toolbarBtnClass} ${editor.isActive('bulletList') ? theme.toolbarBtnActiveClass : ''}`}
-                aria-label="글머리 기호"
-                onClick={() => editor.chain().focus().toggleBulletList().run()}
-              >
-                <span className="text-xs">•≡</span>
-              </button>
-              <button
-                type="button"
-                className={theme.toolbarBtnClass}
-                aria-label="이미지 넣기"
-                onClick={() => fileRef.current?.click()}
-              >
-                <span className="text-xs">▢</span>
-              </button>
-            </>
-          ) : null}
-        </footer>
-      ) : null}
+      <footer
+        className={`flex shrink-0 flex-wrap items-center gap-0.5 px-1.5 py-1 ${theme.footerClass}`}
+      >
+        {editor ? (
+          <>
+            <button
+              type="button"
+              className={`${theme.toolbarBtnClass} ${editor.isActive('bold') ? theme.toolbarBtnActiveClass : ''}`}
+              aria-label="굵게"
+              onClick={() => editor.chain().focus().toggleBold().run()}
+            >
+              <strong>B</strong>
+            </button>
+            <button
+              type="button"
+              className={`${theme.toolbarBtnClass} ${editor.isActive('italic') ? theme.toolbarBtnActiveClass : ''}`}
+              aria-label="기울임"
+              onClick={() => editor.chain().focus().toggleItalic().run()}
+            >
+              <em>I</em>
+            </button>
+            <button
+              type="button"
+              className={`${theme.toolbarBtnClass} ${editor.isActive('underline') ? theme.toolbarBtnActiveClass : ''}`}
+              aria-label="밑줄"
+              onClick={() => editor.chain().focus().toggleUnderline().run()}
+            >
+              <span className="underline">U</span>
+            </button>
+            <button
+              type="button"
+              className={`${theme.toolbarBtnClass} ${editor.isActive('strike') ? theme.toolbarBtnActiveClass : ''}`}
+              aria-label="취소선"
+              onClick={() => editor.chain().focus().toggleStrike().run()}
+            >
+              <s>ab</s>
+            </button>
+            <button
+              type="button"
+              className={`${theme.toolbarBtnClass} ${editor.isActive('bulletList') ? theme.toolbarBtnActiveClass : ''}`}
+              aria-label="글머리 기호"
+              onClick={() => editor.chain().focus().toggleBulletList().run()}
+            >
+              <span className="text-xs">•≡</span>
+            </button>
+            <button
+              type="button"
+              className={theme.toolbarBtnClass}
+              aria-label="이미지 넣기"
+              onClick={() => fileRef.current?.click()}
+            >
+              <span className="text-xs">▢</span>
+            </button>
+          </>
+        ) : null}
+      </footer>
     </div>
+  )
+}
+
+type Props = {
+  note: CalendarStickyNote
+  compact: boolean
+  onPatch: (id: string, patch: Partial<CalendarStickyNote>) => void
+  onRemove: (id: string) => void
+  onAddAfter: (afterId: string) => void
+}
+
+export function CalendarStickyMemoCard({
+  note,
+  compact,
+  onPatch,
+  onRemove,
+  onAddAfter,
+}: Props) {
+  if (compact) {
+    return <StickyMemoCompactPreview note={note} />
+  }
+  return (
+    <StickyMemoExpandedCard
+      note={note}
+      onPatch={onPatch}
+      onRemove={onRemove}
+      onAddAfter={onAddAfter}
+    />
   )
 }
