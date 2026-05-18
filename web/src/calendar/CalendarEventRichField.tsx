@@ -37,6 +37,11 @@ const FONTS = [
   { label: '기본', value: '' },
   { label: '본고딕', value: 'system-ui, sans-serif' },
   { label: '명조', value: 'Georgia, "Apple SD Gothic Neo", serif' },
+  /** 한컴 한글 «복숭아»(HGPEACH); 미설치 시 웹 폰트 Gamja Flower로 유사 표시 */
+  {
+    label: '복숭아',
+    value: '"복숭아", "HGPeach", "Gamja Flower", "Apple SD Gothic Neo", cursive',
+  },
   { label: '궁서', value: '"Gungsuh", "궁서", Batang, "Apple SD Gothic Neo", serif' },
   { label: '고정폭', value: 'Consolas, monospace' },
 ] as const
