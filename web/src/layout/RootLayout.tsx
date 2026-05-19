@@ -60,7 +60,7 @@ function desktopNavLinkClass({ isActive }: { isActive: boolean }) {
 
 function mobileNavLinkClass({ isActive }: { isActive: boolean }) {
   const base =
-    'relative flex min-h-[3.25rem] flex-1 flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-[10px] font-semibold leading-tight transition-colors'
+    'relative flex min-h-14 flex-1 flex-col items-center justify-center gap-1 px-1 py-1 text-[11px] font-medium leading-tight transition-colors'
   return isActive
     ? `${base} text-green-accent theme2:text-green-accent theme3:text-green-accent`
     : `${base} text-text-soft active:bg-well/80`
@@ -98,10 +98,10 @@ function DesktopMainNav({ items }: { items: NavItem[] }) {
 function MobileBottomNav({ items }: { items: NavItem[] }) {
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-border-muted bg-neutral-warm/95 backdrop-blur-md pb-[env(safe-area-inset-bottom,0px)] md:hidden"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-border-muted bg-neutral-warm/95 pt-1.5 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] shadow-[0_-2px_12px_rgb(0_0_0/0.06)] backdrop-blur-md md:hidden dark:shadow-[0_-2px_12px_rgb(0_0_0/0.35)]"
       aria-label="주 메뉴"
     >
-      <div className="mx-auto flex max-w-5xl items-stretch">
+      <div className="mx-auto flex min-h-14 max-w-5xl items-stretch">
         {items.map((item) => (
           <NavLink
             key={item.to}
@@ -117,8 +117,10 @@ function MobileBottomNav({ items }: { items: NavItem[] }) {
                     aria-hidden
                   />
                 ) : null}
-                {item.icon}
-                <span>{item.label}</span>
+                <span className="flex shrink-0 items-center justify-center" aria-hidden>
+                  {item.icon}
+                </span>
+                <span className="max-w-full truncate px-0.5">{item.label}</span>
               </>
             )}
           </NavLink>
@@ -227,7 +229,7 @@ export default function RootLayout() {
         ) : null}
       </header>
 
-      <div className="pb-[calc(3.25rem+env(safe-area-inset-bottom,0px))] md:pb-0">
+      <div className="pb-[calc(3.5rem+0.375rem+max(0.75rem,env(safe-area-inset-bottom,0px)))] md:pb-0">
         <Outlet />
       </div>
 

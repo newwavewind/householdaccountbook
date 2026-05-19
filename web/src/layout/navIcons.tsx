@@ -1,6 +1,6 @@
 type IconProps = { className?: string }
 
-const base = 'size-5 shrink-0'
+const base = 'size-6 shrink-0'
 
 export function DiaryNavIcon({ className = base }: IconProps) {
   return (
