@@ -1177,11 +1177,10 @@ export default function CalendarPage() {
                   </div>
                   {hasLedger ? (
                     <span
-                      className="pointer-events-none absolute bottom-1 right-1 z-[3] min-w-[1.25rem] rounded-md border border-green-accent/30 bg-green-accent px-1 py-0.5 text-center text-[0.625rem] font-bold leading-none tabular-nums text-white shadow-sm md:bottom-1.5 md:right-1.5 md:text-[0.6875rem]"
-                      title="이 날 장부 거래 수"
-                    >
-                      {txCount}
-                    </span>
+                      aria-hidden
+                      className="pointer-events-none absolute bottom-1.5 right-1.5 z-[3] h-1.5 w-1.5 rounded-full bg-green-accent shadow-[0_0_0_1px_rgba(255,255,255,0.6)] md:bottom-2 md:right-2 md:h-2 md:w-2"
+                      title={`이 날 장부 거래 ${txCount}건`}
+                    />
                   ) : null}
                 </button>
               )
