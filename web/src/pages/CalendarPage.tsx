@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { KakaoTalkShareIconButton } from '../components/KakaoTalkShareIconButton'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -837,31 +837,7 @@ export default function CalendarPage() {
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-6 md:px-6">
       <div className="mb-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0 flex-1">
-            {ddaySummaryLines.length > 0 ? (
-              <DdaySummaryTicker lines={ddaySummaryLines} />
-            ) : (
-              <p className="text-sm text-text-soft">
-                <Link
-                  to="/calendar/dday"
-                  className="font-medium text-starbucks-green underline-offset-2 hover:underline"
-                >
-                  디데이 설정
-                </Link>
-                에서 생일·시험일·아기 개월수 등을 등록할 수 있어요.
-              </p>
-            )}
-          </div>
-          <div className="flex shrink-0 flex-col items-stretch gap-2 sm:flex-row sm:items-center">
-            <Link
-              to="/calendar/dday"
-              className="self-center rounded-full border border-border-strong bg-surface-raised px-3 py-1.5 text-center text-sm font-semibold text-starbucks-green transition-colors hover:bg-green-light/40"
-            >
-              디데이 설정
-            </Link>
-          </div>
-        </div>
+        <DdaySummaryTicker lines={ddaySummaryLines} />
         {backend === 'supabase' && cloudConfigured ? (
           <div className="mt-4 space-y-2">
             {!userId ? null : !householdId ? (

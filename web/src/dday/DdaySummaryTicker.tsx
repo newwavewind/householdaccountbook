@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Button } from '../components/ui/Button'
 import type { DdaySummaryLine } from './ddayCompute'
 
 function usePrefersReducedMotion(): boolean {
@@ -26,7 +25,34 @@ export function DdaySummaryTicker({ lines }: Props) {
 
   const durationSec = Math.min(110, Math.max(24, 10 + lines.length * 6.5))
 
-  if (lines.length === 0) return null
+  const actionBtnClass =
+    'inline-flex min-h-[2.75rem] min-w-[4.5rem] shrink-0 items-center justify-center border-l border-border-subtle bg-surface-raised/80 px-2.5 text-xs font-semibold text-starbucks-green transition-colors hover:bg-green-light/35 md:min-h-11 md:px-3'
+
+  if (lines.length === 0) {
+    return (
+      <div className="w-full min-w-0">
+        <div className="overflow-hidden rounded-xl border border-border-subtle bg-gradient-to-r from-ceramic/95 via-well/50 to-ceramic/95 shadow-sm">
+          <div className="flex min-h-[2.75rem] items-stretch">
+            <Link
+              to="/calendar/dday"
+              title="디데이 설정"
+              className="flex shrink-0 items-center border-r border-border-subtle bg-starbucks-green/[0.08] px-2 py-2 transition-colors hover:bg-starbucks-green/[0.14] md:px-3"
+            >
+              <span className="text-[0.65rem] font-bold uppercase tracking-wide text-starbucks-green md:text-xs">
+                D-Day
+              </span>
+            </Link>
+            <p className="flex min-w-0 flex-1 items-center px-3 text-sm text-text-soft">
+              생일·기념일·아기 개월수 등을 등록해 보세요
+            </p>
+            <Link to="/calendar/dday" className={actionBtnClass}>
+              설정
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const segmentItems = lines.map((line, i) => (
     <span
@@ -64,11 +90,15 @@ export function DdaySummaryTicker({ lines }: Props) {
         onMouseLeave={() => setHoverPause(false)}
       >
         <div className="flex min-h-[2.75rem] items-stretch">
-          <div className="flex shrink-0 items-center border-r border-border-subtle bg-starbucks-green/[0.08] px-2 py-2 md:px-3">
+          <Link
+            to="/calendar/dday"
+            title="디데이 설정"
+            className="flex shrink-0 items-center border-r border-border-subtle bg-starbucks-green/[0.08] px-2 py-2 transition-colors hover:bg-starbucks-green/[0.14] md:px-3"
+          >
             <span className="text-[0.65rem] font-bold uppercase tracking-wide text-starbucks-green md:text-xs">
               D-Day
             </span>
-          </div>
+          </Link>
 
           <div className="relative min-h-[2.75rem] min-w-0 flex-1 overflow-hidden">
             {reducedMotion ? (
@@ -116,18 +146,15 @@ export function DdaySummaryTicker({ lines }: Props) {
             )}
           </div>
 
-          <div className="flex shrink-0 items-stretch border-l border-border-subtle">
-            <Button
-              type="button"
-              variant="outlined"
-              className="!min-h-0 min-w-[4.5rem] !rounded-none !border-0 !bg-surface-raised/80 !px-2.5 !text-xs !font-semibold text-starbucks-green hover:!bg-green-light/35 md:!min-h-11 md:!px-3"
-              aria-expanded={expanded}
-              aria-controls="dday-summary-expanded"
-              onClick={() => setExpanded((v) => !v)}
-            >
-              {expanded ? '접기' : '전체'}
-            </Button>
-          </div>
+          <button
+            type="button"
+            className={actionBtnClass}
+            aria-expanded={expanded}
+            aria-controls="dday-summary-expanded"
+            onClick={() => setExpanded((v) => !v)}
+          >
+            {expanded ? '접기' : '전체 · 설정'}
+          </button>
         </div>
       </div>
 
@@ -136,9 +163,17 @@ export function DdaySummaryTicker({ lines }: Props) {
           id="dday-summary-expanded"
           className="mt-2 overflow-hidden rounded-xl border border-border-subtle bg-surface-raised shadow-[var(--shadow-card)]"
         >
-          <p className="border-b border-border-muted px-4 py-2 text-xs font-semibold uppercase tracking-wide text-text-soft">
-            디데이 전체
-          </p>
+          <div className="flex items-center justify-between gap-2 border-b border-border-muted px-4 py-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-text-soft">
+              디데이 전체
+            </p>
+            <Link
+              to="/calendar/dday"
+              className="shrink-0 rounded-full border border-green-accent bg-green-light/45 px-3 py-1 text-xs font-semibold text-starbucks-green shadow-[0_1px_0_rgba(0,117,74,0.12)] transition-colors hover:border-green-accent hover:bg-green-light/70 active:scale-[0.98]"
+            >
+              설정
+            </Link>
+          </div>
           <ul
             className="max-h-[min(60vh,22rem)] overflow-y-auto divide-y divide-border-muted"
             role="list"
@@ -152,14 +187,6 @@ export function DdaySummaryTicker({ lines }: Props) {
               </li>
             ))}
           </ul>
-          <div className="border-t border-border-muted bg-ceramic/50 px-4 py-2.5 text-center">
-            <Link
-              to="/calendar/dday"
-              className="text-sm font-semibold text-starbucks-green underline-offset-2 hover:underline"
-            >
-              디데이 추가·수정
-            </Link>
-          </div>
         </div>
       ) : null}
     </div>
