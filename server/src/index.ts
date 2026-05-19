@@ -105,6 +105,108 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true })
 })
 
+type YoutubeSearchItem = {
+  videoId: string
+  title: string
+  author: string
+  thumbnailUrl: string
+}
+
+function parseVideoIdFromPipedUrl(url: string): string | null {
+  try {
+    const u = new URL(url, 'https://www.youtube.com')
+    const v = u.searchParams.get('v')
+    if (v && /^[a-zA-Z0-9_-]{11}$/.test(v)) return v
+  } catch {
+    /* ignore */
+  }
+  const m = url.match(/(?:v=|\/)([a-zA-Z0-9_-]{11})/)
+  return m ? m[1] : null
+}
+
+async function serverYoutubeSearch(q: string): Promise<YoutubeSearchItem[]> {
+  const pipedBases = [
+    'https://pipedapi.kavin.rocks',
+    'https://api.piped.projectsegfau.lt',
+  ]
+  for (const base of pipedBases) {
+    try {
+      const res = await fetch(`${base}/search?q=${encodeURIComponent(q)}&filter=videos`)
+      if (!res.ok) continue
+      const data = (await res.json()) as {
+        items?: Array<{
+          url?: string
+          title?: string
+          uploaderName?: string
+          thumbnail?: string
+          type?: string
+        }>
+      }
+      const items: YoutubeSearchItem[] = []
+      for (const i of data.items ?? []) {
+        if (i.type !== 'stream' || !i.url) continue
+        const videoId = parseVideoIdFromPipedUrl(i.url)
+        if (!videoId) continue
+        items.push({
+          videoId,
+          title: i.title ?? '(제목 없음)',
+          author: i.uploaderName ?? '',
+          thumbnailUrl: i.thumbnail ?? '',
+        })
+        if (items.length >= 12) break
+      }
+      if (items.length > 0) return items
+    } catch {
+      /* next */
+    }
+  }
+
+  const invidiousBases = ['https://yewtu.be', 'https://invidious.privacydev.net']
+  for (const base of invidiousBases) {
+    try {
+      const res = await fetch(
+        `${base}/api/v1/search?q=${encodeURIComponent(q)}&type=video`,
+      )
+      if (!res.ok) continue
+      const data = (await res.json()) as Array<{
+        type?: string
+        videoId?: string
+        title?: string
+        author?: string
+        authorId?: string
+        videoThumbnails?: { url?: string }[]
+      }>
+      if (!Array.isArray(data)) continue
+      const items = data
+        .filter((v) => v.type === 'video' && v.videoId)
+        .slice(0, 12)
+        .map((v) => ({
+          videoId: v.videoId!,
+          title: v.title ?? '(제목 없음)',
+          author: v.author ?? v.authorId ?? '',
+          thumbnailUrl: v.videoThumbnails?.[0]?.url ?? '',
+        }))
+      if (items.length > 0) return items
+    } catch {
+      /* next */
+    }
+  }
+  throw new Error('유튜브 검색에 실패했습니다.')
+}
+
+app.get('/api/youtube/search', async (req, res) => {
+  const q = typeof req.query.q === 'string' ? req.query.q.trim() : ''
+  if (!q) return res.json([])
+  try {
+    const items = await serverYoutubeSearch(q)
+    res.json(items)
+  } catch (e) {
+    res.status(502).json({
+      error: e instanceof Error ? e.message : '검색 실패',
+    })
+  }
+})
+
 // ── Ledger (로컬에선 인증 없음 — 운영 Supabase 단계에서 RLS·키로 보호)
 app.get('/api/ledgers/:id', async (req, res) => {
   const row = await prisma.householdLedger.findUnique({
