@@ -53,7 +53,11 @@ export default function CalendarStickyNotesBoard({ notes, patchNotes }: Props) {
   )
 
   const addNote = (afterId?: string) => {
-    const pos = nextStickyNotePosition(notes, afterId)
+    const anchorExpanded = afterId ? expandedIds.has(afterId) : false
+    const pos = nextStickyNotePosition(notes, afterId, {
+      anchorExpanded,
+      canvasWidth: canvasWidth || undefined,
+    })
     const n: CalendarStickyNote = {
       id: crypto.randomUUID(),
       body: '',
@@ -68,6 +72,13 @@ export default function CalendarStickyNotesBoard({ notes, patchNotes }: Props) {
       const i = prev.findIndex((x) => x.id === afterId)
       return i < 0 ? [...prev, n] : [...prev.slice(0, i + 1), n, ...prev.slice(i + 1)]
     })
+    if (afterId) {
+      setExpandedIds((prev) => {
+        const next = new Set(prev)
+        next.add(n.id)
+        return next
+      })
+    }
   }
 
   const patchNote = (id: string, patch: Partial<CalendarStickyNote>) => {

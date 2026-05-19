@@ -1,5 +1,8 @@
 export const STICKY_MEMO_DEFAULT_SIZE = 120
 export const STICKY_MEMO_MIN_SIZE = 96
+/** 펼친 메모 카드 너비 (min(100%, 24rem)) */
+export const STICKY_MEMO_EXPANDED_WIDTH = 384
+export const STICKY_MEMO_EXPANDED_MIN_HEIGHT = 288
 /** 컴팩트 미리보기 — 내용 맞춤 최소 크기 */
 export const STICKY_MEMO_MIN_COMPACT_WIDTH = 56
 export const STICKY_MEMO_MIN_COMPACT_HEIGHT = 36

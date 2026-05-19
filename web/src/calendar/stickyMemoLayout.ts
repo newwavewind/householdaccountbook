@@ -8,8 +8,9 @@ import {
   compactSizeEmpty,
   compactSizeFromContent,
   STICKY_MEMO_DEFAULT_SIZE,
+  STICKY_MEMO_EXPANDED_MIN_HEIGHT,
+  STICKY_MEMO_EXPANDED_WIDTH,
   stickyMemoHeight,
-  stickyMemoWidth,
 } from './stickyMemoSize'
 import type { CalendarStickyNote } from './calendarStickyNotesStorage'
 
@@ -78,8 +79,11 @@ export function stickyNoteFootprint(
 ): { width: number; height: number } {
   if (expanded) {
     return {
-      width: stickyMemoWidth(note.widthPx),
-      height: Math.max(stickyMemoHeight(note.heightPx), 288),
+      width: STICKY_MEMO_EXPANDED_WIDTH,
+      height: Math.max(
+        stickyMemoHeight(note.heightPx),
+        STICKY_MEMO_EXPANDED_MIN_HEIGHT,
+      ),
     }
   }
   if (note.widthPx != null && note.heightPx != null) {
@@ -105,9 +109,17 @@ export function computeStickyBoardHeight(
   return maxBottom + GAP
 }
 
+export type NextStickyNotePositionOptions = {
+  /** + 버튼을 누른 기준 메모가 펼쳐진 상태인지 */
+  anchorExpanded?: boolean
+  /** 보드 가로 폭 — 오른쪽에 놓을 공간이 없으면 아래로 배치 */
+  canvasWidth?: number
+}
+
 export function nextStickyNotePosition(
   notes: CalendarStickyNote[],
   afterId?: string,
+  options: NextStickyNotePositionOptions = {},
 ): { xPx: number; yPx: number } {
   if (!afterId) {
     return defaultStickyNotePosition(notes.length)
@@ -116,10 +128,25 @@ export function nextStickyNotePosition(
   if (i < 0) return defaultStickyNotePosition(notes.length)
   const anchor = notes[i]!
   const pos = resolveStickyNotePosition(anchor, i)
-  const { width, height } = stickyNoteFootprint(anchor, false)
+  const anchorExpanded = options.anchorExpanded ?? false
+  const { width: anchorW, height: anchorH } = stickyNoteFootprint(
+    anchor,
+    anchorExpanded,
+  )
+  const newW = compactSizeEmpty().width
+  const canvasW = options.canvasWidth ?? 900
+
+  let xPx = pos.xPx + anchorW + GAP
+  let yPx = pos.yPx
+
+  if (xPx + newW > canvasW - GAP) {
+    xPx = pos.xPx
+    yPx = pos.yPx + anchorH + GAP
+  }
+
   return {
-    xPx: pos.xPx + Math.min(32, width * 0.2),
-    yPx: pos.yPx + Math.min(32, height * 0.2),
+    xPx: Math.round(Math.max(0, xPx)),
+    yPx: Math.round(Math.max(0, yPx)),
   }
 }
 
