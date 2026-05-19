@@ -108,7 +108,7 @@ export function TransactionFormModal({
 
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))]"
       role="presentation"
       onClick={onClose}
     >
@@ -116,7 +116,7 @@ export function TransactionFormModal({
         role="dialog"
         aria-modal
         aria-labelledby="tx-form-title"
-        className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-[var(--radius-card)] bg-surface-raised p-6 shadow-[var(--shadow-card)] sm:rounded-[var(--radius-card)]"
+        className="max-h-[min(90dvh,calc(100dvh-2rem))] w-full max-w-md overflow-y-auto rounded-[var(--radius-card)] bg-surface-raised p-6 shadow-[var(--shadow-frap-stack)]"
         onClick={(e) => e.stopPropagation()}
       >
         <h2
