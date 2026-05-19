@@ -12,7 +12,7 @@ import { DayDetailModal } from './components/DayDetailModal'
 import { ExpenseCategoryBreakdown } from './components/ExpenseCategoryBreakdown'
 import { useLedger } from './hooks/useLedger'
 import { rollupByDate } from './lib/dayTotals'
-import { monthNoSpendStats } from './lib/noSpendChallenge'
+import { ledgerStartIso, monthNoSpendStats } from './lib/noSpendChallenge'
 import { cardBrandLabel } from './constants/cardBrands'
 import type { PaymentMethod, Transaction } from './types/transaction'
 import HouseholdSetupModal from './components/HouseholdSetupModal'
@@ -507,13 +507,17 @@ export default function LedgerApp() {
     [],
   )
 
-  const rollups = useMemo(
-    () => rollupByDate(
+  const filteredTransactions = useMemo(
+    () =>
       selectedMember
         ? transactions.filter(t => t.memberName === selectedMember)
         : transactions,
-    ),
     [transactions, selectedMember],
+  )
+
+  const rollups = useMemo(
+    () => rollupByDate(filteredTransactions),
+    [filteredTransactions],
   )
 
   const noSpendStats = useMemo(
@@ -523,8 +527,9 @@ export default function LedgerApp() {
         cursor.m,
         rollups,
         todayIso(),
+        ledgerStartIso(filteredTransactions),
       ),
-    [rollups, cursor.y, cursor.m],
+    [rollups, cursor.y, cursor.m, filteredTransactions],
   )
 
   const yearIncomeTotal = useMemo(

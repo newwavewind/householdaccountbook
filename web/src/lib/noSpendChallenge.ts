@@ -30,7 +30,19 @@ export function monthCalendarCells(
   return cells
 }
 
-/** 해당 날짜에 지출 거래가 없으면 무지출 */
+/** 가계부에 기록된 가장 이른 날짜(최초 작성일). 없으면 null */
+export function ledgerStartIso(
+  transactions: ReadonlyArray<{ date: string }>,
+): string | null {
+  if (transactions.length === 0) return null
+  let min = transactions[0].date
+  for (let i = 1; i < transactions.length; i++) {
+    if (transactions[i].date < min) min = transactions[i].date
+  }
+  return min
+}
+
+/** 해당 날짜에 지출 거래가 없으면 무지출 (기록이 있는 날만 판정) */
 export function isNoSpendDay(rollup: DayRollup | undefined): boolean {
   if (!rollup) return true
   return rollup.expense <= 0
@@ -48,6 +60,7 @@ export function monthNoSpendStats(
   monthIndex: number,
   rollups: Map<string, DayRollup>,
   todayIso: string,
+  startIso: string | null,
 ): MonthNoSpendStats {
   const noSpendDays = new Set<string>()
   let eligibleDayCount = 0
@@ -55,6 +68,7 @@ export function monthNoSpendStats(
   for (const { iso, inMonth } of monthCalendarCells(year, monthIndex)) {
     if (!inMonth) continue
     if (iso > todayIso) continue
+    if (startIso && iso < startIso) continue
     eligibleDayCount++
     if (isNoSpendDay(rollups.get(iso))) {
       noSpendDays.add(iso)
