@@ -46,7 +46,11 @@ import {
 import { CalendarEventMemoTintPicker } from '../calendar/CalendarEventMemoTintPicker'
 import { CalendarEventRichField } from '../calendar/CalendarEventRichField'
 import type { StickyTint } from '../calendar/calendarStickyNotesStorage'
-import { STICKY_THEMES, stickyTintCalendarCellBg } from '../calendar/stickyNoteTheme'
+import {
+  STICKY_THEMES,
+  stickyTintCalendarCellBg,
+  stickyTintCardChrome,
+} from '../calendar/stickyNoteTheme'
 import {
   extractFirstImageSrc,
   htmlToPlain,
@@ -119,7 +123,7 @@ function memoHasContent(memo: CalendarDayMemo | undefined): boolean {
 
 /** 달력 칸 색 — 첫 번째 일정의 메모지 색과 동일하게 */
 function firstEventPaperTint(memo: CalendarDayMemo | undefined): StickyTint {
-  return getDayEvents(memo)[0]?.memoTint ?? 'yellow'
+  return getDayEvents(memo)[0]?.memoTint ?? 'white'
 }
 
 function formatTimeKo(hhmm: string): string {
@@ -290,12 +294,12 @@ function DayMemoPanel({
           </div>
 
           {events.map((ev, i) => {
-            const paper: StickyTint = ev.memoTint ?? 'yellow'
+            const paper: StickyTint = ev.memoTint ?? 'white'
             const stickyTheme = STICKY_THEMES[paper]
             return (
               <div
                 key={ev.id}
-                className="flex min-h-[18rem] flex-col overflow-visible rounded-md border border-black/15 shadow-[3px_5px_18px_rgba(0,0,0,0.14)]"
+                className={`flex min-h-[18rem] flex-col overflow-visible rounded-md border ${stickyTintCardChrome(paper)}`}
               >
                 <header
                   className={`relative z-10 flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1.5 overflow-visible px-1.5 py-1 ${stickyTheme.headerClass}`}
@@ -362,13 +366,13 @@ function DayMemoPanel({
                   <div className="flex shrink-0 items-center gap-0.5">
                     <CalendarEventMemoTintPicker
                       value={paper}
-                      aria-label={`일정 ${i + 1} 메모지 색`}
+                      aria-label={`일정 ${i + 1} 배경 색`}
                       menuAlign="right"
                       onPick={(t) => {
                         setEvents((prev) => {
                           const next = [...prev]
                           const row: CalendarDayEvent = { ...ev }
-                          if (t === 'yellow') delete row.memoTint
+                          if (t === 'white') delete row.memoTint
                           else row.memoTint = t
                           next[i] = row
                           return next
@@ -452,11 +456,11 @@ function DayMemoPanel({
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 border-t border-border-muted p-4">
+      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border-muted px-4 py-2.5 md:px-5">
         <Button
           type="button"
           variant="darkOutlined"
-          className="min-h-11 flex-1 !border-danger !text-danger"
+          className="!min-h-0 shrink-0 !px-3 !py-1.5 !text-xs !border-danger !text-danger"
           onClick={() => {
             if (confirm('이 날짜의 모든 일정을 지울까요?')) onDelete()
           }}
@@ -466,7 +470,7 @@ function DayMemoPanel({
         <Button
           type="button"
           variant="primary"
-          className="min-h-11 flex-1"
+          className="!min-h-0 shrink-0 !px-4 !py-1.5 !text-xs"
           onClick={() => onPersist(events)}
         >
           저장

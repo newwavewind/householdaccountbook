@@ -1,8 +1,9 @@
 export const CALENDAR_STICKY_NOTES_KEY = 'gaegyeobu-calendar-sticky-v1'
 export const CALENDAR_STICKY_VIEW_KEY = 'gaegyeobu-calendar-sticky-view-v1'
 
-/** 노랑 · 녹색 · 분홍 · 자주 · 파랑 · 회색 · 목탄 */
+/** 흰색(기본) · 노랑 · 녹색 · 분홍 · 자주 · 파랑 · 회색 · 목탄 */
 export type StickyTint =
+  | 'white'
   | 'yellow'
   | 'green'
   | 'pink'
@@ -22,6 +23,7 @@ export type CalendarStickyNote = {
 }
 
 export const STICKY_TINT_ORDER: StickyTint[] = [
+  'white',
   'yellow',
   'green',
   'pink',
@@ -32,6 +34,7 @@ export const STICKY_TINT_ORDER: StickyTint[] = [
 ]
 
 export const STICKY_TINT_LABEL: Record<StickyTint, string> = {
+  white: '흰색',
   yellow: '노랑',
   green: '녹색',
   pink: '분홍',
@@ -51,10 +54,10 @@ function isTint(v: unknown): v is StickyTint {
 }
 
 function normalizeTint(v: unknown): StickyTint {
-  if (typeof v !== 'string') return 'yellow'
+  if (typeof v !== 'string') return 'white'
   if (LEGACY_TINT[v]) return LEGACY_TINT[v]
   if (isTint(v)) return v
-  return 'yellow'
+  return 'white'
 }
 
 /** localStorage·붙여넣기 복구용 — JSON 배열을 스티커 목록으로 검증 */

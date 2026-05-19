@@ -105,7 +105,7 @@ export function CalendarEventRichField({
   onChange,
   minHeightClass = 'min-h-[5rem]',
   variant = 'card',
-  paperTint = 'yellow',
+  paperTint = 'white',
   memoInk,
   onMemoInkChange,
   inkControlId,

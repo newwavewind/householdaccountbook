@@ -7,7 +7,7 @@ import {
 } from './calendarHtmlSanitize'
 import type { CalendarStickyNote } from './calendarStickyNotesStorage'
 import { CalendarEventMemoTintPicker } from './CalendarEventMemoTintPicker'
-import { STICKY_THEMES } from './stickyNoteTheme'
+import { STICKY_THEMES, stickyTintCardChrome } from './stickyNoteTheme'
 
 function deriveEditorHtml(html: string | undefined, plain: string): string {
   const h = html?.trim()
@@ -37,7 +37,7 @@ function StickyMemoCompactPreview({ note }: { note: CalendarStickyNote }) {
 
   return (
     <div
-      className={`flex aspect-square w-36 shrink-0 flex-col overflow-hidden rounded-md border border-black/15 shadow-[3px_5px_18px_rgba(0,0,0,0.14)] sm:w-40 ${theme.bodyClass}`}
+      className={`flex aspect-square w-36 shrink-0 flex-col overflow-hidden rounded-md border sm:w-40 ${stickyTintCardChrome(note.tint)} ${theme.bodyClass}`}
       aria-label="스티커 메모 미리보기 — 펼치기에서 편집"
     >
       {empty ? (
@@ -87,7 +87,9 @@ function StickyMemoExpandedCard({
   }, [])
 
   return (
-    <div className="flex min-h-[18rem] flex-col overflow-visible rounded-md border border-black/15 shadow-[3px_5px_18px_rgba(0,0,0,0.14)]">
+    <div
+      className={`flex min-h-[18rem] flex-col overflow-visible rounded-md border ${stickyTintCardChrome(note.tint)}`}
+    >
       <header
         className={`relative z-10 flex h-9 shrink-0 items-center justify-between overflow-visible px-1.5 ${theme.headerClass}`}
       >
@@ -103,7 +105,7 @@ function StickyMemoExpandedCard({
           <CalendarEventMemoTintPicker
             value={note.tint}
             aria-label="메모 색 선택"
-            listLabel="색 선택"
+            listLabel="배경 색"
             menuAlign="right"
             onPick={(t) => onPatch(note.id, { tint: t })}
           />

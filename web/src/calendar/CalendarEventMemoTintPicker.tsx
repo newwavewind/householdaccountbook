@@ -14,6 +14,7 @@ import {
 import { STICKY_THEMES } from './stickyNoteTheme'
 
 const BODY_PREVIEW: Record<StickyTint, string> = {
+  white: '#ffffff',
   yellow: '#fffef5',
   green: '#eef8ef',
   pink: '#fff5f8',
@@ -65,7 +66,7 @@ export function CalendarEventMemoTintPicker({
   onPick,
   'aria-label': ariaLabel,
   menuAlign = 'right',
-  listLabel = '메모지 색',
+  listLabel = '배경 색',
 }: Props) {
   const theme = STICKY_THEMES[value]
   const [open, setOpen] = useState(false)

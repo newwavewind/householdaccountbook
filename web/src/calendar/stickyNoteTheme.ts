@@ -12,6 +12,17 @@ export type StickyTheme = {
 }
 
 export const STICKY_THEMES: Record<StickyTint, StickyTheme> = {
+  white: {
+    headerClass: 'bg-[#f5f5f3] border-b border-black/[0.07]',
+    bodyClass: 'bg-white',
+    footerClass: 'bg-[#f3f3f1] border-t border-black/[0.07]',
+    headerBtnClass:
+      'rounded p-1 text-text-secondary hover:bg-black/6 focus-visible:outline focus-visible:ring-2 focus-visible:ring-black/15',
+    toolbarBtnClass:
+      'rounded px-2 py-1 text-[0.75rem] font-semibold text-text-muted hover:bg-black/6',
+    toolbarBtnActiveClass: 'bg-black/8 text-text-primary',
+    placeholderClass: 'text-black/35',
+  },
   yellow: {
     headerClass: 'bg-[#e8d78a] border-b border-[#c9b86a]/90',
     bodyClass: 'bg-[#fffef5]',
@@ -95,12 +106,26 @@ export const STICKY_THEMES: Record<StickyTint, StickyTheme> = {
  * 달력 날짜 칸 배경 — 저장된 일정의 memoTint와 맞춤(본문 톤 기준).
  * 목탄은 칸 안 가독성을 위해 옅게만 칠함.
  */
+/** 일정 카드·스티커 외곽 테두리 */
+export function stickyTintCardChrome(tint: StickyTint): string {
+  if (tint === 'white') {
+    return 'border-black/[0.09] shadow-[3px_5px_16px_rgba(0,0,0,0.06)]'
+  }
+  if (tint === 'charcoal') {
+    return 'border-black/40 shadow-[3px_5px_18px_rgba(0,0,0,0.2)]'
+  }
+  return 'border-black/15 shadow-[3px_5px_18px_rgba(0,0,0,0.14)]'
+}
+
 export function stickyTintCalendarCellBg(
   tint: StickyTint,
   inMonth: boolean,
 ): string {
   if (tint === 'charcoal') {
     return inMonth ? 'bg-[#3d3d3d]/25' : 'bg-[#3d3d3d]/18'
+  }
+  if (tint === 'white') {
+    return inMonth ? 'bg-white' : 'bg-white/70'
   }
   const { bodyClass } = STICKY_THEMES[tint]
   if (inMonth) return bodyClass

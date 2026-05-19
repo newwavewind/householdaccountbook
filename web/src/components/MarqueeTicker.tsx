@@ -147,6 +147,7 @@ export function MarqueeTicker({
     .join(' ')
 
   const minH = isCell ? 'min-h-[1.125rem]' : 'min-h-[2.75rem]'
+  const bannerPad = isCell ? 'py-0' : 'py-0 pl-3 pr-10'
 
   return (
     <div
@@ -154,6 +155,7 @@ export function MarqueeTicker({
       className={[
         'pointer-events-none relative min-w-0 flex-1 overflow-hidden',
         minH,
+        isCell ? '' : 'flex items-center',
         className,
       ]
         .filter(Boolean)
@@ -170,7 +172,7 @@ export function MarqueeTicker({
         ref={measureRef}
         className={[
           'pointer-events-none absolute left-0 top-0 flex w-max items-center whitespace-nowrap opacity-0',
-          isCell ? 'py-0' : 'py-2 pl-3 pr-10',
+          bannerPad,
         ].join(' ')}
         aria-hidden
       >
@@ -184,7 +186,7 @@ export function MarqueeTicker({
         <div
           className={[
             'overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
-            isCell ? 'py-0' : 'px-3 py-2',
+            isCell ? 'py-0' : 'flex w-full items-center px-3',
           ].join(' ')}
           tabIndex={needsMarquee ? 0 : undefined}
         >
@@ -207,7 +209,7 @@ export function MarqueeTicker({
             <div
               className={[
                 'flex shrink-0 items-center',
-                isCell ? 'py-0 pr-4' : 'py-2 pl-3 pr-10',
+                isCell ? 'py-0 pr-4' : bannerPad,
               ].join(' ')}
             >
               <SegmentRow
@@ -218,7 +220,7 @@ export function MarqueeTicker({
             <div
               className={[
                 'flex shrink-0 items-center',
-                isCell ? 'py-0 pr-4' : 'py-2 pl-3 pr-10',
+                isCell ? 'py-0 pr-4' : bannerPad,
               ].join(' ')}
               aria-hidden
             >

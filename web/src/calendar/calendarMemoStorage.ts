@@ -315,8 +315,8 @@ export function setCalendarDayEvents(
       const n = ni && ni !== 'default' ? ni : undefined
       if (l) row.labelInk = l
       if (n) row.noteInk = n
-      const mt = normalizeCalendarEventMemoTint(e.memoTint) ?? 'yellow'
-      if (mt !== 'yellow') row.memoTint = mt
+      const mt = normalizeCalendarEventMemoTint(e.memoTint) ?? 'white'
+      if (mt !== 'white') row.memoTint = mt
       return row
     })
     .filter(

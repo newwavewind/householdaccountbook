@@ -470,6 +470,7 @@
 .dday-ticker-track,
 .marquee-ticker-track {
   display: flex;
+  align-items: center;
   width: max-content;
   animation: dday-ticker-marquee linear infinite;
   will-change: transform;
