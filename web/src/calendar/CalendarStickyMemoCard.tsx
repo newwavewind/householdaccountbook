@@ -36,6 +36,24 @@ const RESIZE_HANDLE_CLASS: Record<ResizeEdge, string> = {
 
 const RESIZE_EDGES: ResizeEdge[] = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']
 
+function CollapseIcon({ className = 'size-3.5' }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7" />
+    </svg>
+  )
+}
+
 type PatchProps = {
   note: CalendarStickyNote
   onPatch: (id: string, patch: Partial<CalendarStickyNote>) => void
@@ -215,6 +233,18 @@ function StickyMemoExpandedCard({
           <span className="text-lg font-light leading-none">+</span>
         </button>
         <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            className={theme.headerBtnClass}
+            aria-label="메모 접기"
+            title="축소"
+            onClick={(e) => {
+              e.stopPropagation()
+              onRequestClose()
+            }}
+          >
+            <CollapseIcon />
+          </button>
           <CalendarEventMemoTintPicker
             value={note.tint}
             aria-label="메모 배경 색"
