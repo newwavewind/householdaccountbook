@@ -1,4 +1,3 @@
-import { getCalendarDayLabels } from './holidays'
 import type { DayRollup } from './dayTotals'
 
 export type TickerSegment = { id: string; text: string }
@@ -7,24 +6,12 @@ const fmtPlain = new Intl.NumberFormat('ko-KR', {
   maximumFractionDigits: 0,
 })
 
-/** 공휴일·메모 등 — 칸 본문, 줄마다 독립 티커 */
+/** 거래 메모 — 칸 본문, 줄마다 독립 티커 (공휴일·기념일은 일정 달력에서만 표시) */
 export function buildLedgerContentLines(
-  iso: string,
   rollup: DayRollup | undefined,
 ): TickerSegment[] {
-  const lines: TickerSegment[] = []
-  const labels = getCalendarDayLabels(iso)
-  if (labels) {
-    for (const e of labels.entries) {
-      lines.push({ id: `label-${e.kind}-${e.name}`, text: e.name })
-    }
-  }
-  if (rollup) {
-    for (const memo of rollup.memoLines) {
-      lines.push({ id: `memo-${memo}`, text: memo })
-    }
-  }
-  return lines
+  if (!rollup) return []
+  return rollup.memoLines.map((memo) => ({ id: `memo-${memo}`, text: memo }))
 }
 
 export type LedgerAmountSummary = {

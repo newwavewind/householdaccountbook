@@ -1,9 +1,5 @@
 ﻿import { memo, useMemo, type MouseEvent } from 'react'
 import {
-  getCalendarDayLabels,
-  isRedCalendarDay,
-} from '../lib/holidays'
-import {
   buildLedgerContentLines,
   formatLedgerExpense,
   formatLedgerIncome,
@@ -42,10 +38,10 @@ function buildGrid(year: number, monthIndex: number) {
   return cells
 }
 
-function ledgerContentRows(iso: string, rollup: DayRollup | undefined): MarqueeTickerRow[] {
+function ledgerContentRows(rollup: DayRollup | undefined): MarqueeTickerRow[] {
   const memoText =
     'text-[0.62rem] font-medium leading-tight text-text-soft md:text-[0.68rem]'
-  return buildLedgerContentLines(iso, rollup).map((line) => ({
+  return buildLedgerContentLines(rollup).map((line) => ({
     id: line.id,
     ariaLabel: line.text,
     node: <span className={memoText}>{line.text}</span>,
@@ -119,10 +115,9 @@ export const LedgerCalendar = memo(function LedgerCalendar({
             )
           }
 
-          const dayLabels = getCalendarDayLabels(iso)
           const r = rollups.get(iso)
           const hasTx = r && r.count > 0
-          const contentRows = ledgerContentRows(iso, r)
+          const contentRows = ledgerContentRows(r)
           const amounts = ledgerAmountSummary(r)
           const hasContent = contentRows.length > 0
           const hasFooter = amounts !== null
@@ -130,10 +125,8 @@ export const LedgerCalendar = memo(function LedgerCalendar({
           const isToday = iso === todayIso
           const isSel = iso === selectedIso
           const isSunday = cellIdx % 7 === 0
-          const isRedDay =
-            isSunday || isRedCalendarDay(dayLabels?.primaryKind)
 
-          const watermarkClass = isRedDay
+          const watermarkClass = isSunday
             ? 'text-red-500/[0.11]'
             : 'text-text-primary/[0.08]'
 
@@ -150,9 +143,6 @@ export const LedgerCalendar = memo(function LedgerCalendar({
                 'relative flex w-full flex-col overflow-hidden rounded-lg border border-border-subtle bg-surface-raised px-0.5 py-1.5 text-left md:py-2',
                 CELL_MIN_H,
                 isNoSpend ? 'ledger-no-spend-neon' : '',
-                isRedCalendarDay(dayLabels?.primaryKind)
-                  ? 'ring-1 ring-inset ring-red-300/60'
-                  : '',
                 hasTx ? 'shadow-[0_0_0_1px_rgba(0,117,74,0.25)]' : '',
                 isToday
                   ? 'outline outline-2 outline-offset-[-2px] outline-green-accent/70'

@@ -1,5 +1,4 @@
-﻿import { CalendarDayLabelsInline } from './CalendarDayLabelsInline'
-import type { DayRollup } from '../lib/dayTotals'
+﻿import type { DayRollup } from '../lib/dayTotals'
 
 export function CalendarHoverTooltip({
   show,
@@ -39,7 +38,6 @@ export function CalendarHoverTooltip({
       style={{ left, top }}
     >
       <p className="font-semibold text-starbucks-green">{label}</p>
-      <CalendarDayLabelsInline iso={iso} variant="detail" className="mt-0.5" />
       <p className="mt-2 text-xs text-text-soft">
         수입{' '}
         <span className="font-medium text-semantic-income">

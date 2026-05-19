@@ -1167,14 +1167,6 @@ export default function CalendarPage() {
                   </span>
 
                   <div className="relative z-[1] flex min-h-0 flex-1 flex-col gap-0.5 pt-0.5">
-                    {hasLedger ? (
-                      <span
-                        className="pointer-events-none absolute right-0 top-0 z-[2] rounded bg-green-accent/15 px-1 text-[0.625rem] font-semibold tabular-nums text-green-accent md:text-[0.6875rem]"
-                        title="이 날 장부 거래 수"
-                      >
-                        {txCount}
-                      </span>
-                    ) : null}
                     {hasCellTicker ? (
                       <MarqueeTickerRows
                         rows={cellTickerRows}
@@ -1183,6 +1175,14 @@ export default function CalendarPage() {
                       />
                     ) : null}
                   </div>
+                  {hasLedger ? (
+                    <span
+                      className="pointer-events-none absolute bottom-1 right-1 z-[3] min-w-[1.25rem] rounded-md border border-green-accent/30 bg-green-accent px-1 py-0.5 text-center text-[0.625rem] font-bold leading-none tabular-nums text-white shadow-sm md:bottom-1.5 md:right-1.5 md:text-[0.6875rem]"
+                      title="이 날 장부 거래 수"
+                    >
+                      {txCount}
+                    </span>
+                  ) : null}
                 </button>
               )
             })}

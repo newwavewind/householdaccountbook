@@ -1,7 +1,6 @@
 ﻿import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from './ui/Button'
-import { CalendarDayLabelsInline } from './CalendarDayLabelsInline'
 import { cardBrandLabel } from '../constants/cardBrands'
 import type { Transaction } from '../types/transaction'
 
@@ -62,7 +61,6 @@ export function DayDetailModal({
       >
         <div className="border-b border-border-muted px-5 py-4">
           <p className="text-base font-semibold text-starbucks-green">{title}</p>
-          <CalendarDayLabelsInline iso={iso} variant="detail" className="mt-1" />
           <div className="mt-3 flex flex-wrap gap-3 text-sm">
             <span className="text-semantic-income">
               수입 합계 {fmt.format(incomeSum)}
