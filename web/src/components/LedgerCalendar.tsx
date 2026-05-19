@@ -10,7 +10,7 @@ import {
   ledgerAmountSummary,
 } from '../lib/calendarDayTicker'
 import type { DayRollup } from '../lib/dayTotals'
-import { noSpendBadgeEmoji } from '../lib/noSpendChallenge'
+import { noSpendAnimationDelaySec } from '../lib/noSpendChallenge'
 import { MarqueeTickerRows, type MarqueeTickerRow } from './MarqueeTickerRows'
 
 const WEEK = ['일', '월', '화', '수', '목', '금', '토'] as const
@@ -133,10 +133,11 @@ export const LedgerCalendar = memo(function LedgerCalendar({
                 'relative flex w-full flex-col overflow-hidden rounded-lg border px-0.5 py-1.5 text-left md:py-2',
                 cellMinH,
                 inMonth
-                  ? isNoSpend
-                    ? 'border-amber-300/70 bg-gradient-to-br from-amber-50/95 via-surface-raised to-green-light/25'
-                    : 'border-border-subtle bg-surface-raised'
+                  ? 'border-border-subtle bg-surface-raised'
                   : 'border-transparent bg-neutral-cool/50 text-text-soft/60',
+                isNoSpend && inMonth
+                  ? 'ring-1 ring-inset ring-green-accent/25'
+                  : '',
                 inMonth && isRedCalendarDay(dayLabels?.primaryKind)
                   ? 'ring-1 ring-inset ring-red-300/60'
                   : '',
@@ -151,21 +152,33 @@ export const LedgerCalendar = memo(function LedgerCalendar({
                 .filter(Boolean)
                 .join(' ')}
             >
-              {isNoSpend ? (
-                <span
-                  className="pointer-events-none absolute left-0.5 top-0.5 z-[2] flex items-center gap-0.5 rounded-md bg-amber-100/95 px-1 py-px text-[0.5625rem] font-bold leading-none text-amber-900 shadow-sm ring-1 ring-amber-300/50 md:text-[0.625rem]"
-                  title="무지출 성공!"
-                >
-                  <span aria-hidden>{noSpendBadgeEmoji(iso)}</span>
-                  <span className="sr-only">무지출</span>
-                </span>
+              {isNoSpend && inMonth ? (
+                <>
+                  <span
+                    aria-hidden
+                    className="ledger-no-spend-glow pointer-events-none absolute inset-0 z-0 rounded-[inherit] bg-gradient-to-br from-green-light/50 via-amber-100/25 to-green-light/35"
+                    style={{
+                      animationDelay: `${noSpendAnimationDelaySec(iso)}s`,
+                    }}
+                  />
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-[inherit]"
+                  >
+                    <span
+                      className="ledger-no-spend-shimmer-track absolute inset-y-0 left-0 w-[45%] bg-gradient-to-r from-transparent via-white/55 to-transparent"
+                      style={{
+                        animationDelay: `${noSpendAnimationDelaySec(iso) + 0.6}s`,
+                      }}
+                    />
+                  </span>
+                </>
               ) : null}
               <span
                 aria-hidden
                 className={[
-                  'pointer-events-none absolute left-1/2 top-[42%] z-0 -translate-x-1/2 -translate-y-1/2 select-none text-[2.4rem] font-semibold leading-none tabular-nums md:top-[44%] md:text-[3rem]',
+                  'pointer-events-none absolute left-1/2 top-[42%] z-[1] -translate-x-1/2 -translate-y-1/2 select-none text-[2.4rem] font-semibold leading-none tabular-nums md:top-[44%] md:text-[3rem]',
                   watermarkClass,
-                  isNoSpend ? 'text-amber-600/[0.12]' : '',
                 ].join(' ')}
               >
                 {day}

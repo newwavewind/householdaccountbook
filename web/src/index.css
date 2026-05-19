@@ -486,3 +486,39 @@
     animation: none;
   }
 }
+
+/* 가계부 달력 — 무지출 챌린지 (배경만, 텍스트 가리지 않음) */
+@keyframes ledger-no-spend-glow {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@keyframes ledger-no-spend-shimmer {
+  0% {
+    transform: translateX(-120%) skewX(-14deg);
+  }
+  100% {
+    transform: translateX(220%) skewX(-14deg);
+  }
+}
+
+.ledger-no-spend-glow {
+  animation: ledger-no-spend-glow 3.2s ease-in-out infinite;
+}
+
+.ledger-no-spend-shimmer-track {
+  animation: ledger-no-spend-shimmer 4.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ledger-no-spend-glow,
+  .ledger-no-spend-shimmer-track {
+    animation: none;
+    opacity: 0.35;
+  }
+}

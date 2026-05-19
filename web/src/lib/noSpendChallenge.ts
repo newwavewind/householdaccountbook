@@ -68,12 +68,11 @@ export function monthNoSpendStats(
   }
 }
 
-const BADGE_EMOJIS = ['🎉', '🏆', '✨', '🌟', '💪', '🍀', '🛡️', '👑', '💎', '🦸'] as const
-
-export function noSpendBadgeEmoji(iso: string): string {
+/** 칸마다 펄스 시차 (초) */
+export function noSpendAnimationDelaySec(iso: string): number {
   let h = 0
   for (let i = 0; i < iso.length; i++) h = (h * 31 + iso.charCodeAt(i)) | 0
-  return BADGE_EMOJIS[Math.abs(h) % BADGE_EMOJIS.length]
+  return (Math.abs(h) % 24) / 10
 }
 
 export function noSpendBannerMessage(
