@@ -76,7 +76,7 @@ export function DdaySummaryTicker({ lines }: Props) {
             aria-controls="dday-summary-expanded"
             onClick={() => setExpanded((v) => !v)}
           >
-            {expanded ? '접기' : '전체 · 설정'}
+            {expanded ? '접기' : '전체 입력'}
           </button>
         </div>
       </div>
