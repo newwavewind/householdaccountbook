@@ -13,6 +13,7 @@ import {
   DiaryNavIcon,
   LedgerNavIcon,
 } from './navIcons'
+import { triggerSelectionHaptic } from '../lib/haptics'
 import { useScrollHeaderVisibility } from './useScrollHeaderVisibility'
 
 function SettingsGearButton({ onClick }: { onClick: () => void }) {
@@ -108,6 +109,7 @@ function MobileBottomNav({ items }: { items: NavItem[] }) {
             to={item.to}
             end={item.end}
             className={mobileNavLinkClass}
+            onPointerDown={() => triggerSelectionHaptic()}
           >
             {({ isActive }) => (
               <>
