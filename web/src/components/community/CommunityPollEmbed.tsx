@@ -13,7 +13,7 @@ import {
 type Props = {
   postId: string
   poll: CommunityPollData
-  userId: string | null
+  voterId: string
   userDisplayName: string | null
 }
 
@@ -81,7 +81,7 @@ function OptionIndicator({
   )
 }
 
-export function CommunityPollEmbed({ postId, poll, userId, userDisplayName }: Props) {
+export function CommunityPollEmbed({ postId, poll, voterId, userDisplayName }: Props) {
   const [counts, setCounts] = useState<Record<string, number>>({})
   const [myOptionIds, setMyOptionIds] = useState<string[]>([])
   const [total, setTotal] = useState(0)
@@ -95,7 +95,7 @@ export function CommunityPollEmbed({ postId, poll, userId, userDisplayName }: Pr
   const hasVoted = myOptionIds.length > 0
   const ended = getPollStatus(settings, now) === 'ended'
   const showResults = canSeePollResults(settings, hasVoted, now)
-  const canVote = canVoteOnPoll(settings, hasVoted, now) && Boolean(userId)
+  const canVote = canVoteOnPoll(settings, hasVoted, now)
   const remaining = formatPollRemaining(settings.endsAt, now)
   const badges = pollSettingBadges(poll)
 
@@ -115,12 +115,12 @@ export function CommunityPollEmbed({ postId, poll, userId, userDisplayName }: Pr
   }, [])
 
   const reload = useCallback(async () => {
-    const result = await fetchPollVotes(postId, poll.pollId, optionIds, userId)
+    const result = await fetchPollVotes(postId, poll.pollId, optionIds, voterId)
     setCounts(result.counts)
     setMyOptionIds(result.myOptionIds)
     setTotal(result.total)
     setVoters(result.voters)
-  }, [postId, poll.pollId, optionIds, userId])
+  }, [postId, poll.pollId, optionIds, voterId])
 
   useEffect(() => {
     void reload()
@@ -136,12 +136,12 @@ export function CommunityPollEmbed({ postId, poll, userId, userDisplayName }: Pr
   }, [poll.options, voters])
 
   const vote = async (optionId: string) => {
-    if (!userId || !userDisplayName || busy) return
+    if (!userDisplayName?.trim() || busy) return
     if (!canVoteOnPoll(settings, hasVoted, now) && !settings.allowMultiple) return
     if (ended) return
     setBusy(true)
     try {
-      await castPollVote(postId, poll.pollId, optionId, userId, userDisplayName, settings)
+      await castPollVote(postId, poll.pollId, optionId, voterId, userDisplayName.trim(), settings)
       await reload()
     } catch (e) {
       alert(e instanceof Error ? e.message : '\ud22c\ud45c\uc5d0 \uc2e4\ud328\ud588\uc2b5\ub2c8\ub2e4.')
@@ -151,7 +151,7 @@ export function CommunityPollEmbed({ postId, poll, userId, userDisplayName }: Pr
   }
 
   const optionDisabled = (optionId: string) => {
-    if (!userId || busy || ended) return true
+    if (!userDisplayName?.trim() || busy || ended) return true
     if (settings.allowMultiple) {
       if (myOptionIds.includes(optionId)) return false
       if (myOptionIds.length >= settings.maxSelections) return true
@@ -334,17 +334,17 @@ export function CommunityPollEmbed({ postId, poll, userId, userDisplayName }: Pr
           })}
         </ul>
 
-        {!userId ? (
+        {!userDisplayName?.trim() ? (
           <p className="mt-4 text-center text-xs text-text-soft">
-            {'\ub85c\uadf8\uc778\ud558\uba74 \ud22c\ud45c\ud560 \uc218 \uc788\uc2b5\ub2c8\ub2e4.'}
+            {'\ub2c9\ub124\uc784\uc744 \uc785\ub825\ud558\uba74 \ud22c\ud45c\ud560 \uc218 \uc788\uc2b5\ub2c8\ub2e4.'}
           </p>
         ) : null}
-        {userId && ended ? (
+        {ended ? (
           <p className="mt-4 text-center text-xs text-text-soft">
             {'\ud22c\ud45c\uac00 \ub9c4\ub8cc\ub418\uc5c8\uc2b5\ub2c8\ub2e4.'}
           </p>
         ) : null}
-        {userId && !ended && hasVoted && !settings.allowRevote && !settings.allowMultiple ? (
+        {!ended && hasVoted && !settings.allowRevote && !settings.allowMultiple ? (
           <p className="mt-4 text-center text-xs text-text-soft">
             {'\uc774\ubbf8 \ud22c\ud45c\ud588\uc2b5\ub2c8\ub2e4. \uc120\ud0dd\uc744 \ubc14\uafc0 \uc218 \uc5c6\uc2b5\ub2c8\ub2e4.'}
           </p>

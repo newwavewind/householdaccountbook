@@ -6,7 +6,7 @@ import { CommunityPollEmbed } from './CommunityPollEmbed'
 type Props = {
   body: string
   postId: string
-  userId: string | null
+  voterId: string
   userDisplayName?: string | null
   className?: string
   onImageClick?: (src: string) => void
@@ -15,7 +15,7 @@ type Props = {
 export function CommunityPostBody({
   body,
   postId,
-  userId,
+  voterId,
   userDisplayName,
   className,
   onImageClick,
@@ -31,7 +31,7 @@ export function CommunityPostBody({
               key={`poll-${seg.data.pollId}-${i}`}
               postId={postId}
               poll={seg.data}
-              userId={userId}
+              voterId={voterId}
               userDisplayName={userDisplayName ?? null}
             />
           )

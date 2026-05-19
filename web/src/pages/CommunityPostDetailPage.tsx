@@ -3,6 +3,13 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { useCommunityAuth } from '../community/CommunityAuthContext'
+import {
+  getGuestNickname,
+  resolveVoterId,
+  setGuestNickname,
+} from '../community/communityGuest'
+import { visibilityLabel } from '../community/postVisibility'
+import { CommunityNicknameField } from '../components/community/CommunityNicknameField'
 import { useCommunityPost } from '../community/useCommunityPosts'
 import { isProbablyRichHtml } from '../lib/communityPostHtml'
 import { CommunityPostBody } from '../components/community/CommunityPostBody'
@@ -104,8 +111,13 @@ export default function CommunityPostDetailPage() {
   // 댓글 상태
   const [comments, setComments] = useState<CommunityComment[]>([])
   const [commentBody, setCommentBody] = useState('')
+  const [commentNickname, setCommentNickname] = useState(() =>
+    auth.user?.displayName || getGuestNickname() || '',
+  )
   const [commentBusy, setCommentBusy] = useState(false)
   const commentInputRef = useRef<HTMLTextAreaElement>(null)
+  const voterId = resolveVoterId(auth.user?.id)
+  const displayName = (auth.user?.displayName || commentNickname).trim()
 
   // 추천·비추천
   const [liked, setLiked] = useState(false)
@@ -126,23 +138,24 @@ export default function CommunityPostDetailPage() {
     setLikeCount(post.likeCount)
     setDislikeCount(post.dislikeCount ?? 0)
     void repo.listComments(post.id).then(setComments).catch(() => {})
-    if (auth.user) {
-      void repo.isLiked(post.id, auth.user.id).then(setLiked).catch(() => {})
-      void repo.isDisliked(post.id, auth.user.id).then(setDisliked).catch(() => {})
-    } else {
-      setLiked(false)
-      setDisliked(false)
-    }
-  }, [post, repo, auth.user])
+    void repo.isLiked(post.id, voterId).then(setLiked).catch(() => {})
+    void repo.isDisliked(post.id, voterId).then(setDisliked).catch(() => {})
+  }, [post, repo, voterId])
 
   const handleAddComment = async () => {
-    if (!commentBody.trim() || !auth.user || !post) return
+    if (!commentBody.trim() || !post) return
+    const name = displayName
+    if (!name) {
+      alert('닉네임을 입력하세요.')
+      return
+    }
+    if (!auth.user) setGuestNickname(name)
     setCommentBusy(true)
     try {
       const newComment = await repo.addComment({
         postId: post.id,
-        authorId: auth.user.id,
-        authorDisplayName: auth.user.displayName || auth.user.email,
+        authorId: auth.user?.id ?? null,
+        authorDisplayName: name,
         body: commentBody.trim(),
       })
       setComments((prev) => [...prev, newComment])
@@ -175,10 +188,10 @@ export default function CommunityPostDetailPage() {
   }
 
   const handleToggleLike = async () => {
-    if (!auth.user || !post || voteBusy) return
+    if (!post || voteBusy) return
     setVoteBusy(true)
     try {
-      const result = await repo.toggleLike(post.id, auth.user.id)
+      const result = await repo.toggleLike(post.id, voterId)
       setLiked(result.liked)
       setDisliked(result.disliked)
       await refreshVoteCounts(post.id)
@@ -190,10 +203,10 @@ export default function CommunityPostDetailPage() {
   }
 
   const handleToggleDislike = async () => {
-    if (!auth.user || !post || voteBusy) return
+    if (!post || voteBusy) return
     setVoteBusy(true)
     try {
-      const result = await repo.toggleDislike(post.id, auth.user.id)
+      const result = await repo.toggleDislike(post.id, voterId)
       setLiked(result.liked)
       setDisliked(result.disliked)
       await refreshVoteCounts(post.id)
@@ -219,7 +232,8 @@ export default function CommunityPostDetailPage() {
         <Card className="border border-danger/30 bg-surface-raised p-6 text-danger">{error}</Card>
       ) : !post ? (
         <Card className="border border-border-muted bg-surface-raised p-10 text-center text-text-soft">
-          글을 찾을 수 없습니다.
+          <p>글을 찾을 수 없거나 열람 권한이 없습니다.</p>
+          <p className="mt-2 text-xs">회원공개·비공개 글은 로그인 후 이용할 수 있습니다.</p>
           <div className="mt-6">
             <Button type="button" variant="outlined" onClick={() => nav('/community')}>
               목록으로
@@ -270,6 +284,9 @@ export default function CommunityPostDetailPage() {
                 {post.authorDisplayName} · {fmtDate(post.updatedAt)}
                 {post.updatedAt !== post.createdAt ? ' · 수정됨' : ''}
               </p>
+              {post.visibility !== 'public' ? (
+                <p className="mt-2 text-xs text-text-soft">{visibilityLabel(post.visibility)}</p>
+              ) : null}
               {post.hidden ? (
                 <p className="mt-3 text-xs text-warning">숨김 처리된 글입니다.</p>
               ) : null}
@@ -278,10 +295,8 @@ export default function CommunityPostDetailPage() {
                 <CommunityPostBody
                   body={post.body}
                   postId={post.id}
-                  userId={auth.user?.id ?? null}
-                  userDisplayName={
-                    auth.user?.displayName || auth.user?.email || null
-                  }
+                  voterId={voterId}
+                  userDisplayName={displayName || null}
                   className="community-post-body mt-6 text-base leading-relaxed text-text-primary"
                   onImageClick={setLightboxSrc}
                 />
@@ -296,7 +311,7 @@ export default function CommunityPostDetailPage() {
                 <button
                   type="button"
                   onClick={() => void handleToggleLike()}
-                  disabled={!auth.user || voteBusy}
+                  disabled={voteBusy}
                   className={`inline-flex min-w-[5.5rem] items-center justify-center gap-1.5 rounded border px-4 py-2 text-sm font-bold transition-colors ${
                     liked
                       ? 'border-green-accent bg-green-accent text-on-accent'
@@ -309,7 +324,7 @@ export default function CommunityPostDetailPage() {
                 <button
                   type="button"
                   onClick={() => void handleToggleDislike()}
-                  disabled={!auth.user || voteBusy}
+                  disabled={voteBusy}
                   className={`inline-flex min-w-[5.5rem] items-center justify-center gap-1.5 rounded border px-4 py-2 text-sm font-bold transition-colors ${
                     disliked
                       ? 'border-rose-500 bg-rose-500 text-white'
@@ -319,9 +334,6 @@ export default function CommunityPostDetailPage() {
                   <span>비추천</span>
                   <span className="tabular-nums">{dislikeCount}</span>
                 </button>
-                {!auth.user ? (
-                  <span className="text-xs text-text-soft">로그인하면 추천·비추천을 할 수 있어요.</span>
-                ) : null}
               </div>
             </div>
           </Card>
@@ -360,33 +372,37 @@ export default function CommunityPostDetailPage() {
             )}
 
             {/* 댓글 작성 */}
-            {auth.user ? (
-              <div className="rounded-xl border border-border-muted bg-surface-raised p-4">
-                <textarea
-                  ref={commentInputRef}
-                  value={commentBody}
-                  onChange={(e) => setCommentBody(e.target.value)}
-                  placeholder="댓글을 입력하세요…"
-                  rows={3}
-                  className="w-full resize-none rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
-                />
-                <div className="mt-2 flex justify-end">
-                  <Button
-                    type="button"
-                    variant="primary"
-                    className="!text-xs !px-4 !py-2"
-                    onClick={() => void handleAddComment()}
-                    disabled={commentBusy || !commentBody.trim()}
-                  >
-                    {commentBusy ? '등록 중…' : '댓글 등록'}
-                  </Button>
+            <div className="rounded-xl border border-border-muted bg-surface-raised p-4">
+              {!auth.user ? (
+                <div className="mb-3">
+                  <CommunityNicknameField
+                    id="comment-nickname"
+                    value={commentNickname}
+                    onChange={setCommentNickname}
+                    disabled={commentBusy}
+                  />
                 </div>
+              ) : null}
+              <textarea
+                ref={commentInputRef}
+                value={commentBody}
+                onChange={(e) => setCommentBody(e.target.value)}
+                placeholder="댓글을 입력하세요…"
+                rows={3}
+                className="w-full resize-none rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+              />
+              <div className="mt-2 flex justify-end">
+                <Button
+                  type="button"
+                  variant="primary"
+                  className="!text-xs !px-4 !py-2"
+                  onClick={() => void handleAddComment()}
+                  disabled={commentBusy || !commentBody.trim()}
+                >
+                  {commentBusy ? '등록 중…' : '댓글 등록'}
+                </Button>
               </div>
-            ) : (
-              <p className="rounded-xl border border-border-muted bg-surface-raised p-4 text-center text-sm text-text-soft">
-                댓글을 작성하려면 로그인하세요.
-              </p>
-            )}
+            </div>
           </div>
         </>
       )}

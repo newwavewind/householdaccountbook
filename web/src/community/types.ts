@@ -1,12 +1,16 @@
 export type ProfileRole = 'user' | 'admin'
 
+/** public: 전체 | members: 로그인 회원 | private: 작성자·관리자 */
+export type PostVisibility = 'public' | 'private' | 'members'
+
 export type CommunityPost = {
   id: string
-  authorId: string
+  authorId: string | null
   authorDisplayName: string
   title: string
   body: string
   hidden: boolean
+  visibility: PostVisibility
   isNotice?: boolean
   createdAt: string
   updatedAt: string

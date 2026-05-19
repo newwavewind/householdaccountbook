@@ -14,7 +14,7 @@ import CommunityPostEditorPage from './pages/CommunityPostEditorPage'
 import AuthSetupPage from './pages/AuthSetupPage'
 import SettingsPage from './pages/SettingsPage'
 import DiaryRecoveryPage from './pages/DiaryRecoveryPage'
-import { RequireAdmin, RequireAuth } from './routes/RouteGuards'
+import { RequireAdmin } from './routes/RouteGuards'
 
 export default function App() {
   return (
@@ -29,22 +29,8 @@ export default function App() {
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/" element={<LedgerApp />} />
           <Route path="/community" element={<CommunityListPage />} />
-          <Route
-            path="/community/new"
-            element={
-              <RequireAuth>
-                <CommunityPostEditorPage mode="new" />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/community/:id/edit"
-            element={
-              <RequireAuth>
-                <CommunityPostEditorPage mode="edit" />
-              </RequireAuth>
-            }
-          />
+          <Route path="/community/new" element={<CommunityPostEditorPage mode="new" />} />
+          <Route path="/community/:id/edit" element={<CommunityPostEditorPage mode="edit" />} />
           <Route path="/community/:id" element={<CommunityPostDetailPage />} />
           <Route path="/auth/setup" element={<AuthSetupPage />} />
           <Route

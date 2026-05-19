@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { CommunityPost, CommunityComment } from './types'
+import type { CommunityPost, CommunityComment, PostVisibility } from './types'
+import { parseVoterRef } from './communityGuest'
+import { canReadPostVisibility } from './postVisibility'
 import {
   CONCEPT_LIKE_THRESHOLD,
   DEFAULT_COMMUNITY_PAGE_SIZE,
@@ -16,6 +18,7 @@ import {
   readMockPosts,
   writeMockPosts,
 } from './mockPostStorage'
+import { readMockComments, writeMockComments } from './mockCommentStorage'
 import {
   mockCountVotes,
   mockIsDisliked,
@@ -45,34 +48,57 @@ export interface CommunityRepository {
   createPost(input: {
     title: string
     body: string
-    authorId: string
+    authorId: string | null
     authorDisplayName: string
+    visibility?: PostVisibility
   }): Promise<CommunityPost>
   updatePost(
     id: string,
-    input: { title: string; body: string },
+    input: { title: string; body: string; visibility?: PostVisibility },
   ): Promise<void>
   deletePost(id: string): Promise<void>
   setHidden(id: string, hidden: boolean): Promise<void>
   setNotice(id: string, isNotice: boolean): Promise<void>
   listComments(postId: string): Promise<CommunityComment[]>
-  addComment(input: { postId: string; authorId: string; authorDisplayName: string; body: string }): Promise<CommunityComment>
+  addComment(input: {
+    postId: string
+    authorId: string | null
+    authorDisplayName: string
+    body: string
+  }): Promise<CommunityComment>
   deleteComment(id: string): Promise<void>
-  toggleLike(postId: string, userId: string): Promise<{ liked: boolean; disliked: boolean }>
-  toggleDislike(postId: string, userId: string): Promise<{ liked: boolean; disliked: boolean }>
-  isLiked(postId: string, userId: string): Promise<boolean>
-  isDisliked(postId: string, userId: string): Promise<boolean>
+  toggleLike(postId: string, voterId: string): Promise<{ liked: boolean; disliked: boolean }>
+  toggleDislike(postId: string, voterId: string): Promise<{ liked: boolean; disliked: boolean }>
+  isLiked(postId: string, voterId: string): Promise<boolean>
+  isDisliked(postId: string, voterId: string): Promise<boolean>
   getVoteCounts(postId: string): Promise<{ likeCount: number; dislikeCount: number }>
   recordView(postId: string): Promise<void>
 }
 
+function mockCanReadPost(
+  post: CommunityPost,
+  session: MockSession | null,
+): boolean {
+  if (post.hidden) {
+    if (!session) return false
+    if (session.role === 'admin') return true
+    return post.authorId !== null && post.authorId === session.userId
+  }
+  return canReadPostVisibility(post.visibility, {
+    isLoggedIn: Boolean(session),
+    isAuthor: Boolean(session && post.authorId && post.authorId === session.userId),
+    isAdmin: session?.role === 'admin',
+  })
+}
+
 function mapSupabaseRow(row: {
   id: string
-  author_id: string
+  author_id: string | null
   author_display_name: string
   title: string
   body: string
   hidden: boolean
+  visibility?: string
   is_notice?: boolean
   created_at: string
   updated_at: string
@@ -82,6 +108,10 @@ function mapSupabaseRow(row: {
   view_count?: number
   today_view_count?: number
 }): CommunityPost {
+  const visibility =
+    row.visibility === 'private' || row.visibility === 'members'
+      ? row.visibility
+      : 'public'
   return {
     id: row.id,
     authorId: row.author_id,
@@ -89,6 +119,7 @@ function mapSupabaseRow(row: {
     title: row.title,
     body: row.body,
     hidden: row.hidden,
+    visibility,
     isNotice: row.is_notice ?? false,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -148,15 +179,20 @@ class MockCommunityRepository implements CommunityRepository {
   }
 
   async listPosts(opts: ListPostsOptions): Promise<CommunityPostListResult> {
-    const list = readMockPosts().map(enrichMockVotes)
+    const list = readMockPosts()
+      .map((p) => ({ ...p, visibility: p.visibility ?? 'public' }))
+      .map(enrichMockVotes)
     const admin = this.session?.role === 'admin'
     const mine = this.session?.userId
     const visible = list.filter((p) => {
-      if (!p.hidden) return true
-      if (!opts.includeHidden) return false
-      if (admin) return true
-      if (mine && p.authorId === mine) return true
-      return false
+      if (!mockCanReadPost(p, this.session)) return false
+      if (p.hidden && !opts.includeHidden) return false
+      if (p.hidden && opts.includeHidden) {
+        if (admin) return true
+        if (mine && p.authorId === mine) return true
+        return false
+      }
+      return true
     })
     const query = listQueryFromOpts(opts)
     if (!query) {
@@ -173,32 +209,40 @@ class MockCommunityRepository implements CommunityRepository {
     _opts?: ListPostsOptions,
   ): Promise<CommunityPost | null> {
     void _opts
-    const list = readMockPosts().map(enrichMockVotes)
+    const list = readMockPosts()
+      .map((p) => ({ ...p, visibility: p.visibility ?? 'public' }))
+      .map(enrichMockVotes)
     const post = list.find((p) => p.id === id)
     if (!post) return null
-    const admin = this.session?.role === 'admin'
-    const mine = this.session?.userId
-    if (!post.hidden) return post
-    if (mine && post.authorId === mine) return post
-    if (admin) return post
-    return null
+    if (!mockCanReadPost(post, this.session)) return null
+    if (post.hidden) {
+      const admin = this.session?.role === 'admin'
+      const mine = this.session?.userId
+      if (mine && post.authorId === mine) return post
+      if (admin) return post
+      return null
+    }
+    return post
   }
 
   async createPost(input: {
     title: string
     body: string
-    authorId: string
+    authorId: string | null
     authorDisplayName: string
+    visibility?: PostVisibility
   }): Promise<CommunityPost> {
     const list = readMockPosts()
     const now = new Date().toISOString()
+    const visibility = input.authorId ? (input.visibility ?? 'public') : 'public'
     const post: CommunityPost = {
       id: crypto.randomUUID(),
       authorId: input.authorId,
-      authorDisplayName: input.authorDisplayName,
+      authorDisplayName: input.authorDisplayName.trim() || '익명',
       title: input.title.trim(),
       body: input.body,
       hidden: false,
+      visibility,
       isNotice: false,
       createdAt: now,
       updatedAt: now,
@@ -225,7 +269,7 @@ class MockCommunityRepository implements CommunityRepository {
     writeMockPosts(list)
   }
 
-  async updatePost(id: string, input: { title: string; body: string }) {
+  async updatePost(id: string, input: { title: string; body: string; visibility?: PostVisibility }) {
     const list = readMockPosts()
     const i = list.findIndex((p) => p.id === id)
     if (i === -1) throw new Error('글을 찾을 수 없습니다.')
@@ -233,6 +277,7 @@ class MockCommunityRepository implements CommunityRepository {
       ...list[i],
       title: input.title.trim(),
       body: input.body,
+      visibility: input.visibility ?? list[i].visibility,
       updatedAt: new Date().toISOString(),
     }
     writeMockPosts(list)
@@ -258,29 +303,59 @@ class MockCommunityRepository implements CommunityRepository {
     writeMockPosts(list)
   }
 
-  async listComments(_postId: string): Promise<CommunityComment[]> { return [] }
-  async addComment(input: { postId: string; authorId: string; authorDisplayName: string; body: string }): Promise<CommunityComment> {
-    return { id: crypto.randomUUID(), postId: input.postId, authorId: input.authorId, authorDisplayName: input.authorDisplayName, body: input.body, createdAt: new Date().toISOString() }
+  async listComments(postId: string): Promise<CommunityComment[]> {
+    return readMockComments()
+      .filter((c) => c.postId === postId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
   }
-  async deleteComment(_id: string): Promise<void> {}
-  async toggleLike(postId: string, userId: string): Promise<{ liked: boolean; disliked: boolean }> {
-    const result = mockToggleLike(postId, userId)
+
+  async addComment(input: {
+    postId: string
+    authorId: string | null
+    authorDisplayName: string
+    body: string
+  }): Promise<CommunityComment> {
+    const comment: CommunityComment = {
+      id: crypto.randomUUID(),
+      postId: input.postId,
+      authorId: input.authorId,
+      authorDisplayName: input.authorDisplayName.trim() || '익명',
+      body: input.body,
+      createdAt: new Date().toISOString(),
+    }
+    const all = readMockComments()
+    writeMockComments([...all, comment])
+    const posts = readMockPosts()
+    const i = posts.findIndex((p) => p.id === input.postId)
+    if (i !== -1) {
+      posts[i] = { ...posts[i], commentCount: posts[i].commentCount + 1 }
+      writeMockPosts(posts)
+    }
+    return comment
+  }
+
+  async deleteComment(id: string): Promise<void> {
+    writeMockComments(readMockComments().filter((c) => c.id !== id))
+  }
+
+  async toggleLike(postId: string, voterId: string): Promise<{ liked: boolean; disliked: boolean }> {
+    const result = mockToggleLike(postId, voterId)
     this.syncMockVoteCounts(postId)
     return result
   }
 
-  async toggleDislike(postId: string, userId: string): Promise<{ liked: boolean; disliked: boolean }> {
-    const result = mockToggleDislike(postId, userId)
+  async toggleDislike(postId: string, voterId: string): Promise<{ liked: boolean; disliked: boolean }> {
+    const result = mockToggleDislike(postId, voterId)
     this.syncMockVoteCounts(postId)
     return result
   }
 
-  async isLiked(postId: string, userId: string): Promise<boolean> {
-    return mockIsLiked(postId, userId)
+  async isLiked(postId: string, voterId: string): Promise<boolean> {
+    return mockIsLiked(postId, voterId)
   }
 
-  async isDisliked(postId: string, userId: string): Promise<boolean> {
-    return mockIsDisliked(postId, userId)
+  async isDisliked(postId: string, voterId: string): Promise<boolean> {
+    return mockIsDisliked(postId, voterId)
   }
 
   async getVoteCounts(postId: string): Promise<{ likeCount: number; dislikeCount: number }> {
@@ -401,7 +476,7 @@ class SupabaseCommunityRepository implements CommunityRepository {
   }
 
   private static readonly POST_COLS =
-    'id, author_id, author_display_name, title, body, hidden, is_notice, created_at, updated_at, like_count, dislike_count, comment_count, view_count'
+    'id, author_id, author_display_name, title, body, hidden, visibility, is_notice, created_at, updated_at, like_count, dislike_count, comment_count, view_count'
 
   private async attachTodayViews(posts: CommunityPost[]): Promise<CommunityPost[]> {
     if (posts.length === 0) return posts
@@ -503,33 +578,38 @@ class SupabaseCommunityRepository implements CommunityRepository {
   async createPost(input: {
     title: string
     body: string
-    authorId: string
+    authorId: string | null
     authorDisplayName: string
+    visibility?: PostVisibility
   }): Promise<CommunityPost> {
+    const visibility = input.authorId ? (input.visibility ?? 'public') : 'public'
     const { data, error } = await this.client
       .from('posts')
       .insert({
         author_id: input.authorId,
-        author_display_name: input.authorDisplayName,
+        author_display_name: input.authorDisplayName.trim() || '익명',
         title: input.title.trim(),
         body: input.body,
         hidden: false,
+        visibility,
       })
       .select(
-        'id, author_id, author_display_name, title, body, hidden, created_at, updated_at',
+        'id, author_id, author_display_name, title, body, hidden, visibility, created_at, updated_at',
       )
       .single()
     if (error) throw new Error(translatePostError(error.message))
     return mapSupabaseRow(data as Parameters<typeof mapSupabaseRow>[0])
   }
 
-  async updatePost(id: string, input: { title: string; body: string }) {
+  async updatePost(id: string, input: { title: string; body: string; visibility?: PostVisibility }) {
+    const patch: Record<string, string> = {
+      title: input.title.trim(),
+      body: input.body,
+    }
+    if (input.visibility) patch.visibility = input.visibility
     const { error } = await this.client
       .from('posts')
-      .update({
-        title: input.title.trim(),
-        body: input.body,
-      })
+      .update(patch)
       .eq('id', id)
     if (error) throw new Error(translatePostError(error.message))
   }
@@ -565,13 +645,18 @@ class SupabaseCommunityRepository implements CommunityRepository {
     return (data ?? []).map((row) => mapCommentRow(row as Parameters<typeof mapCommentRow>[0]))
   }
 
-  async addComment(input: { postId: string; authorId: string; authorDisplayName: string; body: string }): Promise<CommunityComment> {
+  async addComment(input: {
+    postId: string
+    authorId: string | null
+    authorDisplayName: string
+    body: string
+  }): Promise<CommunityComment> {
     const { data, error } = await this.client
       .from('comments')
       .insert({
         post_id: input.postId,
         author_id: input.authorId,
-        author_display_name: input.authorDisplayName,
+        author_display_name: input.authorDisplayName.trim() || '익명',
         body: input.body.trim(),
       })
       .select('id, post_id, author_id, author_display_name, body, created_at')
@@ -585,63 +670,69 @@ class SupabaseCommunityRepository implements CommunityRepository {
     if (error) throw new Error(translatePostError(error.message))
   }
 
-  async toggleLike(postId: string, userId: string): Promise<{ liked: boolean; disliked: boolean }> {
-    const { data: existing } = await this.client
-      .from('likes')
-      .select('id')
-      .eq('post_id', postId)
-      .eq('user_id', userId)
-      .maybeSingle()
+  private voterLikeQuery(postId: string, voterId: string) {
+    const { userId, voterKey } = parseVoterRef(voterId)
+    let q = this.client.from('likes').select('id').eq('post_id', postId)
+    if (userId) q = q.eq('user_id', userId)
+    else q = q.eq('voter_key', voterKey!)
+    return q
+  }
+
+  private voterDislikeQuery(postId: string, voterId: string) {
+    const { userId, voterKey } = parseVoterRef(voterId)
+    let q = this.client.from('dislikes').select('id').eq('post_id', postId)
+    if (userId) q = q.eq('user_id', userId)
+    else q = q.eq('voter_key', voterKey!)
+    return q
+  }
+
+  private async clearOppositeVote(
+    table: 'likes' | 'dislikes',
+    postId: string,
+    voterId: string,
+  ): Promise<void> {
+    const { userId, voterKey } = parseVoterRef(voterId)
+    let q = this.client.from(table).delete().eq('post_id', postId)
+    if (userId) q = q.eq('user_id', userId)
+    else q = q.eq('voter_key', voterKey!)
+    await q
+  }
+
+  private buildVoteInsert(postId: string, voterId: string): Record<string, string> {
+    const { userId, voterKey } = parseVoterRef(voterId)
+    if (userId) return { post_id: postId, user_id: userId }
+    return { post_id: postId, voter_key: voterKey! }
+  }
+
+  async toggleLike(postId: string, voterId: string): Promise<{ liked: boolean; disliked: boolean }> {
+    const { data: existing } = await this.voterLikeQuery(postId, voterId).maybeSingle()
     if (existing) {
       await this.client.from('likes').delete().eq('id', existing.id)
-      return { liked: false, disliked: await this.isDisliked(postId, userId) }
+      return { liked: false, disliked: await this.isDisliked(postId, voterId) }
     }
-    await this.client
-      .from('dislikes')
-      .delete()
-      .eq('post_id', postId)
-      .eq('user_id', userId)
-    await this.client.from('likes').insert({ post_id: postId, user_id: userId })
+    await this.clearOppositeVote('dislikes', postId, voterId)
+    await this.client.from('likes').insert(this.buildVoteInsert(postId, voterId))
     return { liked: true, disliked: false }
   }
 
-  async toggleDislike(postId: string, userId: string): Promise<{ liked: boolean; disliked: boolean }> {
-    const { data: existing } = await this.client
-      .from('dislikes')
-      .select('id')
-      .eq('post_id', postId)
-      .eq('user_id', userId)
-      .maybeSingle()
+  async toggleDislike(postId: string, voterId: string): Promise<{ liked: boolean; disliked: boolean }> {
+    const { data: existing } = await this.voterDislikeQuery(postId, voterId).maybeSingle()
     if (existing) {
       await this.client.from('dislikes').delete().eq('id', existing.id)
-      return { liked: await this.isLiked(postId, userId), disliked: false }
+      return { liked: await this.isLiked(postId, voterId), disliked: false }
     }
-    await this.client
-      .from('likes')
-      .delete()
-      .eq('post_id', postId)
-      .eq('user_id', userId)
-    await this.client.from('dislikes').insert({ post_id: postId, user_id: userId })
+    await this.clearOppositeVote('likes', postId, voterId)
+    await this.client.from('dislikes').insert(this.buildVoteInsert(postId, voterId))
     return { liked: false, disliked: true }
   }
 
-  async isLiked(postId: string, userId: string): Promise<boolean> {
-    const { data } = await this.client
-      .from('likes')
-      .select('id')
-      .eq('post_id', postId)
-      .eq('user_id', userId)
-      .maybeSingle()
+  async isLiked(postId: string, voterId: string): Promise<boolean> {
+    const { data } = await this.voterLikeQuery(postId, voterId).maybeSingle()
     return !!data
   }
 
-  async isDisliked(postId: string, userId: string): Promise<boolean> {
-    const { data } = await this.client
-      .from('dislikes')
-      .select('id')
-      .eq('post_id', postId)
-      .eq('user_id', userId)
-      .maybeSingle()
+  async isDisliked(postId: string, voterId: string): Promise<boolean> {
+    const { data } = await this.voterDislikeQuery(postId, voterId).maybeSingle()
     return !!data
   }
 

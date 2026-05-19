@@ -11,6 +11,7 @@ const SEED_POSTS: CommunityPost[] = [
     body:
       '실제 로그인·저장소를 쓰려면 web/.env.local에 Supabase URL·anon 키를 넣으세요(배포는 Vercel 등에 동일 변수). Google 로그인은 메뉴의 Google 로그인 안내(/auth/setup)를 따르세요.',
     hidden: false,
+    visibility: 'public',
     isNotice: true,
     createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
     updatedAt: new Date(Date.now() - 86400000 * 2).toISOString(),

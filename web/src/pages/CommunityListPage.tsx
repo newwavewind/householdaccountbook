@@ -2,7 +2,6 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
-import { useCommunityAuth } from '../community/CommunityAuthContext'
 import {
   COMMUNITY_PAGE_SIZES,
   COMMUNITY_SEARCH_SCOPES,
@@ -126,7 +125,6 @@ function PaginationBar({
 
 export default function CommunityListPage() {
   const nav = useNavigate()
-  const auth = useCommunityAuth()
   const board = useCommunityBoard()
 
   const onSearch = (e: FormEvent) => {
@@ -152,13 +150,9 @@ export default function CommunityListPage() {
             ) : null}
           </p>
         </div>
-        {auth.user ? (
-          <Button type="button" variant="primary" onClick={() => nav('/community/new')}>
-            글쓰기
-          </Button>
-        ) : (
-          <p className="text-xs text-text-soft">글쓰기는 로그인 후 이용할 수 있습니다.</p>
-        )}
+        <Button type="button" variant="primary" onClick={() => nav('/community/new')}>
+          글쓰기
+        </Button>
       </div>
 
       <Card className="overflow-hidden border border-border-muted bg-surface-raised p-0">

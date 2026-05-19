@@ -16,6 +16,7 @@ import {
   COMMUNITY_FONT_SIZE_OPTIONS,
   resolveCommunityFontSizeValue,
 } from '../../community/communityEditorFontSizes'
+import { getGuestVoterId } from '../../community/communityGuest'
 import { getCommunitySupabase } from '../../lib/communitySupabaseClient'
 import { Button } from '../ui/Button'
 import { CommunityTextColorPicker } from './CommunityTextColorPicker'
@@ -48,6 +49,7 @@ type Props = {
   initialHtml: string
   onHtmlChange: (html: string) => void
   disabled?: boolean
+  allowGuestMedia?: boolean
   'aria-labelledby'?: string
 }
 
@@ -58,6 +60,7 @@ export function CommunityRichTextEditor({
   initialHtml,
   onHtmlChange,
   disabled,
+  allowGuestMedia = false,
   'aria-labelledby': ariaLabelledBy,
 }: Props) {
   const [fontSel, setFontSel] = useState('')
@@ -126,7 +129,7 @@ export function CommunityRichTextEditor({
       const {
         data: { session },
       } = await sb.auth.getSession()
-      if (!session) {
+      if (!session && !allowGuestMedia) {
         alert(
           '사진을 업로드하려면 구글 로그인이 필요합니다.\n오른쪽 상단 "로그인" 버튼을 눌러 로그인해 주세요.',
         )
@@ -134,7 +137,9 @@ export function CommunityRichTextEditor({
       }
 
       const ext = file.name.split('.').pop() ?? 'bin'
-      const path = `${session.user.id}/${crypto.randomUUID()}.${ext}`
+      const path = session
+        ? `${session.user.id}/${crypto.randomUUID()}.${ext}`
+        : `guest/${getGuestVoterId()}/${crypto.randomUUID()}.${ext}`
       const { error } = await sb.storage.from('community-media').upload(path, file, {
         contentType: file.type || 'application/octet-stream',
         upsert: false,

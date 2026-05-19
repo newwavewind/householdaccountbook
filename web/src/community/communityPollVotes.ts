@@ -1,5 +1,6 @@
 import { getCommunitySupabase } from '../lib/communitySupabaseClient'
 import { communityBackendMode } from '../lib/communityBackend'
+import { parseVoterRef } from './communityGuest'
 import type { CommunityPollSettings } from './communityPollTypes'
 
 const MOCK_KEY = 'gaegyeobu-community-poll-votes-v2'
@@ -59,11 +60,16 @@ function bumpCount(bucket: Record<string, number>, optionId: string, delta: numb
   bucket[optionId] = Math.max(0, (bucket[optionId] ?? 0) + delta)
 }
 
+function voterIdentity(row: { user_id: string | null; voter_key: string | null }): string {
+  if (row.user_id) return row.user_id
+  return row.voter_key ? `guest:${row.voter_key}` : ''
+}
+
 export async function fetchPollVotes(
   postId: string,
   pollId: string,
   optionIds: string[],
-  userId: string | null,
+  voterId: string | null,
 ): Promise<PollVoteResult> {
   const counts: Record<string, number> = {}
   for (const id of optionIds) counts[id] = 0
@@ -73,7 +79,7 @@ export async function fetchPollVotes(
     const sb = getCommunitySupabase()!
     const { data: rows, error } = await sb
       .from('post_poll_votes')
-      .select('option_id, user_id, voter_display_name, created_at')
+      .select('option_id, user_id, voter_key, voter_display_name, created_at')
       .eq('post_id', postId)
       .eq('poll_id', pollId)
     if (error) throw new Error(error.message)
@@ -83,20 +89,22 @@ export async function fetchPollVotes(
     for (const row of rows ?? []) {
       const r = row as {
         option_id: string
-        user_id: string
+        user_id: string | null
+        voter_key: string | null
         voter_display_name: string | null
         created_at: string
       }
+      const identity = voterIdentity(r)
       counts[r.option_id] = (counts[r.option_id] ?? 0) + 1
-      if (userId && r.user_id === userId) myOptionIds.push(r.option_id)
+      if (voterId && identity && identity === voterId) myOptionIds.push(r.option_id)
       voters.push({
-        userId: r.user_id,
+        userId: identity,
         displayName: r.voter_display_name?.trim() || '\uC775\uBA85',
         optionId: r.option_id,
         votedAt: r.created_at,
       })
     }
-    const total = new Set(voters.map((v) => v.userId)).size
+    const total = new Set(voters.map((v) => v.userId).filter(Boolean)).size
     return { counts, myOptionIds, total, voters }
   }
 
@@ -106,7 +114,7 @@ export async function fetchPollVotes(
   const bucket = map[key] ?? {}
   for (const id of optionIds) counts[id] = bucket[id] ?? 0
   const voters = votersMap[key] ?? []
-  const myOptionIds = userId ? voters.filter((v) => v.userId === userId).map((v) => v.optionId) : []
+  const myOptionIds = voterId ? voters.filter((v) => v.userId === voterId).map((v) => v.optionId) : []
   const total = new Set(voters.map((v) => v.userId)).size
   return { counts, myOptionIds, total, voters }
 }
@@ -115,23 +123,23 @@ export async function castPollVote(
   postId: string,
   pollId: string,
   optionId: string,
-  userId: string,
+  voterId: string,
   displayName: string,
   settings: CommunityPollSettings,
 ): Promise<void> {
-  const current = await fetchPollVotes(postId, pollId, [optionId], userId)
+  const current = await fetchPollVotes(postId, pollId, [optionId], voterId)
   const hasVoted = current.myOptionIds.length > 0
   const alreadyThis = current.myOptionIds.includes(optionId)
 
   if (settings.allowMultiple) {
     if (alreadyThis) {
-      await removePollVote(postId, pollId, optionId, userId)
+      await removePollVote(postId, pollId, optionId, voterId)
       return
     }
     if (current.myOptionIds.length >= settings.maxSelections) {
       throw new Error(`\uCD5C\uB300 ${settings.maxSelections}\uAC1C\uAE4C\uC9C0 \uC120\uD0DD\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.`)
     }
-    await addPollVote(postId, pollId, optionId, userId, displayName)
+    await addPollVote(postId, pollId, optionId, voterId, displayName)
     return
   }
 
@@ -141,29 +149,44 @@ export async function castPollVote(
   }
   if (hasVoted) {
     for (const prev of current.myOptionIds) {
-      await removePollVote(postId, pollId, prev, userId)
+      await removePollVote(postId, pollId, prev, voterId)
     }
   }
-  await addPollVote(postId, pollId, optionId, userId, displayName)
+  await addPollVote(postId, pollId, optionId, voterId, displayName)
+}
+
+function buildPollVoteRow(
+  postId: string,
+  pollId: string,
+  optionId: string,
+  voterId: string,
+  displayName: string,
+): Record<string, string> {
+  const { userId, voterKey } = parseVoterRef(voterId)
+  const row: Record<string, string> = {
+    post_id: postId,
+    poll_id: pollId,
+    option_id: optionId,
+    voter_display_name: displayName,
+  }
+  if (userId) row.user_id = userId
+  else row.voter_key = voterKey!
+  return row
 }
 
 async function addPollVote(
   postId: string,
   pollId: string,
   optionId: string,
-  userId: string,
+  voterId: string,
   displayName: string,
 ): Promise<void> {
   const mode = communityBackendMode()
   if (mode === 'supabase' && getCommunitySupabase()) {
     const sb = getCommunitySupabase()!
-    const { error } = await sb.from('post_poll_votes').insert({
-      post_id: postId,
-      poll_id: pollId,
-      option_id: optionId,
-      user_id: userId,
-      voter_display_name: displayName,
-    })
+    const { error } = await sb
+      .from('post_poll_votes')
+      .insert(buildPollVoteRow(postId, pollId, optionId, voterId, displayName))
     if (error) throw new Error(error.message)
     return
   }
@@ -177,7 +200,7 @@ async function addPollVote(
   writeMockVotes(map)
   const voters = [...(votersMap[key] ?? [])]
   voters.push({
-    userId,
+    userId: voterId,
     displayName,
     optionId,
     votedAt: new Date().toISOString(),
@@ -190,18 +213,21 @@ async function removePollVote(
   postId: string,
   pollId: string,
   optionId: string,
-  userId: string,
+  voterId: string,
 ): Promise<void> {
   const mode = communityBackendMode()
   if (mode === 'supabase' && getCommunitySupabase()) {
     const sb = getCommunitySupabase()!
-    const { error } = await sb
+    const { userId, voterKey } = parseVoterRef(voterId)
+    let q = sb
       .from('post_poll_votes')
       .delete()
       .eq('post_id', postId)
       .eq('poll_id', pollId)
       .eq('option_id', optionId)
-      .eq('user_id', userId)
+    if (userId) q = q.eq('user_id', userId)
+    else q = q.eq('voter_key', voterKey!)
+    const { error } = await q
     if (error) throw new Error(error.message)
     return
   }
@@ -214,7 +240,7 @@ async function removePollVote(
   map[key] = bucket
   writeMockVotes(map)
   votersMap[key] = (votersMap[key] ?? []).filter(
-    (v) => !(v.userId === userId && v.optionId === optionId),
+    (v) => !(v.userId === voterId && v.optionId === optionId),
   )
   writeMockVoters(votersMap)
 }
