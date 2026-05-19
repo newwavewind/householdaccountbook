@@ -1,4 +1,4 @@
-import { Fragment } from 'react'
+import { Fragment, useMemo } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import {
@@ -36,7 +36,13 @@ function SettingsGearButton({ onClick }: { onClick: () => void }) {
   )
 }
 
-function mainNavLinkClass({ isActive }: { isActive: boolean }) {
+type NavItem = {
+  to: string
+  label: string
+  end?: boolean
+}
+
+function desktopNavLinkClass({ isActive }: { isActive: boolean }) {
   const base =
     'inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-[10px] font-semibold leading-none transition-colors md:px-2.5 md:py-1 md:text-xs'
   return isActive
@@ -44,17 +50,88 @@ function mainNavLinkClass({ isActive }: { isActive: boolean }) {
     : `${base} text-text-soft hover:bg-well hover:text-text-primary`
 }
 
-const MAIN_NAV_ITEMS = [
+function mobileNavLinkClass({ isActive }: { isActive: boolean }) {
+  const base =
+    'relative flex min-h-[3.25rem] flex-1 flex-col items-center justify-center gap-0.5 px-1 py-2 text-[11px] font-semibold leading-tight transition-colors'
+  return isActive
+    ? `${base} text-green-accent theme2:text-green-accent theme3:text-green-accent`
+    : `${base} text-text-soft active:bg-well/80`
+}
+
+const MAIN_NAV_ITEMS: NavItem[] = [
   { to: '/calendar', label: '다이어리' },
-  { to: '/', label: '가계부', end: true as const },
+  { to: '/', label: '가계부', end: true },
   { to: '/community', label: '커뮤니티' },
-] as const
+]
+
+function DesktopMainNav({ items }: { items: NavItem[] }) {
+  return (
+    <nav
+      className="hidden min-w-0 shrink-0 items-center gap-0.5 overflow-x-auto rounded-md border border-charcoal-border bg-surface-raised p-0.5 shadow-sm [-ms-overflow-style:none] [scrollbar-width:none] md:flex md:overflow-visible theme2:shadow-[var(--shadow-frap-base)] theme3:border-border-strong [&::-webkit-scrollbar]:hidden"
+      aria-label="주 메뉴"
+    >
+      {items.map((item, index) => (
+        <Fragment key={item.to}>
+          {index > 0 ? (
+            <span
+              className="mx-0.5 h-3 w-px shrink-0 bg-charcoal-border/25 theme3:bg-border-strong/40"
+              aria-hidden
+            />
+          ) : null}
+          <NavLink to={item.to} end={item.end} className={desktopNavLinkClass}>
+            {item.label}
+          </NavLink>
+        </Fragment>
+      ))}
+    </nav>
+  )
+}
+
+function MobileBottomNav({ items }: { items: NavItem[] }) {
+  return (
+    <nav
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-border-muted bg-neutral-warm/95 backdrop-blur-md pb-[env(safe-area-inset-bottom,0px)] md:hidden"
+      aria-label="주 메뉴"
+    >
+      <div className="mx-auto flex max-w-5xl items-stretch">
+        {items.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.end}
+            className={mobileNavLinkClass}
+          >
+            {({ isActive }) => (
+              <>
+                {isActive ? (
+                  <span
+                    className="absolute inset-x-3 top-0 h-0.5 rounded-full bg-green-accent theme2:bg-green-accent theme3:bg-green-accent"
+                    aria-hidden
+                  />
+                ) : null}
+                <span>{item.label}</span>
+              </>
+            )}
+          </NavLink>
+        ))}
+      </div>
+    </nav>
+  )
+}
 
 export default function RootLayout() {
   const nav = useNavigate()
   const mode = communityBackendMode()
   const backendMsg = useCommunityBackendReadyMessage()
   const auth = useCommunityAuth()
+
+  const navItems = useMemo<NavItem[]>(
+    () => [
+      ...MAIN_NAV_ITEMS,
+      ...(auth.role === 'admin' ? [{ to: '/admin', label: '관리' }] : []),
+    ],
+    [auth.role],
+  )
 
   const authControls = (
     <>
@@ -117,37 +194,9 @@ export default function RootLayout() {
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-border-muted bg-neutral-warm/90 backdrop-blur-md">
-        <div className="relative mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 py-2.5 md:flex-wrap md:px-6 md:py-3">
-          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden pr-[4.25rem] md:min-w-0 md:flex-initial md:flex-wrap md:gap-4 md:overflow-visible md:pr-0">
-            <nav
-              className="flex min-w-0 shrink-0 items-center gap-0.5 overflow-x-auto rounded-md border border-charcoal-border bg-surface-raised p-0.5 shadow-sm [-ms-overflow-style:none] [scrollbar-width:none] md:overflow-visible theme2:shadow-[var(--shadow-frap-base)] theme3:border-border-strong [&::-webkit-scrollbar]:hidden"
-              aria-label="주 메뉴"
-            >
-              {[
-                ...MAIN_NAV_ITEMS,
-                ...(auth.role === 'admin'
-                  ? [{ to: '/admin' as const, label: '관리' }]
-                  : []),
-              ].map((item, index) => (
-                <Fragment key={item.to}>
-                  {index > 0 ? (
-                    <span
-                      className="mx-0.5 h-3 w-px shrink-0 bg-charcoal-border/25 theme3:bg-border-strong/40"
-                      aria-hidden
-                    />
-                  ) : null}
-                  <NavLink
-                    to={item.to}
-                    end={'end' in item ? item.end : undefined}
-                    className={mainNavLinkClass}
-                  >
-                    {item.label}
-                  </NavLink>
-                </Fragment>
-              ))}
-            </nav>
-          </div>
-          <div className="absolute right-3 top-1/2 z-10 flex -translate-y-1/2 flex-nowrap items-center justify-end gap-1 md:static md:z-0 md:translate-y-0 md:gap-2">
+        <div className="mx-auto flex max-w-5xl items-center justify-end gap-2 px-4 py-2.5 md:justify-between md:px-6 md:py-3">
+          <DesktopMainNav items={navItems} />
+          <div className="flex flex-nowrap items-center justify-end gap-1 md:gap-2">
             <AppearanceMenu />
             <SettingsGearButton onClick={() => nav('/settings')} />
             {authControls}
@@ -159,7 +208,12 @@ export default function RootLayout() {
           </p>
         ) : null}
       </header>
-      <Outlet />
+
+      <div className="pb-[calc(3.25rem+env(safe-area-inset-bottom,0px))] md:pb-0">
+        <Outlet />
+      </div>
+
+      <MobileBottomNav items={navItems} />
     </>
   )
 }
