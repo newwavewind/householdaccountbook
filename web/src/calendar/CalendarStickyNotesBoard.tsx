@@ -119,12 +119,12 @@ export default function CalendarStickyNotesBoard({ notes, patchNotes }: Props) {
   return (
     <section
       aria-label="스티커 메모"
-      className="rounded-[var(--radius-card)] border border-border-subtle bg-gradient-to-b from-ceramic/60 to-surface-raised px-3 py-3 md:px-5 md:py-4"
+      className="overflow-hidden rounded-[var(--radius-card)] border border-border-subtle bg-gradient-to-b from-ceramic/60 to-surface-raised px-3 py-3 md:px-5 md:py-4"
     >
       {!hasNotes ? (
-        <div className="flex flex-col gap-3 sm:grid sm:grid-cols-[auto_1fr_auto] sm:items-center sm:gap-4">
+        <div className="flex flex-col items-center gap-2 py-1 text-center md:grid md:grid-cols-[auto_1fr_auto] md:items-center md:gap-4 md:py-0 md:text-left">
           <h2 className={titlePillClass}>스티커 메모</h2>
-          <p className="text-center text-sm text-text-soft sm:px-2">
+          <p className="max-w-[18rem] text-sm leading-snug text-text-soft md:max-w-none md:px-2 md:text-center">
             <button
               type="button"
               className="inline font-semibold text-green-accent underline-offset-2 hover:underline focus-visible:outline focus-visible:ring-2 focus-visible:ring-green-accent/40"
@@ -134,14 +134,14 @@ export default function CalendarStickyNotesBoard({ notes, patchNotes }: Props) {
             </button>
             를 눌러 스티커를 추가해 보세요.
           </p>
-          <span className="hidden sm:block" aria-hidden />
+          <span className="hidden md:block" aria-hidden />
         </div>
       ) : null}
 
       {hasNotes ? (
         <div
           ref={canvasRef}
-          className="relative w-full touch-pan-y"
+          className="relative w-full max-w-full touch-pan-y overflow-x-auto overflow-y-visible"
           style={{ minHeight: boardHeight }}
         >
           {notes.map((n, index) => {
