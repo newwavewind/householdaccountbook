@@ -11,6 +11,8 @@ import {
   type CommunitySearchScope,
 } from '../community/boardConstants'
 import { useCommunityBoard } from '../community/useCommunityBoard'
+import { detectPostContentFlags } from '../lib/communityPostContentFlags'
+import { CommunityPostContentIcons } from '../components/community/CommunityPostContentIcons'
 
 function fmtListDate(iso: string) {
   const d = new Date(iso)
@@ -261,11 +263,12 @@ export default function CommunityListPage() {
                     <td className="max-w-0 px-2 py-2.5">
                       <Link
                         to={`/community/${p.id}`}
-                        className="block truncate font-medium text-text-primary hover:text-starbucks-green hover:underline"
+                        className="flex min-w-0 items-center font-medium text-text-primary hover:text-starbucks-green hover:underline"
                       >
-                        {p.title}
+                        <span className="truncate">{p.title}</span>
+                        <CommunityPostContentIcons {...detectPostContentFlags(p.body)} />
                         {p.commentCount > 0 ? (
-                          <span className="ml-1 text-xs font-semibold text-green-accent">
+                          <span className="ml-1 shrink-0 text-xs font-semibold text-green-accent">
                             [{p.commentCount}]
                           </span>
                         ) : null}
