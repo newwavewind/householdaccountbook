@@ -112,86 +112,71 @@ type YoutubeSearchItem = {
   thumbnailUrl: string
 }
 
-function parseVideoIdFromPipedUrl(url: string): string | null {
-  try {
-    const u = new URL(url, 'https://www.youtube.com')
-    const v = u.searchParams.get('v')
-    if (v && /^[a-zA-Z0-9_-]{11}$/.test(v)) return v
-  } catch {
-    /* ignore */
+function extractInnerTubeText(field: unknown): string {
+  if (!field || typeof field !== 'object') return ''
+  const f = field as { simpleText?: string; runs?: { text?: string }[] }
+  if (typeof f.simpleText === 'string') return f.simpleText
+  if (Array.isArray(f.runs)) return f.runs.map((r) => r.text ?? '').join('')
+  return ''
+}
+
+async function searchInnerTube(q: string): Promise<YoutubeSearchItem[]> {
+  const res = await fetch('https://www.youtube.com/youtubei/v1/search?prettyPrint=false', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    },
+    body: JSON.stringify({
+      context: {
+        client: {
+          hl: 'ko',
+          gl: 'KR',
+          clientName: 'WEB',
+          clientVersion: '2.20250218.01.00',
+        },
+      },
+      query: q,
+    }),
+  })
+  if (!res.ok) throw new Error(`InnerTube 검색 실패 (${res.status})`)
+  const data: unknown = await res.json()
+  const items: YoutubeSearchItem[] = []
+  const seen = new Set<string>()
+
+  const walk = (node: unknown): void => {
+    if (!node || typeof node !== 'object' || items.length >= 12) return
+    if (Array.isArray(node)) {
+      for (const x of node) walk(x)
+      return
+    }
+    const obj = node as Record<string, unknown>
+    const vr = obj.videoRenderer as Record<string, unknown> | undefined
+    if (vr && typeof vr.videoId === 'string' && !seen.has(vr.videoId)) {
+      seen.add(vr.videoId)
+      const thumbs = vr.thumbnail as { thumbnails?: { url?: string }[] } | undefined
+      items.push({
+        videoId: vr.videoId,
+        title: extractInnerTubeText(vr.title) || '(제목 없음)',
+        author:
+          extractInnerTubeText(vr.ownerText) ||
+          extractInnerTubeText(vr.longBylineText) ||
+          '',
+        thumbnailUrl:
+          thumbs?.thumbnails?.[0]?.url ??
+          `https://i.ytimg.com/vi/${vr.videoId}/mqdefault.jpg`,
+      })
+    }
+    for (const v of Object.values(obj)) walk(v)
   }
-  const m = url.match(/(?:v=|\/)([a-zA-Z0-9_-]{11})/)
-  return m ? m[1] : null
+  walk(data)
+  if (items.length === 0) throw new Error('검색 결과가 없습니다.')
+  return items
 }
 
 async function serverYoutubeSearch(q: string): Promise<YoutubeSearchItem[]> {
-  const pipedBases = [
-    'https://pipedapi.kavin.rocks',
-    'https://api.piped.projectsegfau.lt',
-  ]
-  for (const base of pipedBases) {
-    try {
-      const res = await fetch(`${base}/search?q=${encodeURIComponent(q)}&filter=videos`)
-      if (!res.ok) continue
-      const data = (await res.json()) as {
-        items?: Array<{
-          url?: string
-          title?: string
-          uploaderName?: string
-          thumbnail?: string
-          type?: string
-        }>
-      }
-      const items: YoutubeSearchItem[] = []
-      for (const i of data.items ?? []) {
-        if (i.type !== 'stream' || !i.url) continue
-        const videoId = parseVideoIdFromPipedUrl(i.url)
-        if (!videoId) continue
-        items.push({
-          videoId,
-          title: i.title ?? '(제목 없음)',
-          author: i.uploaderName ?? '',
-          thumbnailUrl: i.thumbnail ?? '',
-        })
-        if (items.length >= 12) break
-      }
-      if (items.length > 0) return items
-    } catch {
-      /* next */
-    }
-  }
-
-  const invidiousBases = ['https://yewtu.be', 'https://invidious.privacydev.net']
-  for (const base of invidiousBases) {
-    try {
-      const res = await fetch(
-        `${base}/api/v1/search?q=${encodeURIComponent(q)}&type=video`,
-      )
-      if (!res.ok) continue
-      const data = (await res.json()) as Array<{
-        type?: string
-        videoId?: string
-        title?: string
-        author?: string
-        authorId?: string
-        videoThumbnails?: { url?: string }[]
-      }>
-      if (!Array.isArray(data)) continue
-      const items = data
-        .filter((v) => v.type === 'video' && v.videoId)
-        .slice(0, 12)
-        .map((v) => ({
-          videoId: v.videoId!,
-          title: v.title ?? '(제목 없음)',
-          author: v.author ?? v.authorId ?? '',
-          thumbnailUrl: v.videoThumbnails?.[0]?.url ?? '',
-        }))
-      if (items.length > 0) return items
-    } catch {
-      /* next */
-    }
-  }
-  throw new Error('유튜브 검색에 실패했습니다.')
+  return searchInnerTube(q)
 }
 
 app.get('/api/youtube/search', async (req, res) => {

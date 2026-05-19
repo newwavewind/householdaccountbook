@@ -129,7 +129,7 @@ export function CommunityYoutubeDialog({ open, onClose, onInsert }: Props) {
               URL {'\uc0bd\uc785'}
             </Button>
           </div>
-          {error && phase !== 'loading' ? (
+          {error && phase !== 'loading' && phase === 'idle' ? (
             <p className="mt-2 rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>
           ) : null}
         </div>
@@ -177,7 +177,7 @@ export function CommunityYoutubeDialog({ open, onClose, onInsert }: Props) {
                     </div>
                   </li>
                 ))
-              ) : results.length === 0 ? (
+              ) : results.length === 0 && !error ? (
                 <li className="flex flex-col items-center justify-center py-12 text-center">
                   <span className="text-3xl" aria-hidden>
                     {'\ud83d\udd0d'}
@@ -185,7 +185,16 @@ export function CommunityYoutubeDialog({ open, onClose, onInsert }: Props) {
                   <p className="mt-2 text-sm text-text-soft">
                     {'\uac80\uc0c9 \uacb0\uacfc\uac00 \uc5c6\uc2b5\ub2c8\ub2e4.'}
                   </p>
-                  <p className="mt-1 text-xs text-text-soft">URL\uc744 \uc785\ub825\ud574 \ub4f1\ub85d\ud574 \ubcf4\uc138\uc694.</p>
+                  <p className="mt-1 text-xs text-text-soft">
+                    {'URL\uc744 \uc785\ub825\ud574 \ub4f1\ub85d\ud574 \ubcf4\uc138\uc694.'}
+                  </p>
+                </li>
+              ) : results.length === 0 && error ? (
+                <li className="flex flex-col items-center justify-center py-12 text-center">
+                  <span className="text-3xl" aria-hidden>
+                    {'\u26a0\ufe0f'}
+                  </span>
+                  <p className="mt-2 text-sm text-danger">{error}</p>
                 </li>
               ) : (
                 results.map((v) => (
