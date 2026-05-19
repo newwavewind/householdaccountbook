@@ -142,7 +142,7 @@ export default function CalendarStickyNotesBoard({ notes, patchNotes }: Props) {
         <div
           ref={canvasRef}
           className="relative w-full max-w-full touch-pan-y overflow-x-auto overflow-y-visible"
-          style={{ minHeight: boardHeight }}
+          style={{ height: boardHeight, minHeight: 0 }}
         >
           {notes.map((n, index) => {
             const expanded = expandedIds.has(n.id)

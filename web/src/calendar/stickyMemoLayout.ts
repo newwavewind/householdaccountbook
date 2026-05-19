@@ -50,13 +50,14 @@ export function computeStickyBoardHeight(
   notes: CalendarStickyNote[],
   expandedIds: Set<string>,
 ): number {
-  let maxBottom = 200
+  if (notes.length === 0) return 0
+  let maxBottom = 0
   notes.forEach((note, index) => {
     const { yPx } = resolveStickyNotePosition(note, index)
     const { height } = stickyNoteFootprint(note, expandedIds.has(note.id))
-    maxBottom = Math.max(maxBottom, yPx + height + GAP)
+    maxBottom = Math.max(maxBottom, yPx + height)
   })
-  return maxBottom
+  return maxBottom + GAP
 }
 
 export function nextStickyNotePosition(
