@@ -33,7 +33,9 @@ import { CalendarEventRichField } from '../calendar/CalendarEventRichField'
 import type { StickyTint } from '../calendar/calendarStickyNotesStorage'
 import { STICKY_THEMES, stickyTintCalendarCellBg } from '../calendar/stickyNoteTheme'
 import {
+  extractFirstImageSrc,
   htmlToPlain,
+  htmlWithoutImages,
   sanitizeCalendarEventHtml,
 } from '../calendar/calendarHtmlSanitize'
 import type { DdayEvent } from '../dday/ddayTypes'
@@ -157,25 +159,40 @@ function mergeCalendarEventToUnifiedMemo(e: CalendarDayEvent): CalendarDayEvent 
   }
 }
 
+function calendarCellBackgroundImage(
+  memo: CalendarDayMemo | undefined,
+): string | null {
+  for (const e of getDayEvents(memo)) {
+    const merged = mergeCalendarEventToUnifiedMemo(e)
+    const src =
+      extractFirstImageSrc(merged.noteHtml) ??
+      extractFirstImageSrc(e.noteHtml) ??
+      extractFirstImageSrc(e.labelHtml)
+    if (src) return src
+  }
+  return null
+}
+
 function calendarCellPreviewContent(
   e: CalendarDayEvent,
 ):
-  | { kind: 'html'; html: string; ink: CalendarEventInkId | undefined }
   | { kind: 'plain'; text: string; ink: CalendarEventInkId | undefined }
   | null {
   const ink = resolveCalendarEventMemoInk(e)
   const noteSan =
     e.noteHtml?.trim() ? sanitizeCalendarEventHtml(e.noteHtml) : ''
-  if (noteSan && htmlToPlain(noteSan)) {
-    return { kind: 'html', html: noteSan, ink }
+  if (noteSan) {
+    const plain = htmlToPlain(htmlWithoutImages(noteSan))
+    if (plain) return { kind: 'plain', text: plain, ink }
   }
   const nt = e.note?.trim()
   if (nt) return { kind: 'plain', text: nt, ink }
 
   const labelSan =
     e.labelHtml?.trim() ? sanitizeCalendarEventHtml(e.labelHtml) : ''
-  if (labelSan && htmlToPlain(labelSan)) {
-    return { kind: 'html', html: labelSan, ink }
+  if (labelSan) {
+    const plain = htmlToPlain(htmlWithoutImages(labelSan))
+    if (plain) return { kind: 'plain', text: plain, ink }
   }
   const lt = e.label.trim()
   if (lt) return { kind: 'plain', text: lt, ink }
@@ -452,6 +469,8 @@ function CalendarDayPeekSheet({
   ledgerTxCount,
   ddaysThisDay,
   onClose,
+  onGoToMemoEdit,
+  onGoToLedger,
   onToggleEventImportant,
 }: {
   iso: string
@@ -459,6 +478,8 @@ function CalendarDayPeekSheet({
   ledgerTxCount: number
   ddaysThisDay: DdayEvent[]
   onClose: () => void
+  onGoToMemoEdit: () => void
+  onGoToLedger: () => void
   /** 모달에서 일정 중요 표시를 바로 저장할 때 */
   onToggleEventImportant?: (eventId: string, important: boolean) => void
 }) {
@@ -547,9 +568,19 @@ function CalendarDayPeekSheet({
 
         <div className="space-y-4 px-4 py-4 text-sm">
           <section aria-label="이 날 일정">
-            <p className="text-xs font-semibold uppercase tracking-wide text-text-soft">
-              일정
-            </p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-text-soft">
+                일정
+              </p>
+              <Button
+                type="button"
+                variant="outlined"
+                className="!min-h-0 shrink-0 !px-2.5 !py-1 !text-xs"
+                onClick={onGoToMemoEdit}
+              >
+                입력
+              </Button>
+            </div>
             {events.length > 0 ? (
               <ul className="mt-2 space-y-3">
                 {events.map((e) => {
@@ -615,12 +646,18 @@ function CalendarDayPeekSheet({
             <p className="text-xs font-semibold uppercase tracking-wide text-text-soft">
               장부
             </p>
-            <p className="mt-1 text-text-primary">
-              이 날 거래 <span className="font-semibold tabular-nums">{ledgerTxCount}</span>건
-            </p>
-            <p className="mt-3 text-xs text-text-soft">
-              아래에서 일정을 편집한 뒤 저장하면 반영돼요.
-            </p>
+            {ledgerTxCount > 0 ? (
+              <button
+                type="button"
+                className="mt-1 text-left text-text-primary underline-offset-2 transition-colors hover:text-starbucks-green hover:underline"
+                onClick={onGoToLedger}
+              >
+                이 날 거래{' '}
+                <span className="font-semibold tabular-nums">{ledgerTxCount}</span>건
+              </button>
+            ) : (
+              <p className="mt-1 text-text-soft">이 날 거래 없음</p>
+            )}
           </section>
         </div>
       </div>
@@ -866,8 +903,8 @@ export default function CalendarPage() {
       <div className="flex flex-col gap-6">
         <CalendarStickyNotesBoard notes={stickyNotes} patchNotes={patchStickyNotes} />
 
-        <Card className="min-w-0 p-3 md:p-5">
-          <div className="mb-4 flex flex-col gap-3 rounded-[var(--radius-card)] bg-ceramic/80 p-3 md:flex-row md:items-center md:justify-between md:p-4">
+        <Card className="min-w-0 p-1.5 md:p-2">
+          <div className="mb-2 flex flex-col gap-2 rounded-[var(--radius-card)] bg-ceramic/80 p-2 md:flex-row md:items-center md:justify-between md:p-3">
             <div className="flex flex-1 items-center justify-between gap-2 md:justify-start">
               <Button
                 variant="outlined"
@@ -901,7 +938,7 @@ export default function CalendarPage() {
             </Button>
           </div>
 
-          <div className="mb-2 grid grid-cols-7 gap-1 text-center text-sm font-medium text-text-soft md:text-base">
+          <div className="mb-1 grid grid-cols-7 gap-0.5 text-center text-sm font-medium text-text-soft md:gap-1 md:text-base">
             {WEEK.map((d, i) => (
               <div
                 key={d}
@@ -914,11 +951,14 @@ export default function CalendarPage() {
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-1">
+          <div className="grid grid-cols-7 gap-0.5 md:gap-1">
             {cells.map(({ iso, day, inMonth }, cellIdx) => {
               const hol = holidayLabel(iso)
               const memo = memos[iso]
               const hasMemo = memoHasContent(memo)
+              const cellBgImage = hasMemo
+                ? calendarCellBackgroundImage(memo)
+                : null
               const txCount = txCountByDate.get(iso) ?? 0
               const hasLedger = txCount > 0
               const isToday = iso === today
@@ -928,19 +968,26 @@ export default function CalendarPage() {
               const starImportant =
                   getDayEvents(memo).some((e) => e.important === true) && hasMemo
               const ddaysThisDay = eventsOnCalendarDay(iso, ddayEvents)
+              const cellTextShadow = cellBgImage
+                ? 'font-semibold drop-shadow-[0_0_4px_rgba(255,255,255,0.95)]'
+                : ''
 
               const inMonthBase = hasMemo
-                ? `border-border-subtle ${stickyTintCalendarCellBg(
-                    firstEventPaperTint(memo),
-                    true,
-                  )} hover:border-green-accent/45 hover:bg-green-light/30`
+                ? cellBgImage
+                  ? 'border-border-subtle bg-surface-raised/30 hover:border-green-accent/45'
+                  : `border-border-subtle ${stickyTintCalendarCellBg(
+                      firstEventPaperTint(memo),
+                      true,
+                    )} hover:border-green-accent/45 hover:bg-green-light/30`
                 : 'border-border-subtle bg-surface-raised hover:border-green-accent/45 hover:bg-green-light/35'
 
               const outMonthBase = hasMemo
-                ? `border-transparent ${stickyTintCalendarCellBg(
-                    firstEventPaperTint(memo),
-                    false,
-                  )} text-text-soft/60 hover:bg-neutral-cool/65`
+                ? cellBgImage
+                  ? 'border-transparent bg-surface-raised/25 text-text-soft/80 hover:bg-neutral-cool/40'
+                  : `border-transparent ${stickyTintCalendarCellBg(
+                      firstEventPaperTint(memo),
+                      false,
+                    )} text-text-soft/60 hover:bg-neutral-cool/65`
                 : 'border-transparent bg-neutral-cool/50 text-text-soft/60 hover:bg-neutral-cool'
 
               const selectedCellClass =
@@ -962,7 +1009,7 @@ export default function CalendarPage() {
                       : `${iso} 메모·일정`
                   }
                   className={[
-                    'relative flex min-h-[4.5rem] w-full cursor-pointer flex-col overflow-hidden rounded-lg border px-1 py-1.5 text-left transition-colors active:scale-[0.98] md:min-h-[6rem] md:px-1.5 md:py-2',
+                    'relative flex min-h-[5rem] w-full cursor-pointer flex-col overflow-hidden rounded-lg border px-1 py-1.5 text-left transition-colors active:scale-[0.98] md:min-h-[6.25rem] md:px-1.5 md:py-2',
                     inMonth ? inMonthBase : outMonthBase,
                     hol && inMonth ? 'ring-1 ring-inset ring-red-300/60' : '',
                     hasLedger && inMonth
@@ -976,6 +1023,21 @@ export default function CalendarPage() {
                     .filter(Boolean)
                     .join(' ')}
                 >
+                  {cellBgImage ? (
+                    <>
+                      <span
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0 z-0 rounded-[inherit] bg-cover bg-center"
+                        style={{
+                          backgroundImage: `url(${JSON.stringify(cellBgImage)})`,
+                        }}
+                      />
+                      <span
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0 z-0 rounded-[inherit] bg-gradient-to-b from-white/50 via-white/15 to-black/30"
+                      />
+                    </>
+                  ) : null}
                   {starImportant ? (
                     <span
                       aria-hidden
@@ -999,18 +1061,18 @@ export default function CalendarPage() {
                   </span>
 
                   <div className="relative z-[1] flex min-h-0 flex-1 flex-col gap-0.5">
-                    <div className="flex shrink-0 justify-end gap-0.5">
-                      {hasLedger ? (
-                        <span
-                          className="rounded bg-green-accent/15 px-1 text-[0.625rem] font-semibold tabular-nums text-green-accent md:text-[0.6875rem]"
-                          title="이 날 장부 거래 수"
-                        >
-                          {txCount}
-                        </span>
-                      ) : null}
-                    </div>
+                    {hasLedger ? (
+                      <span
+                        className="pointer-events-none absolute right-0 top-0 z-[2] rounded bg-green-accent/15 px-1 text-[0.625rem] font-semibold tabular-nums text-green-accent md:text-[0.6875rem]"
+                        title="이 날 장부 거래 수"
+                      >
+                        {txCount}
+                      </span>
+                    ) : null}
                     {hol && inMonth ? (
-                      <span className="line-clamp-2 text-left text-[0.62rem] font-medium leading-tight text-red-500 md:text-[0.68rem]">
+                      <span
+                        className={`line-clamp-2 text-left text-[0.62rem] font-medium leading-tight text-red-500 md:text-[0.68rem] ${cellTextShadow}`}
+                      >
                         {hol}
                       </span>
                     ) : null}
@@ -1022,24 +1084,16 @@ export default function CalendarPage() {
                           return (
                             <li
                               key={e.id}
-                              className={`max-w-full pl-0.5 [&_mark]:rounded-[3px] ${calendarEventInkTextClass(
+                              className={`max-w-full pl-0.5 ${cellTextShadow} ${calendarEventInkTextClass(
                                 preview.ink,
                               )}`}
                             >
-                              {preview.kind === 'html' ? (
-                                <span
-                                  className="inline-block max-w-full [&_mark]:rounded-[3px] [&_p]:m-0 [&_p]:inline"
-                                  title={htmlToPlain(preview.html)}
-                                  // eslint-disable-next-line react/no-danger
-                                  dangerouslySetInnerHTML={{
-                                    __html: preview.html,
-                                  }}
-                                />
-                              ) : (
-                                <span className="line-clamp-1 truncate">
-                                  {preview.text}
-                                </span>
-                              )}
+                              <span
+                                className="line-clamp-1 truncate"
+                                title={preview.text}
+                              >
+                                {preview.text}
+                              </span>
                             </li>
                           )
                         })}
@@ -1047,7 +1101,7 @@ export default function CalendarPage() {
                     ) : null}
                     {ddaysThisDay.length > 0 ? (
                       <span
-                        className="line-clamp-2 text-left text-[0.58rem] font-semibold leading-tight text-gold md:text-[0.62rem]"
+                        className={`line-clamp-2 text-left text-[0.58rem] font-semibold leading-tight text-gold md:text-[0.62rem] ${cellTextShadow}`}
                         title={ddaysThisDay.map((e) => e.title).join(', ')}
                       >
                         {ddaysThisDay.length === 1
@@ -1080,6 +1134,22 @@ export default function CalendarPage() {
               ledgerTxCount={txCountByDate.get(peekIso) ?? 0}
               ddaysThisDay={eventsOnCalendarDay(peekIso, ddayEvents)}
               onClose={() => setPeekIso(null)}
+              onGoToMemoEdit={() => {
+                const iso = peekIso
+                setPeekIso(null)
+                if (!iso) return
+                const [y, mo] = iso.split('-').map(Number)
+                setCursorY(y)
+                setCursorM(mo - 1)
+                setSelectedIso(iso)
+                scrollDetailIntoView()
+              }}
+              onGoToLedger={() => {
+                const iso = peekIso
+                setPeekIso(null)
+                if (!iso) return
+                nav(`/?ledgerDay=${encodeURIComponent(iso)}`)
+              }}
               onToggleEventImportant={patchPeekDayEventImportant}
             />,
             document.body,

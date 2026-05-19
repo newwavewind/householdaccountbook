@@ -66,3 +66,18 @@ export function htmlToPlain(html: string | undefined): string {
   }
   return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
 }
+
+/** 달력 칸 배경용 — 첫 번째 img src (http(s) 또는 data:image만) */
+export function extractFirstImageSrc(html: string | undefined): string | null {
+  if (!html?.trim()) return null
+  const m = /<img\b[^>]*\bsrc=["']([^"']+)["']/i.exec(html)
+  const src = m?.[1]?.trim()
+  if (!src) return null
+  if (!/^https?:\/\//i.test(src) && !/^data:image\//i.test(src)) return null
+  return src
+}
+
+/** 미리보기·오버레이 텍스트용 — img 태그 제거 */
+export function htmlWithoutImages(html: string): string {
+  return html.replace(/<img\b[^>]*>/gi, '').trim()
+}

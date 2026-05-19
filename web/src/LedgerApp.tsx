@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Link, NavLink } from 'react-router-dom'
+import { Link, NavLink, useSearchParams } from 'react-router-dom'
 import { Button } from './components/ui/Button'
 import { Card } from './components/ui/Card'
 import { Fab } from './components/ui/Fab'
@@ -205,6 +205,7 @@ export default function LedgerApp() {
     clientX: number
     clientY: number
   } | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
   const [dayModalIso, setDayModalIso] = useState<string | null>(null)
   const [expensePayFilter, setExpensePayFilter] =
     useState<ExpensePayFilter>('all')
@@ -465,6 +466,29 @@ export default function LedgerApp() {
     setSelectedIso(iso)
     setDayModalIso(iso)
   }, [])
+
+  useEffect(() => {
+    const raw = searchParams.get('ledgerDay')
+    if (!raw) return
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      setSearchParams({}, { replace: true })
+      return
+    }
+    const [y, mo, dd] = raw.split('-').map(Number)
+    const dt = new Date(y, mo - 1, dd)
+    if (
+      dt.getFullYear() !== y ||
+      dt.getMonth() !== mo - 1 ||
+      dt.getDate() !== dd
+    ) {
+      setSearchParams({}, { replace: true })
+      return
+    }
+    setCursor({ y, m: mo - 1 })
+    setSelectedIso(raw)
+    setDayModalIso(raw)
+    setSearchParams({}, { replace: true })
+  }, [searchParams, setSearchParams])
 
   function goPrevMonth() {
     setCursor(({ y, m }) => {
