@@ -2,7 +2,7 @@ import DOMPurify from 'dompurify'
 
 const SANITIZE_OPTS = {
   ALLOWED_TAGS: [
-    'p', 'br', 'strong', 'em', 's', 'strike', 'code', 'pre',
+    'p', 'br', 'strong', 'em', 's', 'strike', 'code', 'pre', 'span',
     'h1', 'h2', 'h3', 'ul', 'ol', 'li', 'blockquote', 'a',
     'img', 'video', 'source',
   ],
