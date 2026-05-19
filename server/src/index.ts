@@ -69,6 +69,7 @@ function serializePost(p: {
   title: string
   body: string
   hidden: boolean
+  isNotice: boolean
   createdAt: Date
   updatedAt: Date
 }) {
@@ -79,8 +80,14 @@ function serializePost(p: {
     title: p.title,
     body: p.body,
     hidden: p.hidden,
+    isNotice: p.isNotice,
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
+    likeCount: 0,
+    dislikeCount: 0,
+    commentCount: 0,
+    viewCount: 0,
+    todayViewCount: 0,
   }
 }
 
@@ -187,14 +194,64 @@ app.get('/api/me', async (req, res) => {
   })
 })
 
+const CONCEPT_LIKE_THRESHOLD = 5
+
+function postMatchesSearch(
+  p: { title: string; body: string },
+  search: string,
+  scope: string,
+): boolean {
+  const q = search.trim().toLowerCase()
+  if (!q) return true
+  const plain = p.body.replace(/<[^>]+>/g, ' ')
+  const inTitle = p.title.toLowerCase().includes(q)
+  const inBody = plain.toLowerCase().includes(q)
+  if (scope === 'title') return inTitle
+  if (scope === 'content') return inBody
+  return inTitle || inBody
+}
+
 // ── Posts
 app.get('/api/posts', async (req, res) => {
   const auth = authOptional(req)
+  const includeHidden = req.query.includeHidden === '1'
+  const tab = String(req.query.tab ?? 'all')
+  const search = String(req.query.search ?? '')
+  const searchScope = String(req.query.searchScope ?? 'both')
+  const page = Math.max(1, Number(req.query.page) || 1)
+  const pageSizeRaw = Number(req.query.pageSize)
+  const pageSize =
+    pageSizeRaw === 10 || pageSizeRaw === 30 || pageSizeRaw === 50 || pageSizeRaw === 100
+      ? pageSizeRaw
+      : 30
+  const paged = req.query.page != null || req.query.pageSize != null || req.query.tab != null || search
+
   const list = await prisma.post.findMany({
-    orderBy: { createdAt: 'desc' },
+    orderBy: [{ isNotice: 'desc' }, { createdAt: 'desc' }],
   })
-  const out = list.filter((p) => canSeePost(p, auth)).map(serializePost)
-  res.json(out)
+  let visible = list.filter((p) => includeHidden || canSeePost(p, auth))
+
+  if (tab === 'notice') visible = visible.filter((p) => p.isNotice)
+  else if (tab === 'concept') {
+    // Prisma 백엔드에는 추천 수 컬럼이 없어 개념글 탭은 비어 있습니다.
+    visible = []
+  }
+
+  if (search) visible = visible.filter((p) => postMatchesSearch(p, search, searchScope))
+
+  const total = visible.length
+  let slice = visible
+  if (paged) {
+    const start = (page - 1) * pageSize
+    slice = visible.slice(start, start + pageSize)
+  }
+
+  const items = slice.map((p, index) => ({
+    ...serializePost(p),
+    listNumber: paged ? total - (page - 1) * pageSize - index : undefined,
+  }))
+
+  res.json({ items, total })
 })
 
 app.get('/api/posts/:id', async (req, res) => {
@@ -284,6 +341,25 @@ app.patch('/api/posts/:id/hidden', async (req, res) => {
   await prisma.post.update({
     where: { id: req.params.id },
     data: { hidden },
+  })
+  res.status(204).send()
+})
+
+app.patch('/api/posts/:id/notice', async (req, res) => {
+  const auth = authRequired(req, res)
+  if (!auth) return
+  if (auth.role !== 'admin') {
+    return res.status(403).json({ error: '관리자만 공지 설정할 수 있습니다.' })
+  }
+  const isNotice = req.body?.isNotice
+  if (typeof isNotice !== 'boolean') {
+    return res.status(400).json({ error: 'isNotice(boolean)이 필요합니다.' })
+  }
+  const existing = await prisma.post.findUnique({ where: { id: req.params.id } })
+  if (!existing) return res.status(404).json({ error: '글을 찾을 수 없습니다.' })
+  await prisma.post.update({
+    where: { id: req.params.id },
+    data: { isNotice },
   })
   res.status(204).send()
 })

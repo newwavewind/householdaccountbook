@@ -9,6 +9,7 @@ import {
   sanitizeCommunityPostHtml,
 } from '../lib/communityPostHtml'
 import type { CommunityComment } from '../community/types'
+import { sharePageUrl } from '../lib/sharePageUrl'
 
 /** 이미지 라이트박스: 클릭된 src를 전달하면 전체화면 오버레이로 표시 */
 function ImageLightbox({ src, onClose }: { src: string; onClose: () => void }) {
@@ -108,10 +109,12 @@ export default function CommunityPostDetailPage() {
   const [commentBusy, setCommentBusy] = useState(false)
   const commentInputRef = useRef<HTMLTextAreaElement>(null)
 
-  // 좋아요 상태
+  // 추천·비추천
   const [liked, setLiked] = useState(false)
+  const [disliked, setDisliked] = useState(false)
   const [likeCount, setLikeCount] = useState(0)
-  const [likeBusy, setLikeBusy] = useState(false)
+  const [dislikeCount, setDislikeCount] = useState(0)
+  const [voteBusy, setVoteBusy] = useState(false)
   // 라이트박스
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const postBodyRef = useRef<HTMLDivElement>(null)
@@ -125,9 +128,14 @@ export default function CommunityPostDetailPage() {
   useEffect(() => {
     if (!post) return
     setLikeCount(post.likeCount)
+    setDislikeCount(post.dislikeCount ?? 0)
     void repo.listComments(post.id).then(setComments).catch(() => {})
     if (auth.user) {
       void repo.isLiked(post.id, auth.user.id).then(setLiked).catch(() => {})
+      void repo.isDisliked(post.id, auth.user.id).then(setDisliked).catch(() => {})
+    } else {
+      setLiked(false)
+      setDisliked(false)
     }
   }, [post, repo, auth.user])
 
@@ -160,42 +168,49 @@ export default function CommunityPostDetailPage() {
     }
   }
 
-  const handleToggleLike = async () => {
-    if (!auth.user || !post || likeBusy) return
-    setLikeBusy(true)
+  const refreshVoteCounts = async (postId: string) => {
     try {
-      const { liked: newLiked } = await repo.toggleLike(post.id, auth.user.id)
-      setLiked(newLiked)
-      setLikeCount((prev) => newLiked ? prev + 1 : Math.max(prev - 1, 0))
+      const counts = await repo.getVoteCounts(postId)
+      setLikeCount(counts.likeCount)
+      setDislikeCount(counts.dislikeCount)
     } catch {
       // ignore
-    } finally {
-      setLikeBusy(false)
     }
   }
 
-  const handleShare = async () => {
-    const url = window.location.href
-    const title = post?.title ?? '가계부 커뮤니티 글'
-    if (navigator.share) {
-      try {
-        await navigator.share({ title, url })
-        return
-      } catch {
-        // fall through to clipboard
-      }
-    }
+  const handleToggleLike = async () => {
+    if (!auth.user || !post || voteBusy) return
+    setVoteBusy(true)
     try {
-      await navigator.clipboard.writeText(url)
-      alert('링크를 복사했어요!')
-    } catch {
-      alert('공유할 수 없습니다.')
+      const result = await repo.toggleLike(post.id, auth.user.id)
+      setLiked(result.liked)
+      setDisliked(result.disliked)
+      await refreshVoteCounts(post.id)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '추천 처리에 실패했습니다.')
+    } finally {
+      setVoteBusy(false)
     }
   }
 
-  const handleKakaoShare = () => {
-    const url = `https://story.kakao.com/share?url=${encodeURIComponent(window.location.href)}`
-    window.open(url, '_blank', 'width=500,height=400')
+  const handleToggleDislike = async () => {
+    if (!auth.user || !post || voteBusy) return
+    setVoteBusy(true)
+    try {
+      const result = await repo.toggleDislike(post.id, auth.user.id)
+      setLiked(result.liked)
+      setDisliked(result.disliked)
+      await refreshVoteCounts(post.id)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '비추천 처리에 실패했습니다.')
+    } finally {
+      setVoteBusy(false)
+    }
+  }
+
+  const handleShare = () => {
+    if (!post) return
+    void sharePageUrl(window.location.href, post.title)
   }
 
   return (
@@ -225,9 +240,6 @@ export default function CommunityPostDetailPage() {
               {/* 공유 버튼 */}
               <Button type="button" variant="outlined" className="!text-xs !px-3 !py-1" onClick={handleShare}>
                 🔗 공유
-              </Button>
-              <Button type="button" variant="outlined" className="!text-xs !px-3 !py-1 text-yellow-600 border-yellow-400" onClick={handleKakaoShare}>
-                카카오
               </Button>
               {canEdit ? (
                 <>
@@ -285,24 +297,37 @@ export default function CommunityPostDetailPage() {
                 </div>
               )}
 
-              {/* 좋아요 버튼 */}
-              <div className="mt-6 flex items-center gap-3 border-t border-border-muted pt-4">
+              {/* 추천 · 비추천 */}
+              <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-border-muted pt-4">
                 <button
                   type="button"
-                  onClick={handleToggleLike}
-                  disabled={!auth.user || likeBusy}
-                  className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                  onClick={() => void handleToggleLike()}
+                  disabled={!auth.user || voteBusy}
+                  className={`inline-flex min-w-[5.5rem] items-center justify-center gap-1.5 rounded border px-4 py-2 text-sm font-bold transition-colors ${
                     liked
-                      ? 'bg-rose-100 text-rose-600'
-                      : 'bg-gray-100 text-gray-500 hover:bg-rose-50 hover:text-rose-500'
+                      ? 'border-green-accent bg-green-accent text-on-accent'
+                      : 'border-border-subtle bg-surface-raised text-text-secondary hover:border-green-accent/50 hover:bg-green-light/30'
                   } disabled:opacity-40`}
                 >
-                  <span>{liked ? '❤️' : '🤍'}</span>
-                  <span>{likeCount}</span>
+                  <span>추천</span>
+                  <span className="tabular-nums">{likeCount}</span>
                 </button>
-                {!auth.user && (
-                  <span className="text-xs text-text-soft">로그인하면 좋아요를 누를 수 있어요.</span>
-                )}
+                <button
+                  type="button"
+                  onClick={() => void handleToggleDislike()}
+                  disabled={!auth.user || voteBusy}
+                  className={`inline-flex min-w-[5.5rem] items-center justify-center gap-1.5 rounded border px-4 py-2 text-sm font-bold transition-colors ${
+                    disliked
+                      ? 'border-rose-500 bg-rose-500 text-white'
+                      : 'border-border-subtle bg-surface-raised text-text-secondary hover:border-rose-400/50 hover:bg-rose-50'
+                  } disabled:opacity-40`}
+                >
+                  <span>비추천</span>
+                  <span className="tabular-nums">{dislikeCount}</span>
+                </button>
+                {!auth.user ? (
+                  <span className="text-xs text-text-soft">로그인하면 추천·비추천을 할 수 있어요.</span>
+                ) : null}
               </div>
             </div>
           </Card>

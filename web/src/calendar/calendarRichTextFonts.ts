@@ -7,6 +7,16 @@ export const CALENDAR_RICH_FONTS = [
     label: '복숭아',
     value: '"복숭아", "HGPeach", "Gamja Flower", "Apple SD Gothic Neo", cursive',
   },
+  {
+    label: '오이체',
+    value:
+      '"오이", "HGCucumber", "HGCUCMBR", "EF_cucumbersalad", "Gamja Flower", "Apple SD Gothic Neo", cursive',
+  },
+  {
+    label: '가지체',
+    value:
+      '"가지", "HGEggplant", "HGEGPLNT", "Hi Melody", "Gamja Flower", "Apple SD Gothic Neo", cursive',
+  },
   { label: '궁서', value: '"Gungsuh", "궁서", Batang, "Apple SD Gothic Neo", serif' },
 ] as const
 

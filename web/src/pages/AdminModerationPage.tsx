@@ -81,6 +81,19 @@ export default function AdminModerationPage() {
                     <Button
                       type="button"
                       variant="darkOutlined"
+                      className="!text-xs !py-1 !px-2"
+                      onClick={() =>
+                        void (async () => {
+                          await repo.setNotice(p.id, !p.isNotice)
+                          await refresh()
+                        })()
+                      }
+                    >
+                      {p.isNotice ? '공지 해제' : '공지'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="darkOutlined"
                       className="!border-danger/35 !text-xs !py-1 !px-2 text-danger"
                       onClick={() => {
                         if (!window.confirm('이 글을 삭제합니다. 계속할까요?')) return

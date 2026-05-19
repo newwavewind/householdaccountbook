@@ -5,6 +5,16 @@
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
 /* 달력 메모 «복숭아» 옵션: 한컴 글꼴 미설치 시에도 손글씨 느낌 폴백 */
 @import url('https://fonts.googleapis.com/css2?family=Gamja+Flower&display=swap');
+/* «오이체»·«가지체»: 한컴 미설치 시 웹폰트 폴백 */
+@import url('https://fonts.googleapis.com/css2?family=Hi+Melody&display=swap');
+
+@font-face {
+  font-family: 'EF_cucumbersalad';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2210-EF@1.0/EF_cucumbersalad.woff2')
+    format('woff2');
+  font-weight: normal;
+  font-display: swap;
+}
 @import "tailwindcss";
 
 /* Brainfish — html.theme2; PostHog — html.theme3 */

@@ -29,6 +29,11 @@ import type { CalendarEventInkId } from './calendarEventInk'
 import type { StickyTint } from './calendarStickyNotesStorage'
 import { STICKY_THEMES } from './stickyNoteTheme'
 import { uploadCalendarImage } from './uploadCalendarImage'
+import { useMemoDefaults } from '../memo/MemoDefaultsContext'
+import {
+  applyMemoTypingDefaults,
+  isMemoEditorEmpty,
+} from '../memo/applyMemoTypingDefaults'
 
 function deriveContent(html: string | undefined, plain: string): string {
   const h = html?.trim()
@@ -109,8 +114,10 @@ export function CalendarEventRichField({
   const sanitize =
     sanitizeHtml ?? (variant === 'sticky' ? sanitizeStickyNoteHtml : sanitizeCalendarEventHtml)
 
-  const [fontSel, setFontSel] = useState('')
-  const [fontSizeSel, setFontSizeSel] = useState('')
+  const { defaults: memoDefaults } = useMemoDefaults()
+
+  const [fontSel, setFontSel] = useState(() => memoDefaults.fontFamily)
+  const [fontSizeSel, setFontSizeSel] = useState(() => memoDefaults.fontSize)
   const [highlightOpen, setHighlightOpen] = useState(false)
   const [imageUploading, setImageUploading] = useState(false)
   const [, setToolbarTick] = useState(0)
@@ -143,6 +150,20 @@ export function CalendarEventRichField({
       Placeholder.configure({ placeholder }),
     ],
     content: deriveContent(html, plain),
+    onCreate: ({ editor: ed }) => {
+      if (isMemoEditorEmpty(ed)) {
+        applyMemoTypingDefaults(ed, memoDefaults)
+        setFontSel(memoDefaults.fontFamily)
+        setFontSizeSel(memoDefaults.fontSize)
+      }
+    },
+    onFocus: ({ editor: ed }) => {
+      if (isMemoEditorEmpty(ed)) {
+        applyMemoTypingDefaults(ed, memoDefaults)
+        setFontSel(memoDefaults.fontFamily)
+        setFontSizeSel(memoDefaults.fontSize)
+      }
+    },
     editorProps: {
       attributes: {
         'aria-label': ariaLabel,
@@ -186,6 +207,15 @@ export function CalendarEventRichField({
     setFontSel((style.fontFamily as string) ?? '')
     setFontSizeSel((style.fontSize as string) ?? '')
   }, [editor, html, plain])
+
+  useEffect(() => {
+    if (!editor) return
+    setFontSel(memoDefaults.fontFamily)
+    setFontSizeSel(memoDefaults.fontSize)
+    if (isMemoEditorEmpty(editor)) {
+      applyMemoTypingDefaults(editor, memoDefaults)
+    }
+  }, [editor, memoDefaults.fontFamily, memoDefaults.fontSize])
 
   if (!editor) return null
 

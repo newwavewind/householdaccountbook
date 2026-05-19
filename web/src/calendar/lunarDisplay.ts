@@ -21,6 +21,35 @@ function holidaySuggestsLunarEmphasis(hol: string | undefined): boolean {
   return /설날|설\s|추석|구정/.test(hol)
 }
 
+/** 칸 중앙용 — 음력 1일은 "6.1", 그 외는 일만 */
+export function lunarCenterDayText(label: string, emphasize: boolean): string {
+  const dot = label.indexOf('.')
+  if (dot < 0) return label
+  if (emphasize) return label
+  return label.slice(dot + 1)
+}
+
+/** 양력 한 달에 걸친 음력 월 범위 (헤더 부제) */
+export function lunarMonthRangeLabel(year: number, monthIndex: number): string {
+  const start = new Date(year, monthIndex, 1)
+  const end = new Date(year, monthIndex + 1, 0)
+  const labels = new Set<string>()
+  const d = new Date(start)
+  while (d <= end) {
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const info = lunarCellInfo(iso)
+    if (info) {
+      const m = info.label.split('.')[0] ?? info.label
+      labels.add(m.startsWith('윤') ? m : `${m}월`)
+    }
+    d.setDate(d.getDate() + 1)
+  }
+  const list = [...labels]
+  if (list.length === 0) return ''
+  if (list.length === 1) return `음력 ${list[0]}`
+  return `음력 ${list[0]}~${list[list.length - 1]}`
+}
+
 /** 양력 yyyy-mm-dd → 셀용 음력 소표기 */
 export function lunarCellInfo(iso: string, holidayName?: string): LunarCellInfo | null {
   const parts = parseIsoParts(iso)

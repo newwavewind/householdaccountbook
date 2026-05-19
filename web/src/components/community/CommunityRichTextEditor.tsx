@@ -132,18 +132,6 @@ export function CommunityRichTextEditor({
     )
   }
 
-  const setLink = () => {
-    const prev = editor.getAttributes('link').href as string | undefined
-    const next = window.prompt('링크 URL', prev ?? 'https://')
-    if (next === null) return
-    const t = next.trim()
-    if (t === '') {
-      editor.chain().focus().extendMarkRange('link').unsetLink().run()
-      return
-    }
-    editor.chain().focus().extendMarkRange('link').setLink({ href: t }).run()
-  }
-
   return (
     <div
       className="mt-1 flex min-h-[14rem] flex-col overflow-hidden rounded-[var(--radius-card)] border border-input-border text-text-primary focus-within:border-green-accent"
@@ -165,22 +153,6 @@ export function CommunityRichTextEditor({
         <Button type="button" variant="outlined" className="!px-2 !py-0.5 !text-xs" disabled={disabled}
           onClick={() => editor.chain().focus().toggleStrike().run()} data-active={editor.isActive('strike')}>
           취소선
-        </Button>
-        <Button type="button" variant="outlined" className="!px-2 !py-0.5 !text-xs" disabled={disabled}
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} data-active={editor.isActive('heading', { level: 2 })}>
-          제목
-        </Button>
-        <Button type="button" variant="outlined" className="!px-2 !py-0.5 !text-xs" disabled={disabled}
-          onClick={() => editor.chain().focus().toggleBulletList().run()} data-active={editor.isActive('bulletList')}>
-          목록
-        </Button>
-        <Button type="button" variant="outlined" className="!px-2 !py-0.5 !text-xs" disabled={disabled}
-          onClick={() => editor.chain().focus().toggleOrderedList().run()} data-active={editor.isActive('orderedList')}>
-          번호
-        </Button>
-        <Button type="button" variant="outlined" className="!px-2 !py-0.5 !text-xs" disabled={disabled}
-          onClick={setLink} data-active={editor.isActive('link')}>
-          링크
         </Button>
         {/* 미디어 업로드 버튼 */}
         <Button

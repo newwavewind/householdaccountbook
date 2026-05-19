@@ -7,12 +7,16 @@ export type CommunityPost = {
   title: string
   body: string
   hidden: boolean
+  isNotice?: boolean
   createdAt: string
   updatedAt: string
   likeCount: number
+  dislikeCount: number
   commentCount: number
   viewCount: number
   todayViewCount: number
+  /** 목록 API에서만 채워지는 표시용 글번호 */
+  listNumber?: number
 }
 
 export type CommunityComment = {

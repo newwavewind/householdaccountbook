@@ -22,8 +22,8 @@ export function useCommunityPosts(includeHidden: boolean) {
     setBusy(true)
     setError(null)
     try {
-      const list = await repo.listPosts({ includeHidden })
-      setPosts(list)
+      const { items } = await repo.listPosts({ includeHidden })
+      setPosts(items)
     } catch (e) {
       setError(e instanceof Error ? e.message : '목록을 불러오지 못했습니다.')
       setPosts([])

@@ -35,6 +35,7 @@ model Post {
   title             String
   body              String   @default("")
   hidden            Boolean  @default(false)
+  isNotice          Boolean  @default(false) @map("is_notice")
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
   author            Profile  @relation(fields: [authorId], references: [id], onDelete: Cascade)

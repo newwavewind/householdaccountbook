@@ -11,7 +11,15 @@ import {
   type CalendarDayEvent,
   type CalendarDayMemo,
 } from '../calendar/calendarMemoStorage'
-import { lunarCellInfo } from '../calendar/lunarDisplay'
+import {
+  lunarCellInfo,
+  lunarCenterDayText,
+  lunarMonthRangeLabel,
+} from '../calendar/lunarDisplay'
+import {
+  loadCalendarLunarView,
+  saveCalendarLunarView,
+} from '../calendar/calendarLunarViewStorage'
 import CalendarStickyNotesBoard from '../calendar/CalendarStickyNotesBoard'
 import { useHouseholdCalendarMemos } from '../calendar/useHouseholdCalendarMemos'
 import { useHouseholdCalendarStickers } from '../calendar/useHouseholdCalendarStickers'
@@ -676,6 +684,7 @@ export default function CalendarPage() {
   const [cursorM, setCursorM] = useState(now.getMonth())
   const [selectedIso, setSelectedIso] = useState<string>(() => todayIso())
   const [peekIso, setPeekIso] = useState<string | null>(null)
+  const [lunarView, setLunarView] = useState(() => loadCalendarLunarView())
 
   const { transactions, userId, householdId } = useLedger()
   const { memos, patchMemos, cloudStatus, cloudMessage } =
@@ -715,7 +724,20 @@ export default function CalendarPage() {
     [cursorY, cursorM],
   )
 
+  const lunarMonthSubtitle = useMemo(
+    () => (lunarView ? lunarMonthRangeLabel(cursorY, cursorM) : ''),
+    [lunarView, cursorY, cursorM],
+  )
+
   const today = todayIso()
+
+  const toggleLunarView = useCallback(() => {
+    setLunarView((prev) => {
+      const next = !prev
+      saveCalendarLunarView(next)
+      return next
+    })
+  }, [])
 
   useEffect(() => {
     if (!peekIso) return
@@ -882,7 +904,7 @@ export default function CalendarPage() {
 
         <Card className="min-w-0 p-1.5 md:p-2">
           <div className="mb-2 flex flex-col gap-2 rounded-[var(--radius-card)] bg-ceramic/80 p-2 md:flex-row md:items-center md:justify-between md:p-3">
-            <div className="flex flex-1 items-center justify-between gap-2 md:justify-start">
+            <div className="flex flex-1 flex-wrap items-center justify-between gap-x-2 gap-y-2 md:justify-start">
               <Button
                 variant="outlined"
                 className="!min-h-11 min-w-11 !px-3"
@@ -892,9 +914,25 @@ export default function CalendarPage() {
               >
                 ‹
               </Button>
-              <p className="min-w-[10rem] flex-1 text-center text-base font-semibold text-text-primary md:text-lg">
-                {formatMonthLabel(cursorY, cursorM)}
-              </p>
+              <div className="flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1">
+                <p className="w-full text-center text-base font-semibold text-text-primary md:text-lg">
+                  {formatMonthLabel(cursorY, cursorM)}
+                </p>
+                {lunarMonthSubtitle ? (
+                  <p className="text-center text-xs font-medium text-starbucks-green">
+                    {lunarMonthSubtitle}
+                  </p>
+                ) : null}
+              </div>
+              <label className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-border-subtle bg-surface-raised px-2.5 py-1.5 text-xs font-semibold text-text-secondary transition-colors hover:border-green-accent/40 hover:bg-green-light/30 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-green-accent/50">
+                <input
+                  type="checkbox"
+                  checked={lunarView}
+                  onChange={toggleLunarView}
+                  className="size-3.5 rounded border-black/25 text-green-accent"
+                />
+                음력
+              </label>
               <Button
                 variant="outlined"
                 className="!min-h-11 min-w-11 !px-3"
@@ -931,6 +969,8 @@ export default function CalendarPage() {
           <div className="grid grid-cols-7 gap-0.5 md:gap-1">
             {cells.map(({ iso, day, inMonth }, cellIdx) => {
               const dayLabels = getCalendarDayLabels(iso)
+              const holText = holidayLabel(iso)
+              const lunar = lunarCellInfo(iso, holText)
               const memo = memos[iso]
               const hasMemo = memoHasContent(memo)
               const cellBgImage = hasMemo
@@ -976,6 +1016,21 @@ export default function CalendarPage() {
                     ? 'bg-green-light/50'
                     : ''
 
+              const centerDayText =
+                lunarView && lunar
+                  ? lunarCenterDayText(lunar.label, lunar.emphasize)
+                  : String(day)
+              const centerDayClass =
+                lunarView && lunar
+                  ? lunar.emphasize
+                    ? 'text-starbucks-green/[0.22] md:text-[2.4rem]'
+                    : 'text-text-primary/[0.14] md:text-[2.8rem]'
+                  : inMonth && isRedDay
+                    ? 'text-red-500/[0.11]'
+                    : inMonth
+                      ? 'text-text-primary/[0.08]'
+                      : 'text-text-soft/[0.14]'
+
               return (
                 <button
                   key={iso}
@@ -984,8 +1039,12 @@ export default function CalendarPage() {
                   aria-pressed={isSel}
                   aria-label={
                     starImportant
-                      ? `${iso} 메모·일정, 중요 일정 있음`
-                      : `${iso} 메모·일정`
+                      ? lunarView && lunar
+                        ? `${iso} 양력 ${day}일, 음력 ${lunar.label}, 중요 일정 있음`
+                        : `${iso} 메모·일정, 중요 일정 있음`
+                      : lunarView && lunar
+                        ? `${iso} 양력 ${day}일, 음력 ${lunar.label}`
+                        : `${iso} 메모·일정`
                   }
                   className={[
                     'relative flex min-h-[5rem] w-full cursor-pointer flex-col overflow-hidden rounded-lg border px-1 py-1.5 text-left transition-colors active:scale-[0.98] md:min-h-[6.25rem] md:px-1.5 md:py-2',
@@ -998,6 +1057,9 @@ export default function CalendarPage() {
                       : '',
                     isToday
                       ? 'outline outline-2 outline-offset-[-2px] outline-green-accent/70'
+                      : '',
+                    lunarView && lunar?.emphasize && inMonth
+                      ? 'ring-1 ring-inset ring-starbucks-green/35'
                       : '',
                     selectedCellClass,
                   ]
@@ -1027,18 +1089,22 @@ export default function CalendarPage() {
                       ★
                     </span>
                   ) : null}
+                  {lunarView ? (
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute left-1 top-0.5 z-[2] select-none text-[0.625rem] font-semibold tabular-nums text-text-soft md:text-[0.6875rem]"
+                    >
+                      {day}
+                    </span>
+                  ) : null}
                   <span
                     aria-hidden
                     className={[
                       'pointer-events-none absolute left-1/2 top-[42%] z-[1] -translate-x-1/2 -translate-y-1/2 select-none text-[2.6rem] font-semibold leading-none tabular-nums md:top-[44%] md:text-[3.1rem]',
-                      inMonth && isRedDay
-                        ? 'text-red-500/[0.11]'
-                        : inMonth
-                          ? 'text-text-primary/[0.08]'
-                          : 'text-text-soft/[0.14]',
+                      centerDayClass,
                     ].join(' ')}
                   >
-                    {day}
+                    {centerDayText}
                   </span>
 
                   <div className="relative z-[1] flex min-h-0 flex-1 flex-col gap-0.5">
