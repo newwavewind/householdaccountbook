@@ -7,15 +7,18 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { applyAppearance } from './applyAppearance'
 import {
-  applyLiquidGlassToDocument,
-  nextLiquidGlassMode,
+  readColorScheme,
+  writeColorScheme,
+  type ColorScheme,
+} from './colorSchemePreference'
+import {
   readLiquidGlassMode,
   writeLiquidGlassMode,
   type LiquidGlassMode,
 } from './liquidGlassPreference'
 import {
-  applyThemeToDocument,
   readThemePreference,
   writeThemePreference,
   type ThemePreference,
@@ -26,7 +29,8 @@ type ThemeContextValue = {
   setPreference: (p: ThemePreference) => void
   liquidGlass: LiquidGlassMode
   setLiquidGlass: (mode: LiquidGlassMode) => void
-  cycleLiquidGlass: () => void
+  colorScheme: ColorScheme
+  setColorScheme: (scheme: ColorScheme) => void
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null)
@@ -38,14 +42,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [liquidGlass, setLiquidGlassState] = useState<LiquidGlassMode>(() =>
     typeof document !== 'undefined' ? readLiquidGlassMode() : 'off',
   )
+  const [colorScheme, setColorSchemeState] = useState<ColorScheme>(() =>
+    typeof document !== 'undefined' ? readColorScheme() : 'light',
+  )
 
   useEffect(() => {
-    applyThemeToDocument(preference)
-  }, [preference])
-
-  useEffect(() => {
-    applyLiquidGlassToDocument(liquidGlass)
-  }, [liquidGlass])
+    applyAppearance(preference, liquidGlass, colorScheme)
+  }, [preference, liquidGlass, colorScheme])
 
   const setPreference = useCallback((p: ThemePreference) => {
     setPreferenceState(p)
@@ -57,12 +60,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     writeLiquidGlassMode(mode)
   }, [])
 
-  const cycleLiquidGlass = useCallback(() => {
-    setLiquidGlassState((prev) => {
-      const next = nextLiquidGlassMode(prev)
-      writeLiquidGlassMode(next)
-      return next
-    })
+  const setColorScheme = useCallback((scheme: ColorScheme) => {
+    setColorSchemeState(scheme)
+    writeColorScheme(scheme)
   }, [])
 
   const value = useMemo(
@@ -71,9 +71,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       setPreference,
       liquidGlass,
       setLiquidGlass,
-      cycleLiquidGlass,
+      colorScheme,
+      setColorScheme,
     }),
-    [preference, setPreference, liquidGlass, setLiquidGlass, cycleLiquidGlass],
+    [preference, liquidGlass, colorScheme],
   )
 
   return (
@@ -87,12 +88,4 @@ export function useThemePreference(): ThemeContextValue {
     throw new Error('useThemePreference must be used within ThemeProvider')
   }
   return ctx
-}
-
-export function useLiquidGlass(): Pick<
-  ThemeContextValue,
-  'liquidGlass' | 'setLiquidGlass' | 'cycleLiquidGlass'
-> {
-  const { liquidGlass, setLiquidGlass, cycleLiquidGlass } = useThemePreference()
-  return { liquidGlass, setLiquidGlass, cycleLiquidGlass }
 }

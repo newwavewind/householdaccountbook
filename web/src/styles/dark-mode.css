@@ -1,0 +1,69 @@
+/* 다크 모드 — theme1/2/3 공통 토큰 오버라이드 */
+@custom-variant dark (&:where(.dark, .dark *));
+
+html.dark {
+  color-scheme: dark;
+
+  --color-neutral-warm: #141414;
+  --color-neutral-cool: #1a1a1a;
+  --color-ceramic: #242424;
+  --color-surface-raised: #1c1c1e;
+  --color-white: #1c1c1e;
+
+  --color-text-primary: rgba(255, 255, 255, 0.92);
+  --color-text-soft: rgba(255, 255, 255, 0.58);
+  --color-text-secondary: rgba(255, 255, 255, 0.78);
+  --color-text-muted: rgba(255, 255, 255, 0.65);
+  --color-text-faint: rgba(255, 255, 255, 0.5);
+
+  --color-charcoal-border: rgba(255, 255, 255, 0.22);
+  --color-border-subtle: rgb(255 255 255 / 0.1);
+  --color-border-muted: rgb(255 255 255 / 0.08);
+  --color-border-default: rgb(255 255 255 / 0.14);
+  --color-border-strong: rgb(255 255 255 / 0.18);
+  --color-border-pill: rgb(255 255 255 / 0.28);
+
+  --color-well: rgb(255 255 255 / 0.05);
+  --color-inset-highlight: rgb(255 255 255 / 0.06);
+
+  --color-green-light: rgba(0, 117, 74, 0.28);
+  --color-auth-gradient-from: #1a1a1a;
+  --color-auth-gradient-via: #141414;
+  --color-auth-gradient-to: #1c1c1e;
+  --color-alert-surface: rgb(40 36 20 / 0.92);
+
+  --shadow-card: 0 1px 3px rgb(0 0 0 / 0.45);
+  --shadow-nav: 0 1px 4px rgb(0 0 0 / 0.5);
+  --shadow-frap-base: 0 2px 8px rgb(0 0 0 / 0.5);
+  --shadow-frap-stack: 0 2px 8px rgb(0 0 0 / 0.45), 0 8px 20px rgb(0 0 0 / 0.35);
+}
+
+html.dark.theme2 {
+  --color-starbucks-green: #e8e8e8;
+  --color-green-accent: #a3e635;
+  --color-green-light: rgba(163, 230, 53, 0.2);
+  --color-on-accent: #000000;
+}
+
+html.dark.theme3 {
+  --color-starbucks-green: #6ee7b7;
+  --color-green-accent: #34d399;
+  --color-green-light: rgba(52, 211, 153, 0.18);
+}
+
+html.dark.liquid-glass,
+html.dark.liquid-glass body,
+html.dark.liquid-glass #root {
+  background-color: #0e0e0e;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 10% -5%, rgba(0, 117, 74, 0.2), transparent 55%),
+    radial-gradient(ellipse 60% 45% at 90% 10%, rgba(80, 120, 200, 0.12), transparent 50%),
+    linear-gradient(165deg, #161616 0%, #0e0e0e 100%);
+}
+
+html.dark.liquid-glass {
+  --lg-fill: rgba(40, 40, 42, 0.55);
+  --lg-fill-strong: rgba(50, 50, 54, 0.72);
+  --lg-border: rgba(255, 255, 255, 0.18);
+  --lg-border-outer: rgba(255, 255, 255, 0.1);
+}

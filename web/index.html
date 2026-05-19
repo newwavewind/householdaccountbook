@@ -32,7 +32,12 @@
           var lgOn = lg === 'clear' || lg === 'transparent';
           document.documentElement.classList.toggle('liquid-glass', lgOn);
           document.documentElement.classList.toggle('liquid-glass-clear', lgOn);
-          document.documentElement.style.colorScheme = 'light';
+          var cs = localStorage.getItem('mj-gaegyeobu-color-scheme-v1');
+          var dark = cs === 'dark';
+          document.documentElement.classList.toggle('dark', dark);
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+          var metaScheme = document.querySelector('meta[name="color-scheme"]');
+          if (metaScheme) metaScheme.setAttribute('content', dark ? 'dark' : 'light');
         } catch (e) {}
       })();
     </script>

@@ -18,9 +18,6 @@ type Props = {
   patchNotes: (fn: (prev: CalendarStickyNote[]) => CalendarStickyNote[]) => void
 }
 
-const titlePillClass =
-  'inline-flex shrink-0 items-center rounded-full border border-green-accent bg-transparent px-2.5 py-1 text-[10px] font-semibold text-green-accent md:px-3 md:py-1.5 md:text-xs'
-
 export default function CalendarStickyNotesBoard({ notes, patchNotes }: Props) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set())
   const noteCountRef = useRef(0)
@@ -122,20 +119,16 @@ export default function CalendarStickyNotesBoard({ notes, patchNotes }: Props) {
       className="overflow-hidden rounded-[var(--radius-card)] border border-border-subtle bg-gradient-to-b from-ceramic/60 to-surface-raised px-3 py-3 md:px-5 md:py-4"
     >
       {!hasNotes ? (
-        <div className="flex flex-row flex-wrap items-center justify-center gap-x-2 gap-y-1 py-0.5 md:grid md:grid-cols-[auto_1fr_auto] md:items-center md:gap-4 md:py-0">
-          <h2 className={`${titlePillClass} shrink-0`}>스티커 메모</h2>
-          <p className="min-w-0 shrink text-[11px] leading-snug text-text-soft sm:text-sm md:px-2 md:text-center">
-            <button
-              type="button"
-              className="inline font-semibold text-green-accent underline-offset-2 hover:underline focus-visible:outline focus-visible:ring-2 focus-visible:ring-green-accent/40"
-              onClick={() => addNote()}
-            >
-              + 메모
-            </button>
-            를 눌러 스티커를 추가해 보세요.
-          </p>
-          <span className="hidden md:block" aria-hidden />
-        </div>
+        <p className="text-center text-[11px] leading-snug text-text-soft sm:text-sm">
+          <button
+            type="button"
+            className="inline font-semibold text-green-accent underline-offset-2 hover:underline focus-visible:outline focus-visible:ring-2 focus-visible:ring-green-accent/40"
+            onClick={() => addNote()}
+          >
+            + 메모
+          </button>
+          를 눌러 스티커 메모를 추가해 보세요.
+        </p>
       ) : null}
 
       {hasNotes ? (

@@ -31,16 +31,4 @@ export function applyThemeToDocument(pref: ThemePreference): void {
   const root = document.documentElement
   root.classList.toggle('theme2', pref === 'theme2')
   root.classList.toggle('theme3', pref === 'theme3')
-  root.style.colorScheme = 'light'
-
-  const themeMeta = document.querySelector('meta[name="theme-color"]')
-  if (themeMeta) {
-    if (pref === 'theme2') {
-      themeMeta.setAttribute('content', '#f5f5f5')
-    } else if (pref === 'theme3') {
-      themeMeta.setAttribute('content', '#eeefe9')
-    } else {
-      themeMeta.setAttribute('content', '#f2f0eb')
-    }
-  }
 }

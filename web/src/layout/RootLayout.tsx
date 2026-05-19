@@ -6,8 +6,7 @@ import {
   useCommunityBackendReadyMessage,
 } from '../community/CommunityAuthContext'
 import { communityBackendMode } from '../lib/communityBackend'
-import { LiquidGlassToggle } from '../theme/LiquidGlassToggle'
-import { ThemeToggle } from '../theme/ThemeToggle'
+import { AppearanceMenu } from '../theme/AppearanceMenu'
 
 function SettingsGearButton({ onClick }: { onClick: () => void }) {
   return (
@@ -119,7 +118,7 @@ export default function RootLayout() {
     <>
       <header className="sticky top-0 z-40 border-b border-border-muted bg-neutral-warm/90 backdrop-blur-md">
         <div className="relative mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 py-2.5 md:flex-wrap md:px-6 md:py-3">
-          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden pr-[5.25rem] md:min-w-0 md:flex-initial md:flex-wrap md:gap-4 md:overflow-visible md:pr-0">
+          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden pr-[4.25rem] md:min-w-0 md:flex-initial md:flex-wrap md:gap-4 md:overflow-visible md:pr-0">
             <nav
               className="flex min-w-0 shrink-0 items-center gap-0.5 overflow-x-auto rounded-md border border-charcoal-border bg-surface-raised p-0.5 shadow-sm [-ms-overflow-style:none] [scrollbar-width:none] md:overflow-visible theme2:shadow-[var(--shadow-frap-base)] theme3:border-border-strong [&::-webkit-scrollbar]:hidden"
               aria-label="주 메뉴"
@@ -149,8 +148,7 @@ export default function RootLayout() {
             </nav>
           </div>
           <div className="absolute right-3 top-1/2 z-10 flex -translate-y-1/2 flex-nowrap items-center justify-end gap-1 md:static md:z-0 md:translate-y-0 md:gap-2">
-            <ThemeToggle />
-            <LiquidGlassToggle />
+            <AppearanceMenu />
             <SettingsGearButton onClick={() => nav('/settings')} />
             {authControls}
           </div>
