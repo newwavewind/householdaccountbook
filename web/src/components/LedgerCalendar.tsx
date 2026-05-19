@@ -7,6 +7,7 @@ import {
 } from '../lib/calendarDayTicker'
 import type { DayRollup } from '../lib/dayTotals'
 import { noSpendAnimationDelaySec } from '../lib/noSpendChallenge'
+import { MarqueeTicker } from './MarqueeTicker'
 import { MarqueeTickerRows, type MarqueeTickerRow } from './MarqueeTickerRows'
 
 const WEEK = ['일', '월', '화', '수', '목', '금', '토'] as const
@@ -36,6 +37,38 @@ function buildGrid(year: number, monthIndex: number) {
     })
   }
   return cells
+}
+
+function LedgerAmountLine({
+  iso,
+  kind,
+  text,
+  colorClass,
+  amountTextClass,
+}: {
+  iso: string
+  kind: 'income' | 'expense'
+  text: string
+  colorClass: string
+  amountTextClass: string
+}) {
+  return (
+    <MarqueeTicker
+      variant="cell"
+      segments={[
+        {
+          id: kind,
+          node: (
+            <span className={`${amountTextClass} ${colorClass}`}>{text}</span>
+          ),
+        },
+      ]}
+      ariaLabel={kind === 'income' ? `수입 ${text}` : `지출 ${text}`}
+      staggerKey={`${iso}-${kind}`}
+      pauseOnHover={false}
+      className="!min-h-[1.05rem] !flex-none w-full"
+    />
+  )
 }
 
 function ledgerContentRows(rollup: DayRollup | undefined): MarqueeTickerRow[] {
@@ -176,20 +209,24 @@ export const LedgerCalendar = memo(function LedgerCalendar({
                 ) : null}
 
                 {hasFooter && amounts ? (
-                  <div className="mt-auto flex w-full shrink-0 flex-col gap-px border-t border-border-subtle pt-1">
+                  <div className="mt-auto flex w-full min-w-0 shrink-0 flex-col gap-px border-t border-border-subtle pt-1">
                     {amounts.income > 0 ? (
-                      <span
-                        className={`${amountTextClass} text-semantic-income`}
-                      >
-                        {formatLedgerIncome(amounts.income)}
-                      </span>
+                      <LedgerAmountLine
+                        iso={iso}
+                        kind="income"
+                        text={formatLedgerIncome(amounts.income)}
+                        colorClass="text-semantic-income"
+                        amountTextClass={amountTextClass}
+                      />
                     ) : null}
                     {amounts.expense > 0 ? (
-                      <span
-                        className={`${amountTextClass} text-semantic-expense`}
-                      >
-                        {formatLedgerExpense(amounts.expense)}
-                      </span>
+                      <LedgerAmountLine
+                        iso={iso}
+                        kind="expense"
+                        text={formatLedgerExpense(amounts.expense)}
+                        colorClass="text-semantic-expense"
+                        amountTextClass={amountTextClass}
+                      />
                     ) : null}
                   </div>
                 ) : null}

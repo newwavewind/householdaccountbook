@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import {
@@ -5,9 +6,7 @@ import {
   useCommunityBackendReadyMessage,
 } from '../community/CommunityAuthContext'
 import { communityBackendMode } from '../lib/communityBackend'
-import { useThemePreference } from '../theme/ThemeContext'
 import { ThemeToggle } from '../theme/ThemeToggle'
-import type { ThemePreference } from '../theme/themePreference'
 
 function SettingsGearButton({ onClick }: { onClick: () => void }) {
   return (
@@ -37,28 +36,21 @@ function SettingsGearButton({ onClick }: { onClick: () => void }) {
   )
 }
 
-function navLinkClassName(
-  theme: ThemePreference,
-  { isActive }: { isActive: boolean },
-) {
+function mainNavLinkClass({ isActive }: { isActive: boolean }) {
   const base =
-    'inline-flex shrink-0 items-center rounded-lg px-2 py-0.5 text-[10px] font-semibold leading-none transition-all duration-200 md:rounded-xl md:px-2.5 md:py-1 md:text-xs theme2:rounded-lg'
-  if (theme === 'theme3') {
-    return `${base} ${
-      isActive
-        ? 'bg-green-light text-midnight-ink shadow-[var(--shadow-frap-base)]'
-        : 'text-faded-grey hover:bg-green-light/50 hover:text-midnight-ink'
-    }`
-  }
-  return `${base} ${
-    isActive
-      ? 'bg-starbucks-green text-white shadow-[var(--shadow-frap-base)] ring-1 ring-starbucks-green/20 theme2:border theme2:border-charcoal-border theme2:bg-green-accent theme2:text-on-accent'
-      : 'text-starbucks-green hover:bg-house-green/10 hover:shadow-sm theme2:hover:bg-green-light/50'
-  }`
+    'inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-[10px] font-semibold leading-none transition-colors md:px-2.5 md:py-1 md:text-xs'
+  return isActive
+    ? `${base} bg-green-light text-green-accent theme2:bg-green-light theme2:text-midnight-ink theme3:bg-green-light theme3:text-starbucks-green`
+    : `${base} text-text-soft hover:bg-well hover:text-text-primary`
 }
 
+const MAIN_NAV_ITEMS = [
+  { to: '/calendar', label: '다이어리' },
+  { to: '/', label: '가계부', end: true as const },
+  { to: '/community', label: '커뮤니티' },
+] as const
+
 export default function RootLayout() {
-  const { preference } = useThemePreference()
   const nav = useNavigate()
   const mode = communityBackendMode()
   const backendMsg = useCommunityBackendReadyMessage()
@@ -128,23 +120,31 @@ export default function RootLayout() {
         <div className="relative mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 py-2.5 md:flex-wrap md:px-6 md:py-3">
           <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden pr-[5.25rem] md:min-w-0 md:flex-initial md:flex-wrap md:gap-4 md:overflow-visible md:pr-0">
             <nav
-              className="flex min-h-[27px] min-w-0 flex-nowrap items-center gap-0.5 overflow-x-auto rounded-xl border border-border-subtle/60 bg-surface-raised/80 p-0.5 shadow-[var(--shadow-frap-base)] [-ms-overflow-style:none] [scrollbar-width:none] md:min-h-0 md:flex-wrap md:gap-1 md:overflow-visible md:rounded-2xl md:p-1 [&::-webkit-scrollbar]:hidden"
+              className="flex min-w-0 shrink-0 items-center gap-0.5 overflow-x-auto rounded-md border border-charcoal-border bg-surface-raised p-0.5 shadow-sm [-ms-overflow-style:none] [scrollbar-width:none] md:overflow-visible theme2:shadow-[var(--shadow-frap-base)] theme3:border-border-strong [&::-webkit-scrollbar]:hidden"
               aria-label="주 메뉴"
             >
-              <NavLink className={(p) => navLinkClassName(preference, p)} to="/calendar">
-                다이어리
-              </NavLink>
-              <NavLink className={(p) => navLinkClassName(preference, p)} to="/">
-                가계부
-              </NavLink>
-              <NavLink className={(p) => navLinkClassName(preference, p)} to="/community">
-                커뮤니티
-              </NavLink>
-              {auth.role === 'admin' ? (
-                <NavLink className={(p) => navLinkClassName(preference, p)} to="/admin">
-                  관리
-                </NavLink>
-              ) : null}
+              {[
+                ...MAIN_NAV_ITEMS,
+                ...(auth.role === 'admin'
+                  ? [{ to: '/admin' as const, label: '관리' }]
+                  : []),
+              ].map((item, index) => (
+                <Fragment key={item.to}>
+                  {index > 0 ? (
+                    <span
+                      className="mx-0.5 h-3 w-px shrink-0 bg-charcoal-border/25 theme3:bg-border-strong/40"
+                      aria-hidden
+                    />
+                  ) : null}
+                  <NavLink
+                    to={item.to}
+                    end={'end' in item ? item.end : undefined}
+                    className={mainNavLinkClass}
+                  >
+                    {item.label}
+                  </NavLink>
+                </Fragment>
+              ))}
             </nav>
           </div>
           <div className="absolute right-3 top-1/2 z-10 flex -translate-y-1/2 flex-nowrap items-center justify-end gap-1 md:static md:z-0 md:translate-y-0 md:gap-2">
