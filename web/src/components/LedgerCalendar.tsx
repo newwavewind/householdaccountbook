@@ -1,4 +1,4 @@
-﻿import { memo, useMemo } from 'react'
+﻿import { memo, useMemo, type MouseEvent } from 'react'
 import {
   getCalendarDayLabels,
   isRedCalendarDay,
@@ -14,6 +14,8 @@ import { noSpendAnimationDelaySec } from '../lib/noSpendChallenge'
 import { MarqueeTickerRows, type MarqueeTickerRow } from './MarqueeTickerRows'
 
 const WEEK = ['일', '월', '화', '수', '목', '금', '토'] as const
+
+const CELL_MIN_H = 'min-h-[6.25rem] md:min-h-[7.5rem]'
 
 function pad2(n: number) {
   return String(n).padStart(2, '0')
@@ -95,6 +97,28 @@ export const LedgerCalendar = memo(function LedgerCalendar({
       </div>
       <div className="grid grid-cols-7 gap-1">
         {cells.map(({ iso, day, inMonth }, cellIdx) => {
+          const hoverHandlers = {
+            onMouseEnter: (e: MouseEvent<HTMLButtonElement>) =>
+              onHover({ iso, clientX: e.clientX, clientY: e.clientY }),
+            onMouseLeave: () => onHover(null),
+          }
+
+          if (!inMonth) {
+            return (
+              <button
+                key={iso}
+                type="button"
+                aria-label={iso}
+                onClick={() => onSelectDay(iso)}
+                {...hoverHandlers}
+                className={[
+                  CELL_MIN_H,
+                  'rounded-lg border border-border-muted/30 bg-transparent',
+                ].join(' ')}
+              />
+            )
+          }
+
           const dayLabels = getCalendarDayLabels(iso)
           const r = rollups.get(iso)
           const hasTx = r && r.count > 0
@@ -102,20 +126,16 @@ export const LedgerCalendar = memo(function LedgerCalendar({
           const amounts = ledgerAmountSummary(r)
           const hasContent = contentRows.length > 0
           const hasFooter = amounts !== null
-          const isNoSpend = inMonth && noSpendDays.has(iso)
+          const isNoSpend = noSpendDays.has(iso)
           const isToday = iso === todayIso
           const isSel = iso === selectedIso
           const isSunday = cellIdx % 7 === 0
           const isRedDay =
-            inMonth &&
-            (isSunday || isRedCalendarDay(dayLabels?.primaryKind))
-          const cellMinH = 'min-h-[6.25rem] md:min-h-[7.5rem]'
+            isSunday || isRedCalendarDay(dayLabels?.primaryKind)
 
-          const watermarkClass = inMonth
-            ? isRedDay
-              ? 'text-red-500/[0.11]'
-              : 'text-text-primary/[0.08]'
-            : 'text-text-soft/[0.14]'
+          const watermarkClass = isRedDay
+            ? 'text-red-500/[0.11]'
+            : 'text-text-primary/[0.08]'
 
           return (
             <button
@@ -125,25 +145,15 @@ export const LedgerCalendar = memo(function LedgerCalendar({
                 isNoSpend ? `${iso} 가계부, 무지출 성공` : `${iso} 가계부`
               }
               onClick={() => onSelectDay(iso)}
-              onMouseEnter={(e) =>
-                onHover({ iso, clientX: e.clientX, clientY: e.clientY })
-              }
-              onMouseLeave={() => onHover(null)}
+              {...hoverHandlers}
               className={[
-                'relative flex w-full flex-col overflow-hidden rounded-lg border px-0.5 py-1.5 text-left md:py-2',
-                cellMinH,
-                inMonth
-                  ? 'border-border-subtle bg-surface-raised'
-                  : 'border-transparent bg-neutral-cool/50 text-text-soft/60',
-                isNoSpend && inMonth
-                  ? 'ring-1 ring-inset ring-green-accent/25'
-                  : '',
-                inMonth && isRedCalendarDay(dayLabels?.primaryKind)
+                'relative flex w-full flex-col overflow-hidden rounded-lg border border-border-subtle bg-surface-raised px-0.5 py-1.5 text-left md:py-2',
+                CELL_MIN_H,
+                isNoSpend ? 'ledger-no-spend-neon' : '',
+                isRedCalendarDay(dayLabels?.primaryKind)
                   ? 'ring-1 ring-inset ring-red-300/60'
                   : '',
-                hasTx && inMonth
-                  ? 'shadow-[0_0_0_1px_rgba(0,117,74,0.25)]'
-                  : '',
+                hasTx ? 'shadow-[0_0_0_1px_rgba(0,117,74,0.25)]' : '',
                 isToday
                   ? 'outline outline-2 outline-offset-[-2px] outline-green-accent/70'
                   : '',
@@ -151,33 +161,16 @@ export const LedgerCalendar = memo(function LedgerCalendar({
               ]
                 .filter(Boolean)
                 .join(' ')}
+              style={
+                isNoSpend
+                  ? { animationDelay: `${noSpendAnimationDelaySec(iso)}s` }
+                  : undefined
+              }
             >
-              {isNoSpend && inMonth ? (
-                <>
-                  <span
-                    aria-hidden
-                    className="ledger-no-spend-glow pointer-events-none absolute inset-0 z-0 rounded-[inherit] bg-gradient-to-br from-green-light/50 via-amber-100/25 to-green-light/35"
-                    style={{
-                      animationDelay: `${noSpendAnimationDelaySec(iso)}s`,
-                    }}
-                  />
-                  <span
-                    aria-hidden
-                    className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-[inherit]"
-                  >
-                    <span
-                      className="ledger-no-spend-shimmer-track absolute inset-y-0 left-0 w-[45%] bg-gradient-to-r from-transparent via-white/55 to-transparent"
-                      style={{
-                        animationDelay: `${noSpendAnimationDelaySec(iso) + 0.6}s`,
-                      }}
-                    />
-                  </span>
-                </>
-              ) : null}
               <span
                 aria-hidden
                 className={[
-                  'pointer-events-none absolute left-1/2 top-[42%] z-[1] -translate-x-1/2 -translate-y-1/2 select-none text-[2.4rem] font-semibold leading-none tabular-nums md:top-[44%] md:text-[3rem]',
+                  'pointer-events-none absolute left-1/2 top-[42%] z-0 -translate-x-1/2 -translate-y-1/2 select-none text-[2.4rem] font-semibold leading-none tabular-nums md:top-[44%] md:text-[3rem]',
                   watermarkClass,
                 ].join(' ')}
               >
@@ -189,31 +182,25 @@ export const LedgerCalendar = memo(function LedgerCalendar({
                   <MarqueeTickerRows
                     rows={contentRows}
                     staggerKeyPrefix={iso}
-                    className={!inMonth ? 'opacity-70' : ''}
                   />
                 ) : null}
 
                 {hasFooter && amounts ? (
-                  <div
-                    className={[
-                      'mt-auto flex w-full shrink-0 flex-col gap-px border-t pt-1',
-                      inMonth ? 'border-border-subtle' : 'border-border-muted/80',
-                    ].join(' ')}
-                  >
-                  {amounts.income > 0 ? (
-                    <span
-                      className={`${amountTextClass} text-semantic-income`}
-                    >
-                      {formatLedgerIncome(amounts.income)}
-                    </span>
-                  ) : null}
-                  {amounts.expense > 0 ? (
-                    <span
-                      className={`${amountTextClass} text-semantic-expense`}
-                    >
-                      {formatLedgerExpense(amounts.expense)}
-                    </span>
-                  ) : null}
+                  <div className="mt-auto flex w-full shrink-0 flex-col gap-px border-t border-border-subtle pt-1">
+                    {amounts.income > 0 ? (
+                      <span
+                        className={`${amountTextClass} text-semantic-income`}
+                      >
+                        {formatLedgerIncome(amounts.income)}
+                      </span>
+                    ) : null}
+                    {amounts.expense > 0 ? (
+                      <span
+                        className={`${amountTextClass} text-semantic-expense`}
+                      >
+                        {formatLedgerExpense(amounts.expense)}
+                      </span>
+                    ) : null}
                   </div>
                 ) : null}
               </div>

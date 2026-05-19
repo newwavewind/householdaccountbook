@@ -970,6 +970,26 @@ export default function CalendarPage() {
 
           <div className="grid grid-cols-7 gap-0.5 md:gap-1">
             {cells.map(({ iso, day, inMonth }, cellIdx) => {
+              const isSel = iso === selectedIso
+
+              if (!inMonth) {
+                return (
+                  <button
+                    key={iso}
+                    type="button"
+                    onClick={() => onPickDay(iso)}
+                    aria-pressed={isSel}
+                    aria-label={iso}
+                    className={[
+                      'relative flex min-h-[5rem] w-full cursor-pointer flex-col overflow-hidden rounded-lg border border-border-muted/30 bg-transparent transition-colors active:scale-[0.98] md:min-h-[6.25rem]',
+                      isSel ? 'ring-1 ring-inset ring-green-accent/35' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                  />
+                )
+              }
+
               const dayLabels = getCalendarDayLabels(iso)
               const holText = holidayLabel(iso)
               const lunar = lunarCellInfo(iso, holText)
@@ -981,7 +1001,6 @@ export default function CalendarPage() {
               const txCount = txCountByDate.get(iso) ?? 0
               const hasLedger = txCount > 0
               const isToday = iso === today
-              const isSel = iso === selectedIso
               const isSunday = cellIdx % 7 === 0
               const isRedDay =
                 inMonth &&
@@ -1008,7 +1027,7 @@ export default function CalendarPage() {
                   })
                 }
               }
-              if (hasMemo) {
+              if (hasMemo && inMonth) {
                 for (const e of getDayEvents(memo)) {
                   const preview = calendarCellPreviewContent(e)
                   if (!preview) continue
@@ -1025,7 +1044,8 @@ export default function CalendarPage() {
                   })
                 }
               }
-              for (const d of ddaysThisDay) {
+              if (inMonth) {
+                for (const d of ddaysThisDay) {
                 cellTickerRows.push({
                   id: `dday-${d.id}`,
                   ariaLabel: d.title,
@@ -1037,6 +1057,7 @@ export default function CalendarPage() {
                     </span>
                   ),
                 })
+                }
               }
               const hasCellTicker = cellTickerRows.length > 0
 
@@ -1048,15 +1069,6 @@ export default function CalendarPage() {
                       true,
                     )} hover:border-green-accent/45 hover:bg-green-light/30`
                 : 'border-border-subtle bg-surface-raised hover:border-green-accent/45 hover:bg-green-light/35'
-
-              const outMonthBase = hasMemo
-                ? cellBgImage
-                  ? 'border-transparent bg-surface-raised/25 text-text-soft/80 hover:bg-neutral-cool/40'
-                  : `border-transparent ${stickyTintCalendarCellBg(
-                      firstEventPaperTint(memo),
-                      false,
-                    )} text-text-soft/60 hover:bg-neutral-cool/65`
-                : 'border-transparent bg-neutral-cool/50 text-text-soft/60 hover:bg-neutral-cool'
 
               const selectedCellClass =
                 isSel && hasMemo
@@ -1074,11 +1086,9 @@ export default function CalendarPage() {
                   ? lunar.emphasize
                     ? 'text-starbucks-green/[0.22] md:text-[2.4rem]'
                     : 'text-text-primary/[0.14] md:text-[2.8rem]'
-                  : inMonth && isRedDay
+                  : isRedDay
                     ? 'text-red-500/[0.11]'
-                    : inMonth
-                      ? 'text-text-primary/[0.08]'
-                      : 'text-text-soft/[0.14]'
+                    : 'text-text-primary/[0.08]'
 
               return (
                 <button
@@ -1097,17 +1107,17 @@ export default function CalendarPage() {
                   }
                   className={[
                     'relative flex min-h-[5rem] w-full cursor-pointer flex-col overflow-hidden rounded-lg border px-1 py-1.5 text-left transition-colors active:scale-[0.98] md:min-h-[6.25rem] md:px-1.5 md:py-2',
-                    inMonth ? inMonthBase : outMonthBase,
-                    inMonth && isRedCalendarDay(dayLabels?.primaryKind)
+                    inMonthBase,
+                    isRedCalendarDay(dayLabels?.primaryKind)
                       ? 'ring-1 ring-inset ring-red-300/60'
                       : '',
-                    hasLedger && inMonth
+                    hasLedger
                       ? 'shadow-[0_0_0_1px_rgba(0,117,74,0.2)]'
                       : '',
                     isToday
                       ? 'outline outline-2 outline-offset-[-2px] outline-green-accent/70'
                       : '',
-                    lunarView && lunar?.emphasize && inMonth
+                    lunarView && lunar?.emphasize
                       ? 'ring-1 ring-inset ring-starbucks-green/35'
                       : '',
                     selectedCellClass,
@@ -1169,12 +1179,7 @@ export default function CalendarPage() {
                       <MarqueeTickerRows
                         rows={cellTickerRows}
                         staggerKeyPrefix={iso}
-                        className={[
-                          'w-full shrink-0',
-                          !inMonth ? 'opacity-80' : '',
-                        ]
-                          .filter(Boolean)
-                          .join(' ')}
+                        className="w-full shrink-0"
                       />
                     ) : null}
                   </div>

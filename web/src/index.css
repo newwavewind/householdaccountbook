@@ -487,38 +487,36 @@
   }
 }
 
-/* 가계부 달력 — 무지출 챌린지 (배경만, 텍스트 가리지 않음) */
-@keyframes ledger-no-spend-glow {
+/* 가계부 달력 — 무지출 챌린지 (네온 테두리, 텍스트 가리지 않음) */
+@keyframes ledger-no-spend-neon {
   0%,
   100% {
-    opacity: 0.2;
+    box-shadow:
+      0 0 2px rgba(0, 220, 140, 0.45),
+      0 0 6px rgba(0, 117, 74, 0.35),
+      inset 0 0 3px rgba(0, 200, 120, 0.08);
+    border-color: rgba(0, 160, 100, 0.45);
   }
   50% {
-    opacity: 0.55;
+    box-shadow:
+      0 0 4px rgba(160, 255, 200, 1),
+      0 0 12px rgba(0, 230, 150, 0.75),
+      0 0 20px rgba(0, 117, 74, 0.45),
+      inset 0 0 6px rgba(0, 255, 170, 0.18);
+    border-color: rgba(100, 255, 190, 0.95);
   }
 }
 
-@keyframes ledger-no-spend-shimmer {
-  0% {
-    transform: translateX(-120%) skewX(-14deg);
-  }
-  100% {
-    transform: translateX(220%) skewX(-14deg);
-  }
-}
-
-.ledger-no-spend-glow {
-  animation: ledger-no-spend-glow 3.2s ease-in-out infinite;
-}
-
-.ledger-no-spend-shimmer-track {
-  animation: ledger-no-spend-shimmer 4.5s ease-in-out infinite;
+.ledger-no-spend-neon {
+  animation: ledger-no-spend-neon 2.1s ease-in-out infinite;
+  border-width: 1.5px;
+  border-style: solid;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ledger-no-spend-glow,
-  .ledger-no-spend-shimmer-track {
+  .ledger-no-spend-neon {
     animation: none;
-    opacity: 0.35;
+    box-shadow: 0 0 6px rgba(0, 180, 120, 0.45);
+    border-color: rgba(0, 160, 100, 0.55);
   }
 }
