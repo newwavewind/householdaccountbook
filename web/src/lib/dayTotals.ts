@@ -4,7 +4,7 @@ export interface DayRollup {
   income: number
   expense: number
   count: number
-  /** 비어 있지 않은 메모, 금액 큰 거래 우선·중복 제거, 달력 하단 미리보기용 최대 2개. */
+  /** 비어 있지 않은 메모, 금액 큰 거래 우선·중복 제거, 달력 티커용. */
   memoLines: string[]
 }
 
@@ -34,7 +34,7 @@ export function rollupByDate(transactions: Transaction[]): Map<string, DayRollup
       if (memoSeen.has(raw)) continue
       memoSeen.add(raw)
       memoLines.push(raw)
-      if (memoLines.length >= 2) break
+      if (memoLines.length >= 12) break
     }
 
     m.set(date, {

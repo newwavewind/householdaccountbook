@@ -5,12 +5,14 @@ import { Button } from './components/ui/Button'
 import { Card } from './components/ui/Card'
 import { Fab } from './components/ui/Fab'
 import { LedgerCalendar } from './components/LedgerCalendar'
+import { NoSpendChallengeBanner } from './components/NoSpendChallengeBanner'
 import { CalendarHoverTooltip } from './components/CalendarHoverTooltip'
 import { TransactionFormModal } from './components/TransactionFormModal'
 import { DayDetailModal } from './components/DayDetailModal'
 import { ExpenseCategoryBreakdown } from './components/ExpenseCategoryBreakdown'
 import { useLedger } from './hooks/useLedger'
 import { rollupByDate } from './lib/dayTotals'
+import { monthNoSpendStats } from './lib/noSpendChallenge'
 import { cardBrandLabel } from './constants/cardBrands'
 import type { PaymentMethod, Transaction } from './types/transaction'
 import HouseholdSetupModal from './components/HouseholdSetupModal'
@@ -227,7 +229,7 @@ function ExpensePayFilterBar({
   onCardBrandChange: (id: string | null) => void
 }) {
   return (
-    <div className="min-w-0 flex-1 rounded-xl border border-border-subtle/60 bg-ceramic/30 p-2">
+    <div className="min-w-0 flex-1">
       <div className="flex flex-wrap items-center gap-1.5">
         {EXPENSE_PAY_FILTERS.map((chip) => {
           const active = value === chip.id
@@ -512,6 +514,17 @@ export default function LedgerApp() {
         : transactions,
     ),
     [transactions, selectedMember],
+  )
+
+  const noSpendStats = useMemo(
+    () =>
+      monthNoSpendStats(
+        cursor.y,
+        cursor.m,
+        rollups,
+        todayIso(),
+      ),
+    [rollups, cursor.y, cursor.m],
   )
 
   const yearIncomeTotal = useMemo(
@@ -1191,12 +1204,19 @@ export default function LedgerApp() {
               </div>
             </div>
 
+            <NoSpendChallengeBanner
+              count={noSpendStats.count}
+              eligibleDayCount={noSpendStats.eligibleDayCount}
+              monthLabel={formatMonthLabel(cursor.y, cursor.m)}
+            />
+
             <LedgerCalendar
               year={cursor.y}
               monthIndex={cursor.m}
               todayIso={todayIso()}
               selectedIso={selectedIso}
               rollups={rollups}
+              noSpendDays={noSpendStats.noSpendDays}
               onSelectDay={onSelectDay}
               onHover={onCalendarHover}
             />

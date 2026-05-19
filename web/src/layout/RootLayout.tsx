@@ -42,7 +42,7 @@ function navLinkClassName(
   { isActive }: { isActive: boolean },
 ) {
   const base =
-    'shrink-0 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all duration-200 theme2:rounded-lg'
+    'inline-flex shrink-0 items-center rounded-lg px-2 py-0.5 text-[10px] font-semibold leading-none transition-all duration-200 md:rounded-xl md:px-2.5 md:py-1 md:text-xs theme2:rounded-lg'
   if (theme === 'theme3') {
     return `${base} ${
       isActive
@@ -128,7 +128,7 @@ export default function RootLayout() {
         <div className="relative mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 py-2.5 md:flex-wrap md:px-6 md:py-3">
           <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden pr-[5.25rem] md:min-w-0 md:flex-initial md:flex-wrap md:gap-4 md:overflow-visible md:pr-0">
             <nav
-              className="flex min-w-0 flex-nowrap gap-1 overflow-x-auto rounded-2xl border border-border-subtle/60 bg-surface-raised/80 p-1 shadow-[var(--shadow-frap-base)] [-ms-overflow-style:none] [scrollbar-width:none] md:flex-wrap md:overflow-visible [&::-webkit-scrollbar]:hidden"
+              className="flex min-h-[27px] min-w-0 flex-nowrap items-center gap-0.5 overflow-x-auto rounded-xl border border-border-subtle/60 bg-surface-raised/80 p-0.5 shadow-[var(--shadow-frap-base)] [-ms-overflow-style:none] [scrollbar-width:none] md:min-h-0 md:flex-wrap md:gap-1 md:overflow-visible md:rounded-2xl md:p-1 [&::-webkit-scrollbar]:hidden"
               aria-label="주 메뉴"
             >
               <NavLink className={(p) => navLinkClassName(preference, p)} to="/calendar">

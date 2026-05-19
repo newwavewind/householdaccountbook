@@ -467,19 +467,22 @@
   }
 }
 
-.dday-ticker-track {
+.dday-ticker-track,
+.marquee-ticker-track {
   display: flex;
   width: max-content;
   animation: dday-ticker-marquee linear infinite;
   will-change: transform;
 }
 
-.dday-ticker-paused {
+.dday-ticker-paused,
+.marquee-ticker-paused {
   animation-play-state: paused;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dday-ticker-track {
+  .dday-ticker-track,
+  .marquee-ticker-track {
     animation: none;
   }
 }

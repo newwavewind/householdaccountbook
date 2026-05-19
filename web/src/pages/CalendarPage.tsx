@@ -29,11 +29,13 @@ import { DdaySummaryTicker } from '../dday/DdaySummaryTicker'
 import { useHouseholdDDays } from '../dday/useHouseholdDDays'
 import { useLedger } from '../hooks/useLedger'
 import {
+  calendarLabelTextClass,
   getCalendarDayLabels,
   holidayLabel,
   isRedCalendarDay,
 } from '../lib/holidays'
 import { CalendarDayLabelsInline } from '../components/CalendarDayLabelsInline'
+import { MarqueeTickerRows, type MarqueeTickerRow } from '../components/MarqueeTickerRows'
 import { isCloudSyncEnabled } from '../lib/supabaseClient'
 import { ledgerBackendMode } from '../lib/ledgerBackend'
 import {
@@ -990,6 +992,53 @@ export default function CalendarPage() {
               const cellTextShadow = cellBgImage
                 ? 'font-semibold drop-shadow-[0_0_4px_rgba(255,255,255,0.95)]'
                 : ''
+              const cellTickerRows: MarqueeTickerRow[] = []
+              if (dayLabels && inMonth) {
+                for (const e of dayLabels.entries) {
+                  cellTickerRows.push({
+                    id: `label-${e.kind}-${e.name}`,
+                    ariaLabel: e.name,
+                    node: (
+                      <span
+                        className={`text-[0.62rem] font-medium leading-tight md:text-[0.68rem] ${calendarLabelTextClass(e.kind)} ${cellTextShadow}`}
+                      >
+                        {e.name}
+                      </span>
+                    ),
+                  })
+                }
+              }
+              if (hasMemo) {
+                for (const e of getDayEvents(memo)) {
+                  const preview = calendarCellPreviewContent(e)
+                  if (!preview) continue
+                  cellTickerRows.push({
+                    id: `event-${e.id}`,
+                    ariaLabel: preview.text,
+                    node: (
+                      <span
+                        className={`text-[0.65rem] leading-snug md:text-[0.7rem] ${cellTextShadow} ${calendarEventInkTextClass(preview.ink)}`}
+                      >
+                        {preview.text}
+                      </span>
+                    ),
+                  })
+                }
+              }
+              for (const d of ddaysThisDay) {
+                cellTickerRows.push({
+                  id: `dday-${d.id}`,
+                  ariaLabel: d.title,
+                  node: (
+                    <span
+                      className={`text-[0.58rem] font-semibold leading-tight text-gold md:text-[0.62rem] ${cellTextShadow}`}
+                    >
+                      D {d.title}
+                    </span>
+                  ),
+                })
+              }
+              const hasCellTicker = cellTickerRows.length > 0
 
               const inMonthBase = hasMemo
                 ? cellBgImage
@@ -1107,7 +1156,7 @@ export default function CalendarPage() {
                     {centerDayText}
                   </span>
 
-                  <div className="relative z-[1] flex min-h-0 flex-1 flex-col gap-0.5">
+                  <div className="relative z-[1] flex min-h-0 flex-1 flex-col gap-0.5 pt-0.5">
                     {hasLedger ? (
                       <span
                         className="pointer-events-none absolute right-0 top-0 z-[2] rounded bg-green-accent/15 px-1 text-[0.625rem] font-semibold tabular-nums text-green-accent md:text-[0.6875rem]"
@@ -1116,44 +1165,17 @@ export default function CalendarPage() {
                         {txCount}
                       </span>
                     ) : null}
-                    {dayLabels && inMonth ? (
-                      <CalendarDayLabelsInline
-                        iso={iso}
-                        className={cellTextShadow}
+                    {hasCellTicker ? (
+                      <MarqueeTickerRows
+                        rows={cellTickerRows}
+                        staggerKeyPrefix={iso}
+                        className={[
+                          'w-full shrink-0',
+                          !inMonth ? 'opacity-80' : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
                       />
-                    ) : null}
-                    {hasMemo ? (
-                      <ul className="line-clamp-3 w-full space-y-0.5 text-left text-[0.65rem] leading-snug md:text-[0.7rem]">
-                        {getDayEvents(memo).map((e) => {
-                          const preview = calendarCellPreviewContent(e)
-                          if (!preview) return null
-                          return (
-                            <li
-                              key={e.id}
-                              className={`max-w-full pl-0.5 ${cellTextShadow} ${calendarEventInkTextClass(
-                                preview.ink,
-                              )}`}
-                            >
-                              <span
-                                className="line-clamp-1 truncate"
-                                title={preview.text}
-                              >
-                                {preview.text}
-                              </span>
-                            </li>
-                          )
-                        })}
-                      </ul>
-                    ) : null}
-                    {ddaysThisDay.length > 0 ? (
-                      <span
-                        className={`line-clamp-2 text-left text-[0.58rem] font-semibold leading-tight text-gold md:text-[0.62rem] ${cellTextShadow}`}
-                        title={ddaysThisDay.map((e) => e.title).join(', ')}
-                      >
-                        {ddaysThisDay.length === 1
-                          ? `D ${ddaysThisDay[0].title}`
-                          : `D ${ddaysThisDay[0].title} 외 ${ddaysThisDay.length - 1}`}
-                      </span>
                     ) : null}
                   </div>
                 </button>

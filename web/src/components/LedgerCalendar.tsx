@@ -3,8 +3,15 @@ import {
   getCalendarDayLabels,
   isRedCalendarDay,
 } from '../lib/holidays'
-import { CalendarDayLabelsInline } from './CalendarDayLabelsInline'
+import {
+  buildLedgerContentLines,
+  formatLedgerExpense,
+  formatLedgerIncome,
+  ledgerAmountSummary,
+} from '../lib/calendarDayTicker'
 import type { DayRollup } from '../lib/dayTotals'
+import { noSpendBadgeEmoji } from '../lib/noSpendChallenge'
+import { MarqueeTickerRows, type MarqueeTickerRow } from './MarqueeTickerRows'
 
 const WEEK = ['일', '월', '화', '수', '목', '금', '토'] as const
 
@@ -33,12 +40,23 @@ function buildGrid(year: number, monthIndex: number) {
   return cells
 }
 
+function ledgerContentRows(iso: string, rollup: DayRollup | undefined): MarqueeTickerRow[] {
+  const memoText =
+    'text-[0.62rem] font-medium leading-tight text-text-soft md:text-[0.68rem]'
+  return buildLedgerContentLines(iso, rollup).map((line) => ({
+    id: line.id,
+    ariaLabel: line.text,
+    node: <span className={memoText}>{line.text}</span>,
+  }))
+}
+
 export interface LedgerCalendarProps {
   year: number
   monthIndex: number
   todayIso: string
   selectedIso: string | null
   rollups: Map<string, DayRollup>
+  noSpendDays: Set<string>
   onSelectDay: (iso: string) => void
   onHover: (
     detail: null | { iso: string; clientX: number; clientY: number },
@@ -51,6 +69,7 @@ export const LedgerCalendar = memo(function LedgerCalendar({
   todayIso,
   selectedIso,
   rollups,
+  noSpendDays,
   onSelectDay,
   onHover,
 }: LedgerCalendarProps) {
@@ -59,19 +78,19 @@ export const LedgerCalendar = memo(function LedgerCalendar({
     [year, monthIndex],
   )
 
-  const fmtPlain = useMemo(
-    () =>
-      new Intl.NumberFormat('ko-KR', {
-        maximumFractionDigits: 0,
-      }),
-    [],
-  )
+  const amountTextClass =
+    'text-[0.625rem] font-semibold tabular-nums leading-tight md:text-[0.6875rem]'
 
   return (
     <div className="w-full">
       <div className="mb-2 grid grid-cols-7 gap-1 text-center text-sm font-medium text-text-soft md:text-base">
         {WEEK.map((d, i) => (
-          <div key={d} className={i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : ''}>{d}</div>
+          <div
+            key={d}
+            className={i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : ''}
+          >
+            {d}
+          </div>
         ))}
       </div>
       <div className="grid grid-cols-7 gap-1">
@@ -79,30 +98,44 @@ export const LedgerCalendar = memo(function LedgerCalendar({
           const dayLabels = getCalendarDayLabels(iso)
           const r = rollups.get(iso)
           const hasTx = r && r.count > 0
-          const memoLines = r?.memoLines ?? []
+          const contentRows = ledgerContentRows(iso, r)
+          const amounts = ledgerAmountSummary(r)
+          const hasContent = contentRows.length > 0
+          const hasFooter = amounts !== null
+          const isNoSpend = inMonth && noSpendDays.has(iso)
           const isToday = iso === todayIso
           const isSel = iso === selectedIso
           const isSunday = cellIdx % 7 === 0
           const isRedDay =
             inMonth &&
             (isSunday || isRedCalendarDay(dayLabels?.primaryKind))
-          /** 모든 날짜: 위(날짜·금액) / 아래(메모 칸) 고정 */
           const cellMinH = 'min-h-[6.25rem] md:min-h-[7.5rem]'
+
+          const watermarkClass = inMonth
+            ? isRedDay
+              ? 'text-red-500/[0.11]'
+              : 'text-text-primary/[0.08]'
+            : 'text-text-soft/[0.14]'
 
           return (
             <button
               key={iso}
               type="button"
+              aria-label={
+                isNoSpend ? `${iso} 가계부, 무지출 성공` : `${iso} 가계부`
+              }
               onClick={() => onSelectDay(iso)}
               onMouseEnter={(e) =>
                 onHover({ iso, clientX: e.clientX, clientY: e.clientY })
               }
               onMouseLeave={() => onHover(null)}
               className={[
-                'relative flex w-full flex-col rounded-lg border px-0.5 py-1.5 text-left md:py-2',
+                'relative flex w-full flex-col overflow-hidden rounded-lg border px-0.5 py-1.5 text-left md:py-2',
                 cellMinH,
                 inMonth
-                  ? 'border-border-subtle bg-surface-raised'
+                  ? isNoSpend
+                    ? 'border-amber-300/70 bg-gradient-to-br from-amber-50/95 via-surface-raised to-green-light/25'
+                    : 'border-border-subtle bg-surface-raised'
                   : 'border-transparent bg-neutral-cool/50 text-text-soft/60',
                 inMonth && isRedCalendarDay(dayLabels?.primaryKind)
                   ? 'ring-1 ring-inset ring-red-300/60'
@@ -118,90 +151,58 @@ export const LedgerCalendar = memo(function LedgerCalendar({
                 .filter(Boolean)
                 .join(' ')}
             >
-              <div className="flex min-h-0 w-full flex-1 flex-col justify-start gap-0.5">
-                <div className="w-full">
-                  <span
-                    className={[
-                      'text-base font-semibold tabular-nums md:text-lg',
-                      inMonth && !isRedDay ? 'text-text-primary' : '',
-                      isRedDay ? 'text-red-500' : '',
-                      !inMonth ? 'text-text-soft/60' : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                  >
-                    {day}
-                  </span>
-                  {dayLabels && inMonth ? (
-                    <CalendarDayLabelsInline
-                      iso={iso}
-                      className="mt-0.5"
-                    />
-                  ) : null}
-                </div>
-                {hasTx && r ? (
-                  <div className="mt-0.5 flex w-full flex-col gap-px">
-                    {r.income > 0 ? (
-                      <span
-                        className={[
-                          'text-[0.625rem] font-semibold tabular-nums leading-tight text-semantic-income md:text-[0.6875rem]',
-                          !inMonth ? 'opacity-80' : '',
-                        ]
-                          .filter(Boolean)
-                          .join(' ')}
-                      >
-                        +{fmtPlain.format(r.income)}
-                      </span>
-                    ) : null}
-                    {r.expense > 0 ? (
-                      <span
-                        className={[
-                          'text-[0.625rem] font-semibold tabular-nums leading-tight text-semantic-expense md:text-[0.6875rem]',
-                          !inMonth ? 'opacity-80' : '',
-                        ]
-                          .filter(Boolean)
-                          .join(' ')}
-                      >
-                        −{fmtPlain.format(r.expense)}
-                      </span>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-              <div
+              {isNoSpend ? (
+                <span
+                  className="pointer-events-none absolute left-0.5 top-0.5 z-[2] flex items-center gap-0.5 rounded-md bg-amber-100/95 px-1 py-px text-[0.5625rem] font-bold leading-none text-amber-900 shadow-sm ring-1 ring-amber-300/50 md:text-[0.625rem]"
+                  title="무지출 성공!"
+                >
+                  <span aria-hidden>{noSpendBadgeEmoji(iso)}</span>
+                  <span className="sr-only">무지출</span>
+                </span>
+              ) : null}
+              <span
+                aria-hidden
                 className={[
-                  'mt-auto flex min-h-[2rem] w-full shrink-0 flex-col justify-start border-t pt-1 text-[0.5625rem] leading-snug text-text-soft md:min-h-[2.25rem] md:text-[0.625rem]',
-                  inMonth ? 'border-border-subtle' : 'border-border-muted/80',
+                  'pointer-events-none absolute left-1/2 top-[42%] z-0 -translate-x-1/2 -translate-y-1/2 select-none text-[2.4rem] font-semibold leading-none tabular-nums md:top-[44%] md:text-[3rem]',
+                  watermarkClass,
+                  isNoSpend ? 'text-amber-600/[0.12]' : '',
                 ].join(' ')}
               >
-                {memoLines[0] ? (
-                  <>
-                    <p
-                      className={[
-                        'line-clamp-2 break-words',
-                        !inMonth ? 'opacity-70' : '',
-                      ]
-                        .filter(Boolean)
-                        .join(' ')}
+                {day}
+              </span>
+
+              <div className="relative z-[1] flex min-h-0 flex-1 flex-col gap-px pt-0.5">
+                {hasContent ? (
+                  <MarqueeTickerRows
+                    rows={contentRows}
+                    staggerKeyPrefix={iso}
+                    className={!inMonth ? 'opacity-70' : ''}
+                  />
+                ) : null}
+
+                {hasFooter && amounts ? (
+                  <div
+                    className={[
+                      'mt-auto flex w-full shrink-0 flex-col gap-px border-t pt-1',
+                      inMonth ? 'border-border-subtle' : 'border-border-muted/80',
+                    ].join(' ')}
+                  >
+                  {amounts.income > 0 ? (
+                    <span
+                      className={`${amountTextClass} text-semantic-income`}
                     >
-                      {memoLines[0]}
-                    </p>
-                    {memoLines[1] ? (
-                      <p
-                        className={[
-                          'mt-px line-clamp-1 break-words',
-                          !inMonth ? 'opacity-70' : '',
-                        ]
-                          .filter(Boolean)
-                          .join(' ')}
-                      >
-                        {memoLines[1]}
-                      </p>
-                    ) : null}
-                  </>
-                ) : (
-                  <span className="min-h-[1.125rem] shrink-0" aria-hidden />
-                )}
+                      {formatLedgerIncome(amounts.income)}
+                    </span>
+                  ) : null}
+                  {amounts.expense > 0 ? (
+                    <span
+                      className={`${amountTextClass} text-semantic-expense`}
+                    >
+                      {formatLedgerExpense(amounts.expense)}
+                    </span>
+                  ) : null}
+                  </div>
+                ) : null}
               </div>
             </button>
           )

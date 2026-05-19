@@ -1,32 +1,26 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { MarqueeTicker, type MarqueeSegment } from '../components/MarqueeTicker'
 import type { DdaySummaryLine } from './ddayCompute'
-
-function usePrefersReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(false)
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const apply = () => setReduced(mq.matches)
-    apply()
-    mq.addEventListener('change', apply)
-    return () => mq.removeEventListener('change', apply)
-  }, [])
-  return reduced
-}
 
 type Props = {
   lines: DdaySummaryLine[]
 }
 
+function linesToSegments(lines: DdaySummaryLine[]): MarqueeSegment[] {
+  return lines.map((line) => ({
+    id: line.id,
+    node: <span className="font-medium">{line.text}</span>,
+  }))
+}
+
 export function DdaySummaryTicker({ lines }: Props) {
   const [expanded, setExpanded] = useState(false)
-  const [hoverPause, setHoverPause] = useState(false)
-  const reducedMotion = usePrefersReducedMotion()
-
-  const durationSec = Math.min(110, Math.max(24, 10 + lines.length * 6.5))
 
   const actionBtnClass =
     'inline-flex min-h-[2.75rem] min-w-[4.5rem] shrink-0 items-center justify-center border-l border-border-subtle bg-surface-raised/80 px-2.5 text-xs font-semibold text-starbucks-green transition-colors hover:bg-green-light/35 md:min-h-11 md:px-3'
+
+  const ariaLabel = lines.map((l) => l.text).join(' · ')
 
   if (lines.length === 0) {
     return (
@@ -54,41 +48,9 @@ export function DdaySummaryTicker({ lines }: Props) {
     )
   }
 
-  const segmentItems = lines.map((line, i) => (
-    <span
-      key={line.id}
-      className="inline-flex shrink-0 items-center text-sm text-text-primary md:text-[0.95rem]"
-    >
-      {i > 0 ? (
-        <span className="mx-5 select-none text-gold/50" aria-hidden>
-          ·
-        </span>
-      ) : null}
-      <span className="font-medium">{line.text}</span>
-    </span>
-  ))
-
-  const segmentDup = lines.map((line, i) => (
-    <span
-      key={`d-${line.id}`}
-      className="inline-flex shrink-0 items-center text-sm text-text-primary md:text-[0.95rem]"
-    >
-      {i > 0 ? (
-        <span className="mx-5 select-none text-gold/50" aria-hidden>
-          ·
-        </span>
-      ) : null}
-      <span className="font-medium">{line.text}</span>
-    </span>
-  ))
-
   return (
     <div className="w-full min-w-0">
-      <div
-        className="overflow-hidden rounded-xl border border-border-subtle bg-gradient-to-r from-ceramic/95 via-well/50 to-ceramic/95 shadow-sm"
-        onMouseEnter={() => setHoverPause(true)}
-        onMouseLeave={() => setHoverPause(false)}
-      >
+      <div className="overflow-hidden rounded-xl border border-border-subtle bg-gradient-to-r from-ceramic/95 via-well/50 to-ceramic/95 shadow-sm">
         <div className="flex min-h-[2.75rem] items-stretch">
           <Link
             to="/calendar/dday"
@@ -100,51 +62,12 @@ export function DdaySummaryTicker({ lines }: Props) {
             </span>
           </Link>
 
-          <div className="relative min-h-[2.75rem] min-w-0 flex-1 overflow-hidden">
-            {reducedMotion ? (
-              <div
-                className="overflow-x-auto overscroll-x-contain px-3 py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                tabIndex={0}
-                aria-label="디데이 요약 · 가로로 스크롤"
-              >
-                <div className="flex w-max items-center whitespace-nowrap pr-4">
-                  {segmentItems}
-                </div>
-              </div>
-            ) : (
-              <>
-                <div
-                  className={[
-                    'dday-ticker-track',
-                    hoverPause ? 'dday-ticker-paused' : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                  style={{
-                    animationDuration: `${durationSec}s`,
-                  }}
-                >
-                  <div className="flex shrink-0 items-center py-2 pl-3 pr-10">
-                    {segmentItems}
-                  </div>
-                  <div
-                    className="flex shrink-0 items-center py-2 pl-3 pr-10"
-                    aria-hidden
-                  >
-                    {segmentDup}
-                  </div>
-                </div>
-                <div
-                  className="pointer-events-none absolute inset-y-0 left-0 z-[1] w-8 bg-gradient-to-r from-ceramic to-transparent"
-                  aria-hidden
-                />
-                <div
-                  className="pointer-events-none absolute inset-y-0 right-0 z-[1] w-12 bg-gradient-to-l from-ceramic to-transparent"
-                  aria-hidden
-                />
-              </>
-            )}
-          </div>
+          <MarqueeTicker
+            variant="banner"
+            segments={linesToSegments(lines)}
+            ariaLabel={ariaLabel}
+            className="pointer-events-auto"
+          />
 
           <button
             type="button"
