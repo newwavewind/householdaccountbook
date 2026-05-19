@@ -8,7 +8,7 @@ html.dark {
   --color-neutral-cool: #1a1a1a;
   --color-ceramic: #242424;
   --color-surface-raised: #1c1c1e;
-  --color-white: #1c1c1e;
+  --color-white: #2c2c2e;
 
   --color-text-primary: rgba(255, 255, 255, 0.92);
   --color-text-soft: rgba(255, 255, 255, 0.58);
@@ -16,21 +16,36 @@ html.dark {
   --color-text-muted: rgba(255, 255, 255, 0.65);
   --color-text-faint: rgba(255, 255, 255, 0.5);
 
+  --color-midnight-ink: rgba(255, 255, 255, 0.92);
+  --color-black: #ffffff;
+  --color-faded-grey: rgba(255, 255, 255, 0.55);
+
+  --color-starbucks-green: #6ee7b7;
+  --color-house-green: #a7f3d0;
+  --color-green-uplift: #5eead4;
+  --color-green-accent: #34d399;
+  --color-green-light: rgba(52, 211, 153, 0.22);
+  --color-rewards-green: #86efac;
+
   --color-charcoal-border: rgba(255, 255, 255, 0.22);
   --color-border-subtle: rgb(255 255 255 / 0.1);
   --color-border-muted: rgb(255 255 255 / 0.08);
   --color-border-default: rgb(255 255 255 / 0.14);
   --color-border-strong: rgb(255 255 255 / 0.18);
   --color-border-pill: rgb(255 255 255 / 0.28);
+  --color-input-border: rgba(255, 255, 255, 0.22);
 
   --color-well: rgb(255 255 255 / 0.05);
   --color-inset-highlight: rgb(255 255 255 / 0.06);
 
-  --color-green-light: rgba(0, 117, 74, 0.28);
+  --color-gold-lightest: rgb(40 36 28 / 0.85);
   --color-auth-gradient-from: #1a1a1a;
   --color-auth-gradient-via: #141414;
   --color-auth-gradient-to: #1c1c1e;
   --color-alert-surface: rgb(40 36 20 / 0.92);
+
+  --color-semantic-income: #4ade80;
+  --color-semantic-expense: #f87171;
 
   --shadow-card: 0 1px 3px rgb(0 0 0 / 0.45);
   --shadow-nav: 0 1px 4px rgb(0 0 0 / 0.5);
@@ -38,17 +53,114 @@ html.dark {
   --shadow-frap-stack: 0 2px 8px rgb(0 0 0 / 0.45), 0 8px 20px rgb(0 0 0 / 0.35);
 }
 
+/* theme2/3 라이트 전용 토큰이 html.dark보다 뒤에 와도 다크에서 재정의 */
+html.dark.theme2,
+html.dark.theme3 {
+  --color-neutral-warm: #141414;
+  --color-neutral-cool: #1a1a1a;
+  --color-ceramic: #242424;
+  --color-surface-raised: #1c1c1e;
+  --color-white: #2c2c2e;
+
+  --color-text-primary: rgba(255, 255, 255, 0.92);
+  --color-text-soft: rgba(255, 255, 255, 0.58);
+  --color-text-secondary: rgba(255, 255, 255, 0.78);
+  --color-text-muted: rgba(255, 255, 255, 0.65);
+  --color-text-faint: rgba(255, 255, 255, 0.5);
+  --color-midnight-ink: rgba(255, 255, 255, 0.92);
+
+  --color-border-subtle: rgb(255 255 255 / 0.1);
+  --color-border-muted: rgb(255 255 255 / 0.08);
+  --color-border-default: rgb(255 255 255 / 0.14);
+  --color-border-strong: rgb(255 255 255 / 0.2);
+  --color-border-pill: rgb(255 255 255 / 0.28);
+  --color-charcoal-border: rgba(255, 255, 255, 0.24);
+  --color-input-border: rgba(255, 255, 255, 0.22);
+
+  --color-well: rgb(255 255 255 / 0.05);
+  --color-inset-highlight: rgb(255 255 255 / 0.06);
+  --color-auth-gradient-from: #1a1a1a;
+  --color-auth-gradient-via: #141414;
+  --color-auth-gradient-to: #1c1c1e;
+  --color-alert-surface: rgb(40 36 20 / 0.92);
+}
+
 html.dark.theme2 {
   --color-starbucks-green: #e8e8e8;
   --color-green-accent: #a3e635;
   --color-green-light: rgba(163, 230, 53, 0.2);
   --color-on-accent: #000000;
+  --color-semantic-income: #a3e635;
+  --color-semantic-expense: #f87171;
 }
 
 html.dark.theme3 {
   --color-starbucks-green: #6ee7b7;
-  --color-green-accent: #34d399;
-  --color-green-light: rgba(52, 211, 153, 0.18);
+  --color-green-accent: #fbbf24;
+  --color-green-light: rgba(251, 191, 36, 0.18);
+  --color-on-accent: #000000;
+  --color-semantic-income: #4ade80;
+  --color-semantic-expense: #f87171;
+}
+
+html.dark h1,
+html.dark h2,
+html.dark.theme2 h1,
+html.dark.theme2 h2,
+html.dark.theme3 h1,
+html.dark.theme3 h2 {
+  color: var(--color-text-primary);
+}
+
+/* 폼·선택 — 라이트 배경 하드코딩 방지 */
+html.dark :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='color']
+      ):not([type='hidden']):not([type='file']),
+    textarea,
+    select
+  ) {
+  background-color: var(--color-surface-raised);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-default);
+}
+
+html.dark :where(input::placeholder, textarea::placeholder) {
+  color: var(--color-text-soft);
+}
+
+html.dark :where(select option) {
+  background-color: var(--color-surface-raised);
+  color: var(--color-text-primary);
+}
+
+/* TipTap / 리치 텍스트 */
+html.dark :where(.ProseMirror) {
+  color: var(--color-text-primary);
+  caret-color: var(--color-green-accent);
+}
+
+html.dark :where(.ProseMirror p.is-editor-empty:first-child::before) {
+  color: var(--color-text-soft);
+}
+
+html.dark :where(.community-post-body pre) {
+  background: var(--color-neutral-cool);
+  color: var(--color-text-primary);
+}
+
+html.dark :where(.community-post-body a) {
+  color: var(--color-green-accent);
+}
+
+/* 스티커·달력 메모 에디터 */
+html.dark :where(.calendar-sticky-rich-editor .ProseMirror) {
+  color: var(--color-text-primary);
+}
+
+/* 하드코딩 유틸 보정 (자주 쓰는 패턴) */
+html.dark :where(.bg-black\/\[0\.03\], .bg-black\/\[0\.04\], .bg-black\/\[0\.06\]) {
+  background-color: rgb(255 255 255 / 0.06) !important;
 }
 
 html.dark.liquid-glass,
@@ -66,4 +178,16 @@ html.dark.liquid-glass {
   --lg-fill-strong: rgba(50, 50, 54, 0.72);
   --lg-border: rgba(255, 255, 255, 0.18);
   --lg-border-outer: rgba(255, 255, 255, 0.1);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html.dark.liquid-glass :where(header, section, article, nav, select, input, textarea) {
+    background: rgba(28, 28, 30, 0.94) !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  html.dark.liquid-glass :where(header, section, article, nav) {
+    background: var(--color-surface-raised) !important;
+  }
 }

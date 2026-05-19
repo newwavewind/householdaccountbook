@@ -69,7 +69,7 @@ export function CalendarInkColorDropdown({
         className={
           [
             toolbar
-              ? 'flex h-7 w-9 max-w-9 touch-manipulation items-center justify-center gap-px rounded border border-black/18 bg-white/85 px-0.5 outline-none transition-colors hover:bg-black/[0.06] focus-visible:ring-2 focus-visible:ring-black/25'
+              ? 'flex h-7 w-9 max-w-9 touch-manipulation items-center justify-center gap-px rounded border border-black/18 bg-white/85 px-0.5 outline-none transition-colors hover:bg-black/[0.06] focus-visible:ring-2 focus-visible:ring-black/25 dark:border-white/18 dark:bg-white/10 dark:hover:bg-white/10 dark:focus-visible:ring-white/25'
               : 'flex min-h-11 w-[7.25rem] max-w-full touch-manipulation items-center justify-between gap-2 rounded-[var(--radius-card)] border border-border-default bg-surface-raised px-2.5 py-2 text-left shadow-sm outline-none transition-colors hover:bg-well focus-visible:ring-2 focus-visible:ring-green-accent/35',
             triggerClassName ?? '',
           ]

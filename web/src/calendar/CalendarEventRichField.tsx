@@ -295,7 +295,7 @@ export function CalendarEventRichField({
   ) : null
 
   const toolbarSelectClass = isSticky
-    ? `${st.toolbarBtnClass} h-7 max-w-[4.75rem] shrink-0 rounded border border-black/10 bg-white/80 px-1 text-[9px]`
+    ? `${st.toolbarBtnClass} h-7 max-w-[4.75rem] shrink-0 rounded border border-black/10 bg-white/80 px-1 text-[9px] dark:border-white/15 dark:bg-white/10 dark:text-text-primary`
     : 'h-8 max-w-[5.5rem] shrink-0 rounded-md border border-border-default bg-surface-raised px-2 text-[11px] text-text-primary outline-none transition-colors focus-visible:ring-2 focus-visible:ring-green-accent/35'
 
   const fontSelect = (
@@ -530,7 +530,7 @@ export function CalendarEventRichField({
 
   if (isSticky) {
     return (
-      <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-transparent">
+      <div className="calendar-sticky-rich-editor flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-transparent">
         {hiddenFileInput}
         <div
           className={`min-h-0 flex-1 overflow-y-auto ${st.placeholderClass} [&_.ProseMirror]:px-3 [&_.ProseMirror]:py-2`}
@@ -554,7 +554,7 @@ export function CalendarEventRichField({
   return (
     <div className="w-full overflow-hidden rounded-[var(--radius-card)] border border-border-subtle bg-surface-raised shadow-[var(--shadow-card)]">
       <div
-        className="flex flex-wrap items-center gap-x-1 gap-y-1 border-b border-border-muted bg-ceramic/35 px-2 py-1.5 theme2:border-border-subtle theme2:bg-well theme2:shadow-none theme3:bg-neutral-cool/40"
+        className="flex flex-wrap items-center gap-x-1 gap-y-1 border-b border-border-muted bg-ceramic/35 px-2 py-1.5 dark:bg-well theme2:border-border-subtle theme2:bg-well theme2:shadow-none theme3:bg-neutral-cool/40 dark:theme3:bg-well"
         role="toolbar"
         aria-label={`${ariaLabel} 서식`}
       >

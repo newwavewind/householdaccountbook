@@ -7,10 +7,12 @@ const variants = {
   primary:
     'border-green-accent bg-green-accent text-on-accent theme2:border-charcoal-border theme2:shadow-[var(--shadow-frap-base)]',
   outlined: 'border-green-accent bg-transparent text-green-accent',
-  black: 'border-black bg-black text-sm text-white',
+  black:
+    'border-black bg-black text-sm text-white dark:border-white/25 dark:bg-white/12 dark:text-text-primary',
   darkOutlined:
-    'border-text-primary bg-transparent text-sm text-text-primary',
-  inverted: 'border-white bg-white text-green-accent',
+    'border-text-primary bg-transparent text-sm text-text-primary dark:border-border-strong',
+  inverted:
+    'border-white bg-white text-green-accent dark:border-border-default dark:bg-surface-raised dark:text-green-accent',
   outlinedOnDark: 'border-white bg-transparent text-white',
 } as const
 

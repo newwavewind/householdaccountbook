@@ -320,12 +320,12 @@ function DayMemoPanel({
                             return next
                           })
                         }}
-                        className="size-3.5 rounded border-black/25 text-text-primary"
+                        className="size-3.5 rounded border-black/25 text-text-primary dark:border-white/30"
                       />
                       중요
                     </label>
                     <div
-                      className="relative flex h-7 w-[7.25rem] max-w-[42vw] shrink-0 items-stretch overflow-hidden rounded border border-black/20 bg-white/90 sm:max-w-none"
+                      className="relative flex h-7 w-[7.25rem] max-w-[42vw] shrink-0 items-stretch overflow-hidden rounded border border-black/20 bg-white/90 sm:max-w-none dark:border-white/15 dark:bg-surface-raised"
                       title={ev.time?.trim() ? undefined : '시간 미지정'}
                     >
                       <input
@@ -347,7 +347,7 @@ function DayMemoPanel({
                       {ev.time?.trim() ? (
                         <button
                           type="button"
-                          className="absolute right-0 top-0 flex h-full w-6 shrink-0 items-center justify-center border-l border-black/15 bg-white/95 text-[0.95rem] leading-none text-text-muted hover:bg-black/[0.06]"
+                          className="absolute right-0 top-0 flex h-full w-6 shrink-0 items-center justify-center border-l border-black/15 bg-white/95 text-[0.95rem] leading-none text-text-muted hover:bg-black/[0.06] dark:border-white/12 dark:bg-surface-raised dark:hover:bg-white/8"
                           aria-label={`일정 ${i + 1} 시간 없음`}
                           title="시간 지정 안 함"
                           onClick={() => {
@@ -547,7 +547,7 @@ function CalendarDayPeekSheet({
                           onChange={(e) =>
                             onToggleEventImportant(ev.id, e.target.checked)
                           }
-                          className="size-3.5 rounded border-black/25 text-amber-600"
+                          className="size-3.5 rounded border-black/25 text-amber-600 dark:border-white/30"
                         />
                         <span className="text-amber-800">
                           {events.length > 1 ? `일정 ${idx + 1} 중요` : '중요'}
@@ -935,7 +935,7 @@ export default function CalendarPage() {
                   type="checkbox"
                   checked={lunarView}
                   onChange={toggleLunarView}
-                  className="size-3.5 rounded border-black/25 text-green-accent"
+                  className="size-3.5 rounded border-black/25 text-green-accent dark:border-white/30"
                 />
                 음력
               </label>

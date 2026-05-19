@@ -74,7 +74,9 @@ export function CalendarEventMemoTintPicker({
   const btnRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const isCharcoal = value === 'charcoal'
-  const swatchBorder = isCharcoal ? 'border-white/25' : 'border-black/15'
+  const swatchBorder = isCharcoal
+    ? 'border-white/25'
+    : 'border-black/15 dark:border-white/15'
 
   const reposition = () => {
     const btn = btnRef.current
@@ -148,7 +150,7 @@ export function CalendarEventMemoTintPicker({
         }
       }
       className={`rounded-lg border bg-surface-raised p-2 shadow-lg ${
-        isCharcoal ? 'border-white/20' : 'border-black/10'
+        isCharcoal ? 'border-white/20' : 'border-black/10 dark:border-white/12'
       }`}
     >
       <p className="mb-1.5 px-1 text-[0.65rem] font-medium text-text-soft">
@@ -169,7 +171,7 @@ export function CalendarEventMemoTintPicker({
             }}
           >
             <span
-              className="block h-7 w-full rounded-sm border border-black/10"
+              className="block h-7 w-full rounded-sm border border-black/10 dark:border-white/12"
               style={{ backgroundColor: BODY_PREVIEW[t] }}
               aria-hidden
             />
