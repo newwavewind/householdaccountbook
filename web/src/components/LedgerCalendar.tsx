@@ -1,5 +1,9 @@
 ﻿import { memo, useMemo } from 'react'
-import { holidayLabel } from '../lib/holidays'
+import {
+  getCalendarDayLabels,
+  isRedCalendarDay,
+} from '../lib/holidays'
+import { CalendarDayLabelsInline } from './CalendarDayLabelsInline'
 import type { DayRollup } from '../lib/dayTotals'
 
 const WEEK = ['일', '월', '화', '수', '목', '금', '토'] as const
@@ -72,14 +76,16 @@ export const LedgerCalendar = memo(function LedgerCalendar({
       </div>
       <div className="grid grid-cols-7 gap-1">
         {cells.map(({ iso, day, inMonth }, cellIdx) => {
-          const hol = holidayLabel(iso)
+          const dayLabels = getCalendarDayLabels(iso)
           const r = rollups.get(iso)
           const hasTx = r && r.count > 0
           const memoLines = r?.memoLines ?? []
           const isToday = iso === todayIso
           const isSel = iso === selectedIso
           const isSunday = cellIdx % 7 === 0
-          const isRedDay = (isSunday || !!hol) && inMonth
+          const isRedDay =
+            inMonth &&
+            (isSunday || isRedCalendarDay(dayLabels?.primaryKind))
           /** 모든 날짜: 위(날짜·금액) / 아래(메모 칸) 고정 */
           const cellMinH = 'min-h-[6.25rem] md:min-h-[7.5rem]'
 
@@ -98,7 +104,9 @@ export const LedgerCalendar = memo(function LedgerCalendar({
                 inMonth
                   ? 'border-border-subtle bg-surface-raised'
                   : 'border-transparent bg-neutral-cool/50 text-text-soft/60',
-                hol && inMonth ? 'ring-1 ring-inset ring-red-300/60' : '',
+                inMonth && isRedCalendarDay(dayLabels?.primaryKind)
+                  ? 'ring-1 ring-inset ring-red-300/60'
+                  : '',
                 hasTx && inMonth
                   ? 'shadow-[0_0_0_1px_rgba(0,117,74,0.25)]'
                   : '',
@@ -124,10 +132,11 @@ export const LedgerCalendar = memo(function LedgerCalendar({
                   >
                     {day}
                   </span>
-                  {hol && inMonth ? (
-                    <span className="mt-0.5 block w-full line-clamp-1 text-left text-[0.65rem] font-medium leading-tight text-red-400 md:text-xs">
-                      {hol}
-                    </span>
+                  {dayLabels && inMonth ? (
+                    <CalendarDayLabelsInline
+                      iso={iso}
+                      className="mt-0.5"
+                    />
                   ) : null}
                 </div>
                 {hasTx && r ? (

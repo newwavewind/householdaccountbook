@@ -1,4 +1,4 @@
-﻿import { holidayLabel } from '../lib/holidays'
+﻿import { CalendarDayLabelsInline } from './CalendarDayLabelsInline'
 import type { DayRollup } from '../lib/dayTotals'
 
 export function CalendarHoverTooltip({
@@ -18,7 +18,6 @@ export function CalendarHoverTooltip({
 }) {
   if (!show || !iso) return null
 
-  const hol = holidayLabel(iso)
   const label = new Intl.DateTimeFormat('ko-KR', {
     year: 'numeric',
     month: 'short',
@@ -40,9 +39,7 @@ export function CalendarHoverTooltip({
       style={{ left, top }}
     >
       <p className="font-semibold text-starbucks-green">{label}</p>
-      {hol ? (
-        <p className="mt-0.5 text-xs font-medium text-gold">{hol}</p>
-      ) : null}
+      <CalendarDayLabelsInline iso={iso} variant="detail" className="mt-0.5" />
       <p className="mt-2 text-xs text-text-soft">
         수입{' '}
         <span className="font-medium text-semantic-income">

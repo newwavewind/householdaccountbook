@@ -20,7 +20,12 @@ import { buildDdaySummaryLines, eventsOnCalendarDay } from '../dday/ddayCompute'
 import { DdaySummaryTicker } from '../dday/DdaySummaryTicker'
 import { useHouseholdDDays } from '../dday/useHouseholdDDays'
 import { useLedger } from '../hooks/useLedger'
-import { holidayLabel } from '../lib/holidays'
+import {
+  getCalendarDayLabels,
+  holidayLabel,
+  isRedCalendarDay,
+} from '../lib/holidays'
+import { CalendarDayLabelsInline } from '../components/CalendarDayLabelsInline'
 import { isCloudSyncEnabled } from '../lib/supabaseClient'
 import { ledgerBackendMode } from '../lib/ledgerBackend'
 import {
@@ -241,10 +246,8 @@ function DayMemoPanel({
           <p className="text-base font-semibold text-starbucks-green">
             {formatSelectedHeading(iso)}
           </p>
-          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm text-text-soft">
-            {hol ? (
-              <span className="font-medium text-gold">{hol}</span>
-            ) : null}
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-soft">
+            <CalendarDayLabelsInline iso={iso} variant="detail" />
             {lunar ? (
               <span
                 className={
@@ -540,10 +543,8 @@ function CalendarDayPeekSheet({
                   </span>
                 ) : null}
               </p>
-              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm text-text-soft">
-                {hol ? (
-                  <span className="font-medium text-gold">{hol}</span>
-                ) : null}
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-soft">
+                <CalendarDayLabelsInline iso={iso} variant="detail" />
                 {lunar ? (
                   <span
                     className={
@@ -929,7 +930,7 @@ export default function CalendarPage() {
 
           <div className="grid grid-cols-7 gap-0.5 md:gap-1">
             {cells.map(({ iso, day, inMonth }, cellIdx) => {
-              const hol = holidayLabel(iso)
+              const dayLabels = getCalendarDayLabels(iso)
               const memo = memos[iso]
               const hasMemo = memoHasContent(memo)
               const cellBgImage = hasMemo
@@ -940,7 +941,9 @@ export default function CalendarPage() {
               const isToday = iso === today
               const isSel = iso === selectedIso
               const isSunday = cellIdx % 7 === 0
-              const isRedDay = (isSunday || !!hol) && inMonth
+              const isRedDay =
+                inMonth &&
+                (isSunday || isRedCalendarDay(dayLabels?.primaryKind))
               const starImportant =
                   getDayEvents(memo).some((e) => e.important === true) && hasMemo
               const ddaysThisDay = eventsOnCalendarDay(iso, ddayEvents)
@@ -987,7 +990,9 @@ export default function CalendarPage() {
                   className={[
                     'relative flex min-h-[5rem] w-full cursor-pointer flex-col overflow-hidden rounded-lg border px-1 py-1.5 text-left transition-colors active:scale-[0.98] md:min-h-[6.25rem] md:px-1.5 md:py-2',
                     inMonth ? inMonthBase : outMonthBase,
-                    hol && inMonth ? 'ring-1 ring-inset ring-red-300/60' : '',
+                    inMonth && isRedCalendarDay(dayLabels?.primaryKind)
+                      ? 'ring-1 ring-inset ring-red-300/60'
+                      : '',
                     hasLedger && inMonth
                       ? 'shadow-[0_0_0_1px_rgba(0,117,74,0.2)]'
                       : '',
@@ -1045,12 +1050,11 @@ export default function CalendarPage() {
                         {txCount}
                       </span>
                     ) : null}
-                    {hol && inMonth ? (
-                      <span
-                        className={`line-clamp-2 text-left text-[0.62rem] font-medium leading-tight text-red-500 md:text-[0.68rem] ${cellTextShadow}`}
-                      >
-                        {hol}
-                      </span>
+                    {dayLabels && inMonth ? (
+                      <CalendarDayLabelsInline
+                        iso={iso}
+                        className={cellTextShadow}
+                      />
                     ) : null}
                     {hasMemo ? (
                       <ul className="line-clamp-3 w-full space-y-0.5 text-left text-[0.65rem] leading-snug md:text-[0.7rem]">
