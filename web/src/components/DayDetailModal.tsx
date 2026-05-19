@@ -50,14 +50,14 @@ export function DayDetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4"
       role="presentation"
       onClick={onClose}
     >
       <div
         role="dialog"
         aria-modal
-        className="flex max-h-[92dvh] w-full max-w-lg flex-col rounded-t-[var(--radius-card)] bg-surface-raised shadow-[var(--shadow-card)] sm:max-h-[85dvh] sm:rounded-[var(--radius-card)]"
+        className="flex max-h-[min(85dvh,32rem)] w-full max-w-lg flex-col rounded-[var(--radius-card)] bg-surface-raised shadow-[var(--shadow-card)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="border-b border-border-muted px-5 py-4">
