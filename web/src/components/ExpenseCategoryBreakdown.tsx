@@ -212,12 +212,6 @@ export function ExpenseCategoryBreakdown({
           )
         })}
       </ul>
-
-      {!selected ? (
-        <p className="mt-4 text-center text-sm text-text-soft">
-          분류를 누르면 해당 분류 거래 목록과 합계·비율이 펼쳐져 보여요.
-        </p>
-      ) : null}
     </div>
   )
 }

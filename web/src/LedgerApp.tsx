@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Link, NavLink, useSearchParams } from 'react-router-dom'
+import { NavLink, useSearchParams } from 'react-router-dom'
 import { Button } from './components/ui/Button'
 import { Card } from './components/ui/Card'
 import { Fab } from './components/ui/Fab'
@@ -44,6 +44,322 @@ function compareTransactions(a: Transaction, b: Transaction, cfg: TxListSort) {
 
 const LEGACY_CARD_BRAND_SENTINEL = '__legacy_card__'
 type ExpensePayFilter = 'all' | 'cash' | 'ieum' | 'card'
+type TxListTab = 'all' | 'income' | 'expense'
+type LedgerDetailPanel = 'transactions' | 'category'
+
+const LEDGER_DETAIL_PANELS: { id: LedgerDetailPanel; label: string }[] = [
+  { id: 'transactions', label: '거래 내역' },
+  { id: 'category', label: '분류별 지출' },
+]
+
+function LedgerPanelNavButton({
+  direction,
+  label,
+  onClick,
+}: {
+  direction: 'prev' | 'next'
+  label: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-starbucks-green/15 bg-surface-raised/90 text-starbucks-green shadow-[var(--shadow-frap-base)] backdrop-blur-sm transition-all hover:border-starbucks-green/35 hover:bg-house-green/10 active:scale-[0.97]"
+      onClick={onClick}
+    >
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.25"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden
+      >
+        {direction === 'prev' ? (
+          <path d="M15 18l-6-6 6-6" />
+        ) : (
+          <path d="M9 18l6-6-6-6" />
+        )}
+      </svg>
+    </button>
+  )
+}
+
+function LedgerDetailPanelHeader({
+  detailPanel,
+  onSelect,
+  onPrev,
+  onNext,
+  prevLabel,
+  nextLabel,
+}: {
+  detailPanel: LedgerDetailPanel
+  onSelect: (id: LedgerDetailPanel) => void
+  onPrev: () => void
+  onNext: () => void
+  prevLabel: string
+  nextLabel: string
+}) {
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-border-subtle/80 bg-gradient-to-br from-house-green/[0.07] via-ceramic/50 to-surface-raised p-2 shadow-[var(--shadow-card)]">
+      <div
+        className="pointer-events-none absolute -right-8 -top-10 h-28 w-28 rounded-full bg-starbucks-green/10 blur-2xl"
+        aria-hidden
+      />
+      <div className="relative flex items-center gap-2">
+        <LedgerPanelNavButton direction="prev" label={prevLabel} onClick={onPrev} />
+        <div
+          role="tablist"
+          aria-label="화면 전환"
+          className="grid min-w-0 flex-1 grid-cols-2 gap-1 rounded-xl bg-black/[0.04] p-1 theme2:bg-neutral-cool/50"
+        >
+          {LEDGER_DETAIL_PANELS.map((panel) => {
+            const active = detailPanel === panel.id
+            return (
+              <button
+                key={panel.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                className={`rounded-lg px-2 py-2.5 text-sm font-semibold transition-all duration-200 ${
+                  active
+                    ? 'bg-surface-raised text-starbucks-green shadow-[var(--shadow-frap-base)] ring-1 ring-starbucks-green/20'
+                    : 'text-text-soft hover:bg-surface-raised/60 hover:text-text-primary'
+                }`}
+                onClick={() => onSelect(panel.id)}
+              >
+                {panel.label}
+              </button>
+            )
+          })}
+        </div>
+        <LedgerPanelNavButton direction="next" label={nextLabel} onClick={onNext} />
+      </div>
+    </div>
+  )
+}
+
+function PaymentFilterIcon({ id }: { id: ExpensePayFilter }) {
+  const common = {
+    width: 14,
+    height: 14,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 2,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    'aria-hidden': true,
+  }
+  if (id === 'all') {
+    return (
+      <svg {...common}>
+        <path d="M4 6h16M4 12h10M4 18h6" />
+      </svg>
+    )
+  }
+  if (id === 'cash') {
+    return (
+      <svg {...common}>
+        <rect x="2" y="6" width="20" height="12" rx="2" />
+        <circle cx="12" cy="12" r="2.5" />
+      </svg>
+    )
+  }
+  if (id === 'ieum') {
+    return (
+      <svg {...common}>
+        <path d="M3 10h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8z" />
+        <path d="M3 10l2-4h14l2 4" />
+      </svg>
+    )
+  }
+  return (
+    <svg {...common}>
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <path d="M2 10h20" />
+    </svg>
+  )
+}
+
+const EXPENSE_PAY_FILTERS: { id: ExpensePayFilter; label: string }[] = [
+  { id: 'all', label: '전체' },
+  { id: 'cash', label: '현금' },
+  { id: 'ieum', label: '이음카드' },
+  { id: 'card', label: '신용카드' },
+]
+
+function LedgerSectionTitle({ title }: { title: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span
+        className="h-8 w-1 shrink-0 rounded-full bg-gradient-to-b from-starbucks-green to-house-green"
+        aria-hidden
+      />
+      <h2 className="!m-0 text-lg font-bold tracking-tight text-starbucks-green md:text-xl">
+        {title}
+      </h2>
+    </div>
+  )
+}
+
+function ExpensePayFilterBar({
+  value,
+  cardBrandFilter,
+  cardRows,
+  legacyCount,
+  selectedTotal,
+  fmtKrw,
+  onChange,
+  onCardBrandChange,
+}: {
+  value: ExpensePayFilter
+  cardBrandFilter: string | null
+  cardRows: { id: string; label: string; sum: number }[]
+  legacyCount: number
+  selectedTotal: number
+  fmtKrw: Intl.NumberFormat
+  onChange: (id: ExpensePayFilter) => void
+  onCardBrandChange: (id: string | null) => void
+}) {
+  return (
+    <div className="min-w-0 flex-1 rounded-xl border border-border-subtle/60 bg-ceramic/30 p-2">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {EXPENSE_PAY_FILTERS.map((chip) => {
+          const active = value === chip.id
+          return (
+            <button
+              key={chip.id}
+              type="button"
+              aria-pressed={active}
+              aria-label={
+                active
+                  ? `${chip.label} 합계 ${fmtKrw.format(selectedTotal)}`
+                  : chip.label
+              }
+              onClick={() => onChange(chip.id)}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-all duration-200 ${
+                active
+                  ? 'border-starbucks-green/35 bg-starbucks-green/10 text-starbucks-green ring-1 ring-starbucks-green/20'
+                  : 'border-border-subtle/80 bg-surface-raised text-text-secondary hover:border-starbucks-green/25 hover:text-starbucks-green'
+              }`}
+            >
+              <PaymentFilterIcon id={chip.id} />
+              <span>{chip.label}</span>
+              {active ? (
+                <span className="tabular-nums text-semantic-expense">
+                  −{fmtKrw.format(selectedTotal)}
+                </span>
+              ) : null}
+            </button>
+          )
+        })}
+        {value === 'card' ? (
+          <label className="inline-flex items-center gap-2 rounded-lg border border-border-subtle/80 bg-surface-raised px-3 py-2">
+            <span className="text-xs text-text-soft">카드사</span>
+            <select
+              className="cursor-pointer bg-transparent text-xs font-semibold text-text-primary outline-none"
+              aria-label="신용 카드사 선택"
+              value={cardBrandFilter ?? ''}
+              onChange={(e) =>
+                onCardBrandChange(e.target.value ? e.target.value : null)
+              }
+            >
+              <option value="">전체</option>
+              {cardRows.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.label}
+                </option>
+              ))}
+              {legacyCount > 0 ? (
+                <option value={LEGACY_CARD_BRAND_SENTINEL}>미입력</option>
+              ) : null}
+            </select>
+          </label>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+function filterExpenseTransactions(
+  base: Transaction[],
+  payFilter: ExpensePayFilter,
+  cardBrandFilter: string | null,
+): Transaction[] {
+  if (payFilter === 'all') return base
+  if (payFilter === 'cash') return base.filter((t) => t.paymentMethod === 'cash')
+  if (payFilter === 'ieum') return base.filter((t) => t.paymentMethod === 'ieum')
+  let list = base.filter((t) => t.paymentMethod === 'card')
+  if (cardBrandFilter === null) return list
+  if (cardBrandFilter === LEGACY_CARD_BRAND_SENTINEL) {
+    return list.filter((t) => !t.cardBrand)
+  }
+  return list.filter((t) => t.cardBrand === cardBrandFilter)
+}
+
+function expensePaymentLabel(t: Transaction): string {
+  if (t.paymentMethod === 'cash') return '현금'
+  if (t.paymentMethod === 'ieum') return '이음카드'
+  if (t.paymentMethod === 'card') {
+    return t.cardBrand
+      ? (cardBrandLabel(t.cardBrand) ?? t.cardBrand)
+      : '신용카드(미입력)'
+  }
+  return '미입력'
+}
+
+function TransactionLedgerRow({
+  t,
+  fmtKrw,
+  onSelectDate,
+}: {
+  t: Transaction
+  fmtKrw: Intl.NumberFormat
+  onSelectDate: (iso: string) => void
+}) {
+  const isIncome = t.type === 'income'
+  return (
+    <li className="flex items-start gap-3 py-3">
+      <button
+        type="button"
+        className="min-w-0 flex-1 rounded-lg py-0.5 text-left transition-colors hover:bg-neutral-cool/40"
+        onClick={() => onSelectDate(t.date)}
+      >
+        <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm text-text-soft">
+          <span className="tabular-nums">{t.date}</span>
+          {t.category ? (
+            <span className="text-text-primary/80">{t.category}</span>
+          ) : null}
+        </span>
+        {t.memo ? (
+          <span className="mt-0.5 block truncate text-sm font-medium text-text-primary">
+            {t.memo}
+          </span>
+        ) : null}
+      </button>
+      <div className="flex shrink-0 flex-col items-end gap-0.5 self-center">
+        {!isIncome ? (
+          <span className="max-w-[8.5rem] truncate text-[0.7rem] text-text-soft">
+            {expensePaymentLabel(t)}
+          </span>
+        ) : null}
+        <span
+          className={`text-sm font-semibold tabular-nums tracking-tight ${
+            isIncome ? 'text-semantic-income' : 'text-semantic-expense'
+          }`}
+        >
+          {isIncome ? '+' : '−'}
+          {fmtKrw.format(t.amount)}
+        </span>
+      </div>
+    </li>
+  )
+}
 
 function SortToggleRow({
   value,
@@ -61,7 +377,6 @@ function SortToggleRow({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-xs text-text-soft">정렬</span>
       <Button
         type="button"
         aria-pressed={value.primary === 'amount'}
@@ -82,54 +397,6 @@ function SortToggleRow({
         날짜순{' '}
         <span className="tabular-nums">{dateSubs}</span>
       </Button>
-    </div>
-  )
-}
-
-function TransactionListSummaryBanner({
-  count,
-  formattedSum,
-  variant,
-}: {
-  count: number
-  formattedSum: string
-  variant: 'income' | 'expense'
-}) {
-  const sumClass =
-    variant === 'income' ? 'text-semantic-income' : 'text-semantic-expense'
-  const sign = variant === 'income' ? '+' : '−'
-
-  return (
-    <div
-      className="mt-2 flex flex-col gap-1.5 rounded-lg bg-ceramic/50 px-3 py-2 sm:flex-row sm:flex-wrap sm:items-stretch sm:gap-3 md:px-3 md:py-2.5"
-      aria-label={`거래 ${count}건, 합계 ${formattedSum}`}
-    >
-      <div className="flex min-w-[5.75rem] flex-1 flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-2 md:min-w-0 md:flex-none">
-        <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-text-soft">
-          건수
-        </span>
-        <span className="flex items-baseline gap-1 tabular-nums">
-          <span className="text-xl font-semibold tracking-tight text-text-primary sm:text-[1.3rem]">
-            {count}
-          </span>
-          <span className="text-xs font-medium text-text-soft">건</span>
-        </span>
-      </div>
-      <div
-        className="hidden w-px shrink-0 bg-border-subtle sm:block sm:self-stretch sm:mx-0.5"
-        aria-hidden
-      />
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-2 md:flex-none md:justify-end">
-        <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-text-soft">
-          합계
-        </span>
-        <span
-          className={`text-lg font-semibold tabular-nums tracking-tight sm:text-xl ${sumClass}`}
-        >
-          {sign}
-          {formattedSum}
-        </span>
-      </div>
     </div>
   )
 }
@@ -189,12 +456,9 @@ export default function LedgerApp() {
     y: now.getFullYear(),
     m: now.getMonth(),
   })
-  const [incomeSort, setIncomeSort] = useState<TxListSort>({
-    primary: 'amount',
-    amountDir: 'desc',
-    dateDir: 'desc',
-  })
-  const [expenseSort, setExpenseSort] = useState<TxListSort>({
+  const [detailPanel, setDetailPanel] = useState<LedgerDetailPanel>('transactions')
+  const [txListTab, setTxListTab] = useState<TxListTab>('all')
+  const [txSort, setTxSort] = useState<TxListSort>({
     primary: 'amount',
     amountDir: 'desc',
     dateDir: 'desc',
@@ -302,78 +566,88 @@ export default function LedgerApp() {
     [filtered],
   )
 
-  const toggleIncomeAmount = useCallback(() => {
-    setIncomeSort((prev) => ({
+  const toggleTxAmount = useCallback(() => {
+    setTxSort((prev) => ({
       ...prev,
       primary: 'amount',
       amountDir: prev.amountDir === 'desc' ? 'asc' : 'desc',
     }))
   }, [])
 
-  const toggleIncomeDate = useCallback(() => {
-    setIncomeSort((prev) => ({
+  const toggleTxDate = useCallback(() => {
+    setTxSort((prev) => ({
       ...prev,
       primary: 'date',
       dateDir: prev.dateDir === 'desc' ? 'asc' : 'desc',
     }))
   }, [])
 
-  const toggleExpenseAmount = useCallback(() => {
-    setExpenseSort((prev) => ({
-      ...prev,
-      primary: 'amount',
-      amountDir: prev.amountDir === 'desc' ? 'asc' : 'desc',
-    }))
-  }, [])
-
-  const toggleExpenseDate = useCallback(() => {
-    setExpenseSort((prev) => ({
-      ...prev,
-      primary: 'date',
-      dateDir: prev.dateDir === 'desc' ? 'asc' : 'desc',
-    }))
-  }, [])
+  const monthIncomeTransactions = useMemo(
+    () => filtered.filter((t) => t.type === 'income'),
+    [filtered],
+  )
 
   const incomesSorted = useMemo(() => {
-    const list = filtered.filter((t) => t.type === 'income')
-    list.sort((a, b) => compareTransactions(a, b, incomeSort))
-    return list
-  }, [filtered, incomeSort])
+    const next = [...monthIncomeTransactions]
+    next.sort((a, b) => compareTransactions(a, b, txSort))
+    return next
+  }, [monthIncomeTransactions, txSort])
 
   const expensesFilteredSorted = useMemo(() => {
-    const base = filtered.filter((t) => t.type === 'expense')
-    let list: Transaction[]
-    if (expensePayFilter === 'all') {
-      list = base
-    } else if (expensePayFilter === 'cash') {
-      list = base.filter((t) => t.paymentMethod === 'cash')
-    } else if (expensePayFilter === 'ieum') {
-      list = base.filter((t) => t.paymentMethod === 'ieum')
-    } else {
-      list = base.filter((t) => t.paymentMethod === 'card')
-      if (expenseCardBrandFilter !== null) {
-        if (expenseCardBrandFilter === LEGACY_CARD_BRAND_SENTINEL) {
-          list = list.filter((t) => !t.cardBrand)
-        } else {
-          list = list.filter((t) => t.cardBrand === expenseCardBrandFilter)
-        }
-      }
-    }
+    const list = filterExpenseTransactions(
+      monthExpenseTransactions,
+      expensePayFilter,
+      expenseCardBrandFilter,
+    )
     const next = [...list]
-    next.sort((a, b) => compareTransactions(a, b, expenseSort))
+    next.sort((a, b) => compareTransactions(a, b, txSort))
     return next
   }, [
-    filtered,
+    monthExpenseTransactions,
     expensePayFilter,
     expenseCardBrandFilter,
-    expenseSort,
+    txSort,
   ])
 
+  const displayedTransactions = useMemo(() => {
+    if (txListTab === 'income') return incomesSorted
+    if (txListTab === 'expense') return expensesFilteredSorted
+    const combined = [
+      ...monthIncomeTransactions,
+      ...filterExpenseTransactions(
+        monthExpenseTransactions,
+        expensePayFilter,
+        expenseCardBrandFilter,
+      ),
+    ]
+    const next = [...combined]
+    next.sort((a, b) => compareTransactions(a, b, txSort))
+    return next
+  }, [
+    txListTab,
+    incomesSorted,
+    expensesFilteredSorted,
+    monthIncomeTransactions,
+    monthExpenseTransactions,
+    expensePayFilter,
+    expenseCardBrandFilter,
+    txSort,
+  ])
+
+  const monthNetTotal = incomeTotal - expenseTotal
+
   const expenseFilteredTotal = useMemo(
-    () =>
-      expensesFilteredSorted.reduce((s, t) => s + t.amount, 0),
+    () => expensesFilteredSorted.reduce((s, t) => s + t.amount, 0),
     [expensesFilteredSorted],
   )
+
+  const detailPanelIndex = LEDGER_DETAIL_PANELS.findIndex((p) => p.id === detailPanel)
+  const shiftDetailPanel = useCallback((delta: -1 | 1) => {
+    const next =
+      (detailPanelIndex + delta + LEDGER_DETAIL_PANELS.length) %
+      LEDGER_DETAIL_PANELS.length
+    setDetailPanel(LEDGER_DETAIL_PANELS[next].id)
+  }, [detailPanelIndex])
 
   const expensePaymentBreakdown = useMemo(() => {
     let cash = 0
@@ -570,10 +844,10 @@ export default function LedgerApp() {
           </p>
         </div>
       ) : null}
-      <header className="relative z-10 border-b border-border-subtle bg-surface-raised">
+      <header className="relative z-10 border-b border-border-subtle bg-gradient-to-r from-surface-raised via-ceramic/30 to-surface-raised">
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-3 px-4 md:h-[4.5rem] md:px-6 lg:h-[5.2rem]">
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <p className="truncate text-lg font-semibold tracking-[-0.16px] text-starbucks-green md:text-xl">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <p className="truncate text-xl font-bold tracking-tight text-starbucks-green">
               가계부
             </p>
             <NavLink
@@ -697,17 +971,11 @@ export default function LedgerApp() {
 
         {/* 가족 구성원 관리 + 필터 */}
         <section aria-label="가족 구성원">
-          <Card>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="!m-0 !text-base font-semibold text-starbucks-green">가족 구성원</h2>
-                <p className="mt-0.5 text-xs text-text-soft">
-                  이름을 클릭하면 해당 구성원만 필터 · 우클릭하면 삭제. 아래는 선택한 해
-                  연 누적 요약이에요.
-                </p>
-              </div>
+          <Card className="overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle/60 pb-4">
+              <LedgerSectionTitle title="가족 구성원" />
               <form
-                className="flex gap-2"
+                className="flex gap-2 rounded-2xl border border-border-subtle/70 bg-ceramic/40 p-1.5 shadow-sm"
                 onSubmit={(e) => {
                   e.preventDefault()
                   const trimmed = newMemberName.trim()
@@ -732,32 +1000,42 @@ export default function LedgerApp() {
               </form>
             </div>
 
-            {/* 구성원 탭 (필터) — 우클릭으로 삭제 */}
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => setSelectedMember(null)}
-                className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${selectedMember === null ? 'border-starbucks-green bg-starbucks-green text-white' : 'border-border-pill text-text-soft hover:bg-neutral-cool'}`}
+                className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
+                  selectedMember === null
+                    ? 'border-starbucks-green/40 bg-starbucks-green/10 text-starbucks-green ring-1 ring-starbucks-green/25'
+                    : 'border-border-pill bg-surface-raised text-text-soft hover:bg-neutral-cool/60'
+                }`}
               >
                 전체
               </button>
-              {cloudMembers.map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setSelectedMember(selectedMember === m ? null : m)}
-                  onContextMenu={(e) => {
-                    e.preventDefault()
-                    setDeleteConfirm({ member: m, step: 1 })
-                  }}
-                  className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${selectedMember === m ? 'border-starbucks-green bg-starbucks-green text-white' : 'border-border-pill text-text-primary hover:bg-neutral-cool'}`}
-                >
-                  {m}
-                </button>
-              ))}
+              {cloudMembers.map((m) => {
+                const active = selectedMember === m
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setSelectedMember(active ? null : m)}
+                    onContextMenu={(e) => {
+                      e.preventDefault()
+                      setDeleteConfirm({ member: m, step: 1 })
+                    }}
+                    className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
+                      active
+                        ? 'border-starbucks-green/40 bg-starbucks-green/10 text-starbucks-green ring-1 ring-starbucks-green/25'
+                        : 'border-border-pill bg-surface-raised text-text-primary hover:bg-neutral-cool/60'
+                    }`}
+                  >
+                    {m}
+                  </button>
+                )
+              })}
             </div>
 
-            <div className="mt-4 rounded-[var(--radius-card)] border border-gold/30 bg-gold-lightest/50 px-3 py-3 md:px-4 md:py-4">
+            <div className="mt-4 rounded-2xl border border-gold/25 bg-gradient-to-br from-gold-lightest/80 to-transparent px-3 py-3 md:px-4 md:py-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-text-soft">
                 {cursor.y}년 누적 · 전체{' '}
                 <span className="font-semibold tabular-nums text-text-secondary">
@@ -850,24 +1128,25 @@ export default function LedgerApp() {
         )}
 
         <section aria-label="달력">
-          <Card>
-            <div className="mb-4 flex flex-col gap-3 rounded-[var(--radius-card)] bg-ceramic/80 p-3 md:flex-row md:items-center md:justify-between md:p-4">
-              <div className="flex flex-1 items-center justify-between gap-2 md:justify-start">
+          <Card className="overflow-hidden">
+            <LedgerSectionTitle title="달력" />
+            <div className="mb-4 mt-4 flex flex-col gap-3 rounded-2xl border border-border-subtle/60 bg-gradient-to-r from-ceramic/70 via-surface-raised to-ceramic/40 p-2 shadow-[var(--shadow-frap-base)] md:flex-row md:items-center md:justify-between md:p-3">
+              <div className="flex flex-1 items-center justify-between gap-1 md:justify-start md:gap-2">
                 <Button
                   variant="outlined"
-                  className="!min-h-11 min-w-11 !px-3"
+                  className="!min-h-11 !min-w-11 !rounded-xl !px-0"
                   aria-label="이전 달"
                   type="button"
                   onClick={goPrevMonth}
                 >
                   ‹
                 </Button>
-                <p className="min-w-[10rem] flex-1 text-center text-base font-semibold text-text-primary md:text-lg">
+                <p className="min-w-[10rem] flex-1 text-center text-base font-bold tracking-tight text-starbucks-green md:text-lg">
                   {formatMonthLabel(cursor.y, cursor.m)}
                 </p>
                 <Button
                   variant="outlined"
-                  className="!min-h-11 min-w-11 !px-3"
+                  className="!min-h-11 !min-w-11 !rounded-xl !px-0"
                   aria-label="다음 달"
                   type="button"
                   onClick={goNextMonth}
@@ -878,7 +1157,7 @@ export default function LedgerApp() {
               <Button
                 variant="outlined"
                 type="button"
-                className="w-full shrink-0 md:w-auto"
+                className="w-full shrink-0 !rounded-xl md:w-auto"
                 onClick={goThisMonth}
               >
                 이번 달
@@ -912,25 +1191,6 @@ export default function LedgerApp() {
               </div>
             </div>
 
-            <h2 className="!m-0 !mb-3 !text-lg font-semibold text-starbucks-green">
-              달력 · 공휴일
-            </h2>
-            <p className="mb-2 text-sm text-text-soft">
-              날짜에 마우스를 올리면 요약이 보이고, 클릭하면{' '}
-              <span className="font-medium text-text-primary">이 날 거래</span>를
-              볼 수 있어요.
-            </p>
-            <p className="mb-4 text-sm text-text-soft">
-              시간·중요 표시·스티커형{' '}
-              <span className="font-medium text-text-primary">일정·메모</span>는{' '}
-              <Link
-                to="/calendar"
-                className="font-semibold text-starbucks-green underline-offset-2 hover:underline"
-              >
-                달력 화면
-              </Link>
-              에서 편집해요. 날짜를 눌렀을 때 뜨는 창에서도 바로 갈 수 있어요.
-            </p>
             <LedgerCalendar
               year={cursor.y}
               monthIndex={cursor.m}
@@ -943,254 +1203,169 @@ export default function LedgerApp() {
           </Card>
         </section>
 
-        <section aria-label="월별 수입 내역">
+        <section aria-label="거래·분류 상세">
           <Card>
-            <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h2 className="!m-0 !text-lg font-semibold text-starbucks-green">
-                  수입 내역
-                </h2>
-                <TransactionListSummaryBanner
-                  count={incomesSorted.length}
-                  formattedSum={fmtKrw.format(incomeTotal)}
-                  variant="income"
-                />
-              </div>
-              <SortToggleRow
-                value={incomeSort}
-                onToggleAmount={toggleIncomeAmount}
-                onToggleDate={toggleIncomeDate}
-              />
-            </div>
-            {incomesSorted.length === 0 ? (
-              <p className="py-8 text-center text-sm text-text-soft">
-                이번 달 수입 기록이 없습니다.
-              </p>
-            ) : (
-              <ul className="divide-y divide-black/[0.06]">
-                {incomesSorted.map((t) => (
-                  <li key={t.id}>
-                    <button
-                      type="button"
-                      className="flex w-full items-start justify-between gap-3 py-3 text-left transition-colors hover:bg-neutral-cool/50"
-                      onClick={() => {
-                        setDayModalIso(t.date)
-                        setSelectedIso(t.date)
-                      }}
-                    >
-                      <span className="min-w-0">
-                        <span className="text-sm text-text-soft">
-                          {t.date}
-                          {t.category ? ` · ${t.category}` : ''}
-                        </span>
-                        {t.memo ? (
-                          <span className="mt-0.5 block truncate text-sm text-text-primary">
-                            {t.memo}
-                          </span>
-                        ) : null}
-                      </span>
-                      <span className="shrink-0 font-semibold text-semantic-income">
-                        +{fmtKrw.format(t.amount)}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-        </section>
-
-        <section aria-label="이번 달 지출 내역">
-          <Card>
-            <div className="mb-3 flex flex-col gap-4">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div className="min-w-0 flex-1">
-                  <h2 className="!m-0 !text-lg font-semibold text-starbucks-green">
-                    지출 내역
-                  </h2>
-                  <TransactionListSummaryBanner
-                    count={expensesFilteredSorted.length}
-                    formattedSum={fmtKrw.format(expenseFilteredTotal)}
-                    variant="expense"
-                  />
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      aria-pressed={expensePayFilter === 'all'}
-                      onClick={() => {
-                        setExpensePayFilter('all')
-                        setExpenseCardBrandFilter(null)
-                      }}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                        expensePayFilter === 'all'
-                          ? 'border-starbucks-green bg-starbucks-green text-white'
-                          : 'border-border-pill text-text-primary hover:bg-neutral-cool'
-                      }`}
-                    >
-                      전체
-                    </button>
-                    <button
-                      type="button"
-                      aria-pressed={expensePayFilter === 'cash'}
-                      onClick={() => {
-                        setExpensePayFilter('cash')
-                        setExpenseCardBrandFilter(null)
-                      }}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                        expensePayFilter === 'cash'
-                          ? 'border-starbucks-green bg-starbucks-green text-white'
-                          : 'border-border-pill text-text-primary hover:bg-neutral-cool'
-                      }`}
-                    >
-                      현금
-                    </button>
-                    <button
-                      type="button"
-                      aria-pressed={expensePayFilter === 'ieum'}
-                      onClick={() => {
-                        setExpensePayFilter('ieum')
-                        setExpenseCardBrandFilter(null)
-                      }}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                        expensePayFilter === 'ieum'
-                          ? 'border-starbucks-green bg-starbucks-green text-white'
-                          : 'border-border-pill text-text-primary hover:bg-neutral-cool'
-                      }`}
-                    >
-                      이음카드
-                    </button>
-                    <button
-                      type="button"
-                      aria-pressed={expensePayFilter === 'card'}
-                      onClick={() => {
-                        setExpensePayFilter('card')
-                      }}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                        expensePayFilter === 'card'
-                          ? 'border-starbucks-green bg-starbucks-green text-white'
-                          : 'border-border-pill text-text-primary hover:bg-neutral-cool'
-                      }`}
-                    >
-                      신용카드
-                    </button>
-                    {expensePayFilter === 'card' ? (
-                      <label className="flex flex-wrap items-center gap-2 rounded-full border border-border-strong bg-ceramic/60 px-3 py-1.5">
-                        <span className="text-xs font-medium text-text-soft md:text-[0.8rem]">
-                          카드사
-                        </span>
-                        <select
-                          className="max-w-[11rem] min-w-[9rem] cursor-pointer rounded-md border border-border-subtle bg-surface-raised px-2 py-1 text-xs outline-none ring-green-accent/25 focus:ring-2 md:text-sm"
-                          aria-label="신용 카드사 선택"
-                          value={expenseCardBrandFilter ?? ''}
-                          onChange={(e) =>
-                            setExpenseCardBrandFilter(
-                              e.target.value ? e.target.value : null,
-                            )
-                          }
-                        >
-                          <option value="">전체 카드</option>
-                          {expensePaymentBreakdown.cardRows.map((row) => (
-                            <option key={row.id} value={row.id}>
-                              {row.label}
-                            </option>
-                          ))}
-                          {expensePaymentBreakdown.legacy > 0 ? (
-                            <option value={LEGACY_CARD_BRAND_SENTINEL}>
-                              미입력 · 과거 카드
-                            </option>
-                          ) : null}
-                        </select>
-                      </label>
-                    ) : null}
-                  </div>
-                </div>
-                <SortToggleRow
-                  value={expenseSort}
-                  onToggleAmount={toggleExpenseAmount}
-                  onToggleDate={toggleExpenseDate}
-                />
-              </div>
-            </div>
-            {expenseTotal === 0 ? (
-              <p className="py-8 text-center text-sm text-text-soft">
-                이번 달 지출 기록이 없습니다.
-              </p>
-            ) : expensesFilteredSorted.length === 0 ? (
-              <p className="py-8 text-center text-sm text-text-soft">
-                선택한 수단(또는 카드사)에 해당하는 지출이 없습니다.
-              </p>
-            ) : (
-              <ul className="divide-y divide-black/[0.06]">
-                {expensesFilteredSorted.map((t) => (
-                  <li key={t.id} className="flex items-start gap-2 py-3">
-                    <button
-                      type="button"
-                      className="min-w-0 flex-1 rounded-lg py-1 text-left transition-colors hover:bg-neutral-cool/50"
-                      onClick={() => {
-                        setDayModalIso(t.date)
-                        setSelectedIso(t.date)
-                      }}
-                    >
-                      <span className="block text-sm text-text-soft">
-                        {t.date}
-                        {t.category ? ` · ${t.category}` : ''}
-                      </span>
-                      {t.memo ? (
-                        <span className="mt-0.5 block truncate text-sm text-text-primary">
-                          {t.memo}
-                        </span>
-                      ) : null}
-                    </button>
-                    <div className="flex shrink-0 flex-col items-end gap-1 self-center">
-                      <span className="max-w-[9rem] truncate text-right text-xs text-text-soft">
-                        {t.paymentMethod === 'cash'
-                          ? '현금'
-                          : t.paymentMethod === 'ieum'
-                            ? '이음카드'
-                            : t.paymentMethod === 'card'
-                              ? t.cardBrand
-                                ? cardBrandLabel(t.cardBrand) ?? t.cardBrand
-                                : '신용카드(미입력)'
-                              : '미입력'}
-                      </span>
-                      <span className="font-semibold tabular-nums text-semantic-expense">
-                        −{fmtKrw.format(t.amount)}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-        </section>
-
-        <section aria-label="이번 달 분류별 지출">
-          <Card>
-            <h2 className="!m-0 !text-lg font-semibold text-starbucks-green">
-              이번 달 · 분류별 지출
-            </h2>
-            <p className="mt-1 text-sm text-text-soft">
-              등록 시 고른 분류 기준입니다. 분류를 누르면 해당 분류의 거래 목록과
-              합계·이번 달 전체 지출 대비 비율이 펼쳐져 보여요.
-            </p>
-            <ExpenseCategoryBreakdown
-              expenses={monthExpenseTransactions}
-              fmtKrw={fmtKrw}
+            <LedgerDetailPanelHeader
+              detailPanel={detailPanel}
+              onSelect={setDetailPanel}
+              onPrev={() => shiftDetailPanel(-1)}
+              onNext={() => shiftDetailPanel(1)}
+              prevLabel={`${LEDGER_DETAIL_PANELS[(detailPanelIndex - 1 + LEDGER_DETAIL_PANELS.length) % LEDGER_DETAIL_PANELS.length].label} 보기`}
+              nextLabel={`${LEDGER_DETAIL_PANELS[(detailPanelIndex + 1) % LEDGER_DETAIL_PANELS.length].label} 보기`}
             />
+
+            {detailPanel === 'transactions' ? (
+              <>
+            <div className="mt-5 flex justify-end">
+              <div
+                role="tablist"
+                aria-label="거래 유형"
+                className="inline-flex w-full max-w-md rounded-xl border border-border-subtle/60 bg-black/[0.03] p-1 sm:w-auto theme2:bg-neutral-cool/40"
+              >
+                {(
+                  [
+                    { id: 'all' as const, label: '전체' },
+                    { id: 'income' as const, label: '수입' },
+                    { id: 'expense' as const, label: '지출' },
+                  ] as const
+                ).map((tab) => {
+                  const active = txListTab === tab.id
+                  const tone =
+                    tab.id === 'income'
+                      ? active
+                        ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-700/20'
+                        : 'text-emerald-800/70 hover:bg-emerald-50'
+                      : tab.id === 'expense'
+                        ? active
+                          ? 'bg-rose-600 text-white shadow-sm ring-1 ring-rose-700/20'
+                          : 'text-rose-800/70 hover:bg-rose-50'
+                        : active
+                          ? 'bg-starbucks-green text-white shadow-sm'
+                          : 'text-text-soft hover:bg-surface-raised/70'
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-200 ${tone}`}
+                      onClick={() => setTxListTab(tab.id)}
+                    >
+                      {tab.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
+              <div className="rounded-xl border border-emerald-200/50 bg-gradient-to-b from-emerald-50/80 to-transparent px-3 py-2.5">
+                <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-emerald-900/55">
+                  수입
+                </p>
+                <p className="mt-1 text-base font-semibold tabular-nums text-semantic-income sm:text-lg">
+                  +{fmtKrw.format(incomeTotal)}
+                </p>
+                <p className="mt-0.5 text-xs tabular-nums text-text-soft">
+                  {monthIncomeTransactions.length}건
+                </p>
+              </div>
+              <div className="rounded-xl border border-rose-200/50 bg-gradient-to-b from-rose-50/70 to-transparent px-3 py-2.5">
+                <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-rose-900/55">
+                  지출
+                </p>
+                <p className="mt-1 text-base font-semibold tabular-nums text-semantic-expense sm:text-lg">
+                  −{fmtKrw.format(expenseTotal)}
+                </p>
+                <p className="mt-0.5 text-xs tabular-nums text-text-soft">
+                  {monthExpenseTransactions.length}건
+                </p>
+              </div>
+              <div className="rounded-xl border border-border-subtle bg-ceramic/40 px-3 py-2.5">
+                <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-text-soft">
+                  순액
+                </p>
+                <p
+                  className={`mt-1 text-base font-semibold tabular-nums sm:text-lg ${
+                    monthNetTotal >= 0
+                      ? 'text-semantic-income'
+                      : 'text-semantic-expense'
+                  }`}
+                >
+                  {monthNetTotal >= 0 ? '+' : '−'}
+                  {fmtKrw.format(Math.abs(monthNetTotal))}
+                </p>
+                <p className="mt-0.5 text-xs tabular-nums text-text-soft">
+                  {filtered.length}건
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 border-t border-border-subtle/80 pt-4 lg:flex-row lg:items-stretch lg:justify-between">
+              {txListTab !== 'income' ? (
+                <ExpensePayFilterBar
+                  value={expensePayFilter}
+                  cardBrandFilter={expenseCardBrandFilter}
+                  cardRows={expensePaymentBreakdown.cardRows}
+                  legacyCount={expensePaymentBreakdown.legacy}
+                  selectedTotal={expenseFilteredTotal}
+                  fmtKrw={fmtKrw}
+                  onChange={(id) => {
+                    setExpensePayFilter(id)
+                    if (id !== 'card') setExpenseCardBrandFilter(null)
+                  }}
+                  onCardBrandChange={setExpenseCardBrandFilter}
+                />
+              ) : (
+                <div className="flex-1" />
+              )}
+              <div className="flex shrink-0 items-center lg:pl-2">
+                <SortToggleRow
+                  value={txSort}
+                  onToggleAmount={toggleTxAmount}
+                  onToggleDate={toggleTxDate}
+                />
+              </div>
+            </div>
+
+            {displayedTransactions.length === 0 ? (
+              <p className="py-10 text-center text-sm text-text-soft">
+                {txListTab === 'income' && monthIncomeTransactions.length === 0
+                  ? '이번 달 수입 기록이 없습니다.'
+                  : txListTab === 'expense' && expenseTotal === 0
+                    ? '이번 달 지출 기록이 없습니다.'
+                    : txListTab === 'expense'
+                      ? '선택한 수단에 해당하는 지출이 없습니다.'
+                      : filtered.length === 0
+                        ? '이번 달 거래 기록이 없습니다.'
+                        : '선택한 수단에 해당하는 거래가 없습니다.'}
+              </p>
+            ) : (
+              <ul className="mt-1 divide-y divide-border-subtle/70">
+                {displayedTransactions.map((t) => (
+                  <TransactionLedgerRow
+                    key={t.id}
+                    t={t}
+                    fmtKrw={fmtKrw}
+                    onSelectDate={(iso) => {
+                      setDayModalIso(iso)
+                      setSelectedIso(iso)
+                    }}
+                  />
+                ))}
+              </ul>
+            )}
+              </>
+            ) : (
+              <div className="mt-5">
+                <ExpenseCategoryBreakdown
+                  expenses={monthExpenseTransactions}
+                  fmtKrw={fmtKrw}
+                />
+              </div>
+            )}
           </Card>
         </section>
-
-        <footer className="border-t border-white/10 bg-house-green px-4 py-6 text-text-on-dark-soft md:px-6 lg:rounded-[var(--radius-card)] lg:shadow-[var(--shadow-card)]">
-          <p className="text-center text-sm text-text-on-dark-soft/80">
-            {syncState.mode === 'cloud'
-              ? syncState.cloudBackend === 'prisma'
-                ? '가계부 · 로컬 SQLite(Prisma)에 저장됩니다. API를 같이 띄운 기기·브라우저와 맞출 수 있어요.'
-                : '가계부 · Supabase에 저장되어 같은 사이트 주소로 들어오면 함께 볼 수 있어요.'
-              : (syncState as { hint?: string }).hint === 'login_required'
-                ? '가계부 · 지금은 이 기기에만 저장됩니다. 로그인하면 Supabase에 저장되어 어떤 기기에서든 볼 수 있어요.'
-                : '가계부 · 이 기기(localStorage)에만 저장됩니다. 같이 쓰려면 .env에서 Prisma API 또는 Supabase를 설정하고 배포하세요.'}
-          </p>
-        </footer>
       </main>
       </div>
 

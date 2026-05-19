@@ -41,17 +41,19 @@ function navLinkClassName(
   theme: ThemePreference,
   { isActive }: { isActive: boolean },
 ) {
+  const base =
+    'shrink-0 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all duration-200 theme2:rounded-lg'
   if (theme === 'theme3') {
-    return `shrink-0 rounded-md px-3 py-1.5 text-sm font-semibold transition-colors ${
+    return `${base} ${
       isActive
-        ? 'bg-green-light text-midnight-ink'
-        : 'text-faded-grey hover:bg-green-light/50'
+        ? 'bg-green-light text-midnight-ink shadow-[var(--shadow-frap-base)]'
+        : 'text-faded-grey hover:bg-green-light/50 hover:text-midnight-ink'
     }`
   }
-  return `shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors theme2:rounded-md ${
+  return `${base} ${
     isActive
-      ? 'bg-green-accent text-on-accent theme2:border theme2:border-charcoal-border theme2:shadow-[var(--shadow-frap-base)]'
-      : 'text-starbucks-green hover:bg-green-light/40 theme2:hover:bg-green-light/50'
+      ? 'bg-starbucks-green text-white shadow-[var(--shadow-frap-base)] ring-1 ring-starbucks-green/20 theme2:border theme2:border-charcoal-border theme2:bg-green-accent theme2:text-on-accent'
+      : 'text-starbucks-green hover:bg-house-green/10 hover:shadow-sm theme2:hover:bg-green-light/50'
   }`
 }
 
@@ -122,11 +124,11 @@ export default function RootLayout() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-border-muted bg-neutral-warm/95 backdrop-blur-sm">
-        <div className="relative mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 py-2 md:flex-wrap md:px-6 md:py-3">
+      <header className="sticky top-0 z-40 border-b border-border-muted bg-neutral-warm/90 backdrop-blur-md">
+        <div className="relative mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 py-2.5 md:flex-wrap md:px-6 md:py-3">
           <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden pr-[5.25rem] md:min-w-0 md:flex-initial md:flex-wrap md:gap-4 md:overflow-visible md:pr-0">
             <nav
-              className="flex min-w-0 flex-nowrap gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] md:flex-wrap md:overflow-visible [&::-webkit-scrollbar]:hidden"
+              className="flex min-w-0 flex-nowrap gap-1 overflow-x-auto rounded-2xl border border-border-subtle/60 bg-surface-raised/80 p-1 shadow-[var(--shadow-frap-base)] [-ms-overflow-style:none] [scrollbar-width:none] md:flex-wrap md:overflow-visible [&::-webkit-scrollbar]:hidden"
               aria-label="주 메뉴"
             >
               <NavLink className={(p) => navLinkClassName(preference, p)} to="/calendar">
