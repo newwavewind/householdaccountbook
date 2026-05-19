@@ -19,6 +19,22 @@ function json(data: unknown, status = 200): Response {
   })
 }
 
+const FETCH_TIMEOUT_MS = 8_000
+
+async function fetchTimed(url: string, init?: RequestInit): Promise<Response> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+  try {
+    return await fetch(url, { ...init, signal: controller.signal })
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+function thumbFor(videoId: string, thumb?: string): string {
+  return thumb?.trim() ? thumb : `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`
+}
+
 function parseVideoIdFromUrl(url: string): string | null {
   try {
     const u = new URL(url, 'https://www.youtube.com')
@@ -32,7 +48,7 @@ function parseVideoIdFromUrl(url: string): string | null {
 }
 
 async function searchPiped(base: string, q: string): Promise<YoutubeSearchItem[] | null> {
-  const res = await fetch(`${base}/search?q=${encodeURIComponent(q)}&filter=videos`, {
+  const res = await fetchTimed(`${base}/search?q=${encodeURIComponent(q)}&filter=videos`, {
     headers: { 'User-Agent': 'MJ-Household/1.0' },
   })
   if (!res.ok) return null
@@ -54,7 +70,7 @@ async function searchPiped(base: string, q: string): Promise<YoutubeSearchItem[]
       videoId,
       title: i.title ?? '(제목 없음)',
       author: i.uploaderName ?? '',
-      thumbnailUrl: i.thumbnail ?? '',
+      thumbnailUrl: thumbFor(videoId, i.thumbnail),
     })
     if (items.length >= 12) break
   }
@@ -62,7 +78,7 @@ async function searchPiped(base: string, q: string): Promise<YoutubeSearchItem[]
 }
 
 async function searchInvidious(base: string, q: string): Promise<YoutubeSearchItem[] | null> {
-  const res = await fetch(`${base}/api/v1/search?q=${encodeURIComponent(q)}&type=video`, {
+  const res = await fetchTimed(`${base}/api/v1/search?q=${encodeURIComponent(q)}&type=video`, {
     headers: { 'User-Agent': 'MJ-Household/1.0' },
   })
   if (!res.ok) return null
@@ -82,7 +98,7 @@ async function searchInvidious(base: string, q: string): Promise<YoutubeSearchIt
       videoId: v.videoId!,
       title: v.title ?? '(제목 없음)',
       author: v.author ?? v.authorId ?? '',
-      thumbnailUrl: v.videoThumbnails?.[0]?.url ?? '',
+      thumbnailUrl: thumbFor(v.videoId!, v.videoThumbnails?.[0]?.url),
     }))
   return items.length > 0 ? items : null
 }

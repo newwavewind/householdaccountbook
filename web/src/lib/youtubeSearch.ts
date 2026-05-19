@@ -7,16 +7,50 @@ export type YoutubeSearchItem = {
   thumbnailUrl: string
 }
 
+const SEARCH_TIMEOUT_MS = 22_000
+
 function pickThumb(thumbnails?: { url?: string }[]): string {
   if (!thumbnails?.length) return ''
   return thumbnails[0]?.url ?? ''
 }
 
-async function searchViaSupabaseProxy(q: string): Promise<YoutubeSearchItem[] | null> {
-  if (!isCommunitySupabaseConfigured()) return null
+export function youtubeThumbnailUrl(videoId: string): string {
+  return `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`
+}
+
+async function fetchWithTimeout(
+  url: string,
+  init?: RequestInit,
+  ms = SEARCH_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController()
+  const timer = window.setTimeout(() => controller.abort(), ms)
+  try {
+    return await fetch(url, { ...init, signal: controller.signal })
+  } catch (e) {
+    if (e instanceof Error && e.name === 'AbortError') {
+      throw new Error('\uac80\uc0c9 \uc2dc\uac04\uc774 \ucd08\uacfc\ub418\uc5c8\uc2b5\ub2c8\ub2e4. \uc7a0\uc2dc \ud6c4 \ub2e4\uc2dc \uc2dc\ub3c4\ud574 \uc8fc\uc138\uc694.')
+    }
+    throw e
+  } finally {
+    window.clearTimeout(timer)
+  }
+}
+
+function normalizeItem(item: YoutubeSearchItem): YoutubeSearchItem {
+  return {
+    ...item,
+    thumbnailUrl: item.thumbnailUrl || youtubeThumbnailUrl(item.videoId),
+  }
+}
+
+async function searchViaSupabaseProxy(q: string): Promise<YoutubeSearchItem[]> {
+  if (!isCommunitySupabaseConfigured()) {
+    throw new Error('\uc720\ud29c\ube0c \uac80\uc0c9 \uc124\uc815\uc774 \uc5c6\uc2b5\ub2c8\ub2e4.')
+  }
   const base = import.meta.env.VITE_SUPABASE_URL!.replace(/\/$/, '')
   const key = import.meta.env.VITE_SUPABASE_ANON_KEY!
-  const res = await fetch(
+  const res = await fetchWithTimeout(
     `${base}/functions/v1/youtube-search?q=${encodeURIComponent(q)}`,
     {
       headers: {
@@ -37,21 +71,21 @@ async function searchViaSupabaseProxy(q: string): Promise<YoutubeSearchItem[] | 
         : '\uac80\uc0c9 \uacb0\uacfc \ud615\uc2dd \uc624\ub958',
     )
   }
-  return data
+  return data.map(normalizeItem)
 }
 
 async function searchViaLocalApi(q: string): Promise<YoutubeSearchItem[] | null> {
   try {
-    const res = await fetch(`/api/youtube/search?q=${encodeURIComponent(q)}`)
+    const res = await fetchWithTimeout(`/api/youtube/search?q=${encodeURIComponent(q)}`)
     if (!res.ok) return null
     const data = (await res.json()) as YoutubeSearchItem[]
-    return Array.isArray(data) ? data : null
+    if (!Array.isArray(data)) return null
+    return data.map(normalizeItem)
   } catch {
     return null
   }
 }
 
-/** Invidious 직접 호출 (CORS 허용 인스턴스만 — 대부분 브라우저에서 실패) */
 async function searchDirectInvidious(q: string): Promise<YoutubeSearchItem[]> {
   const endpoints = [
     `https://yewtu.be/api/v1/search?q=${encodeURIComponent(q)}&type=video`,
@@ -61,7 +95,7 @@ async function searchDirectInvidious(q: string): Promise<YoutubeSearchItem[]> {
   let lastErr: Error | null = null
   for (const url of endpoints) {
     try {
-      const res = await fetch(url)
+      const res = await fetchWithTimeout(url)
       if (!res.ok) throw new Error(`\uac80\uc0c9 \uc2e4\ud328 (${res.status})`)
       const data = (await res.json()) as Array<{
         type?: string
@@ -75,12 +109,14 @@ async function searchDirectInvidious(q: string): Promise<YoutubeSearchItem[]> {
       return data
         .filter((v) => v.type === 'video' && v.videoId)
         .slice(0, 12)
-        .map((v) => ({
-          videoId: v.videoId!,
-          title: v.title ?? '(\uc81c\ubaa9 \uc5c6\uc74c)',
-          author: v.author ?? v.authorId ?? '',
-          thumbnailUrl: pickThumb(v.videoThumbnails),
-        }))
+        .map((v) =>
+          normalizeItem({
+            videoId: v.videoId!,
+            title: v.title ?? '(\uc81c\ubaa9 \uc5c6\uc74c)',
+            author: v.author ?? v.authorId ?? '',
+            thumbnailUrl: pickThumb(v.videoThumbnails),
+          }),
+        )
     } catch (e) {
       lastErr = e instanceof Error ? e : new Error('\uac80\uc0c9 \uc2e4\ud328')
     }
@@ -88,31 +124,32 @@ async function searchDirectInvidious(q: string): Promise<YoutubeSearchItem[]> {
   throw lastErr ?? new Error('\uc720\ud29c\ube0c \uac80\uc0c9\uc5d0 \uc2e4\ud328\ud588\uc2b5\ub2c8\ub2e4.')
 }
 
-/**
- * 유튜브 동영상 검색
- * - 배포: Supabase Edge Function 프록시 (CORS 회피)
- * - 로컬: Express /api/youtube/search 또는 Vite 프록시
- */
 export async function searchYoutubeVideos(query: string): Promise<YoutubeSearchItem[]> {
   const q = query.trim()
   if (!q) return []
 
   if (isCommunitySupabaseConfigured()) {
-    const proxied = await searchViaSupabaseProxy(q)
-    if (proxied) return proxied
+    try {
+      return await searchViaSupabaseProxy(q)
+    } catch (supabaseErr) {
+      if (import.meta.env.DEV) {
+        const local = await searchViaLocalApi(q)
+        if (local && local.length > 0) return local
+      }
+      throw supabaseErr
+    }
   }
 
   if (import.meta.env.DEV) {
     const local = await searchViaLocalApi(q)
-    if (local && local.length > 0) return local
+    if (local) return local
   }
 
   try {
     return await searchDirectInvidious(q)
   } catch (directErr) {
-    const msg =
-      directErr instanceof Error ? directErr.message : '\uac80\uc0c9 \uc2e4\ud328'
-    if (msg.includes('fetch') || msg === 'Failed to fetch') {
+    const msg = directErr instanceof Error ? directErr.message : '\uac80\uc0c9 \uc2e4\ud328'
+    if (msg.includes('fetch') || msg === 'Failed to fetch' || msg.includes('aborted')) {
       throw new Error(
         '\uac80\uc0c9 \uc11c\ubc84\uc5d0 \uc5f0\uacb0\ud560 \uc218 \uc5c6\uc2b5\ub2c8\ub2e4. URL \uc785\ub825\uc73c\ub85c \ub4f1\ub85d\ud558\uac70\ub098 \uc7a0\uc2dc \ud6c4 \ub2e4\uc2dc \uc2dc\ub3c4\ud574 \uc8fc\uc138\uc694.',
       )
