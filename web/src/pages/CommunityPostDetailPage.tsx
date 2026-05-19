@@ -4,10 +4,8 @@ import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { useCommunityAuth } from '../community/CommunityAuthContext'
 import { useCommunityPost } from '../community/useCommunityPosts'
-import {
-  isProbablyRichHtml,
-  sanitizeCommunityPostHtml,
-} from '../lib/communityPostHtml'
+import { isProbablyRichHtml } from '../lib/communityPostHtml'
+import { CommunityPostBody } from '../components/community/CommunityPostBody'
 import type { CommunityComment } from '../community/types'
 import { sharePageUrl } from '../lib/sharePageUrl'
 
@@ -117,8 +115,6 @@ export default function CommunityPostDetailPage() {
   const [voteBusy, setVoteBusy] = useState(false)
   // 라이트박스
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
-  const postBodyRef = useRef<HTMLDivElement>(null)
-
   const closeLightbox = useCallback(() => setLightboxSrc(null), [])
 
   const canEdit =
@@ -279,17 +275,15 @@ export default function CommunityPostDetailPage() {
               ) : null}
               <h1 className="mt-4 font-serif-display text-starbucks-green">{post.title}</h1>
               {isProbablyRichHtml(post.body) ? (
-                <div
-                  ref={postBodyRef}
+                <CommunityPostBody
+                  body={post.body}
+                  postId={post.id}
+                  userId={auth.user?.id ?? null}
+                  userDisplayName={
+                    auth.user?.displayName || auth.user?.email || null
+                  }
                   className="community-post-body mt-6 text-base leading-relaxed text-text-primary"
-                  dangerouslySetInnerHTML={{ __html: sanitizeCommunityPostHtml(post.body) }}
-                  onClick={(e) => {
-                    const target = e.target as HTMLElement
-                    if (target.tagName === 'IMG') {
-                      const src = (target as HTMLImageElement).src
-                      if (src) setLightboxSrc(src)
-                    }
-                  }}
+                  onImageClick={setLightboxSrc}
                 />
               ) : (
                 <div className="mt-6 whitespace-pre-wrap text-base leading-relaxed text-text-primary">

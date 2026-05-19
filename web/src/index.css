@@ -357,6 +357,53 @@
   color: var(--color-text-soft);
 }
 
+.community-rich-editor .community-poll-embed,
+.community-rich-editor .community-youtube-embed {
+  margin: 0.5rem 0;
+  padding: 0.5rem 0.75rem;
+  border: 1px dashed var(--color-border-muted);
+  border-radius: var(--radius-card);
+  background: var(--color-neutral-warm);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-soft);
+}
+
+.community-rich-editor .community-poll-embed::before {
+  content: '📊 투표 블록';
+}
+
+.community-rich-editor .community-youtube-embed::before {
+  content: '▶ 유튜브 동영상';
+}
+
+/* 커뮤니티 투표 카드 */
+.community-poll-card .poll-bar-track {
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--color-border-muted) 55%, transparent);
+  overflow: hidden;
+}
+
+.community-poll-card .poll-bar-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-green-accent) 88%, white),
+    var(--color-green-accent)
+  );
+  transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.community-poll-card .poll-option.is-leading .poll-bar-fill {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-green-accent) 70%, #fbbf24),
+    var(--color-green-accent)
+  );
+}
+
 /* 게시글 본문(정화된 HTML) */
 .community-post-body p {
   margin: 0 0 0.75em;

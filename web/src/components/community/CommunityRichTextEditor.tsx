@@ -19,6 +19,11 @@ import {
 import { getCommunitySupabase } from '../../lib/communitySupabaseClient'
 import { Button } from '../ui/Button'
 import { CommunityTextColorPicker } from './CommunityTextColorPicker'
+import { CommunityPollNode } from '../../community/tiptap/communityPollNode'
+import { CommunityYoutubeNode } from '../../community/tiptap/communityYoutubeNode'
+import { CommunityPollDialog } from './CommunityPollDialog'
+import { CommunityYoutubeDialog } from './CommunityYoutubeDialog'
+import type { CommunityPollData } from '../../community/communityPollTypes'
 
 const VideoNode = Node.create({
   name: 'video',
@@ -78,6 +83,8 @@ export function CommunityRichTextEditor({
         HTMLAttributes: { style: 'max-width:100%;border-radius:8px;' },
       }),
       VideoNode,
+      CommunityPollNode,
+      CommunityYoutubeNode,
       TextStyle,
       FontFamily.configure({ types: ['textStyle'] }),
       CalendarFontSize,
@@ -96,6 +103,8 @@ export function CommunityRichTextEditor({
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
+  const [pollOpen, setPollOpen] = useState(false)
+  const [youtubeOpen, setYoutubeOpen] = useState(false)
 
   useEffect(() => {
     if (!editor) return
@@ -177,11 +186,52 @@ export function CommunityRichTextEditor({
       className="mt-1 flex min-h-[14rem] flex-col overflow-hidden rounded-[var(--radius-card)] border border-input-border text-text-primary focus-within:border-green-accent"
       aria-labelledby={ariaLabelledBy}
     >
-      <div
-        className="flex flex-wrap items-center gap-1 border-b border-border-muted bg-neutral-warm/60 px-2 py-1.5"
-        role="toolbar"
-        aria-label="서식"
-      >
+      <div className="border-b border-border-muted bg-neutral-warm/60">
+        <div
+          className="flex flex-wrap items-center gap-1 border-b border-border-muted/80 px-2 py-1.5"
+          role="toolbar"
+          aria-label="미디어"
+        >
+          <Button
+            type="button"
+            variant="outlined"
+            className="!px-2 !py-0.5 !text-xs"
+            disabled={disabled || uploading}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {uploading ? '업로드 중…' : '📷 사진·동영상'}
+          </Button>
+          <Button
+            type="button"
+            variant="outlined"
+            className="!px-2 !py-0.5 !text-xs"
+            disabled={disabled}
+            onClick={() => setPollOpen(true)}
+          >
+            📊 투표
+          </Button>
+          <Button
+            type="button"
+            variant="outlined"
+            className="!px-2 !py-0.5 !text-xs"
+            disabled={disabled}
+            onClick={() => setYoutubeOpen(true)}
+          >
+            ▶ 유튜브
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,video/quicktime"
+            className="hidden"
+            onChange={handleMediaUpload}
+          />
+        </div>
+        <div
+          className="flex flex-wrap items-center gap-1 px-2 py-1.5"
+          role="toolbar"
+          aria-label="서식"
+        >
         <label className="sr-only" htmlFor="community-editor-font">
           글꼴
         </label>
@@ -263,24 +313,26 @@ export function CommunityRichTextEditor({
         >
           취소선
         </Button>
-        <Button
-          type="button"
-          variant="outlined"
-          className="!px-2 !py-0.5 !text-xs"
-          disabled={disabled || uploading}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          {uploading ? '업로드 중…' : '📷 사진·동영상'}
-        </Button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,video/quicktime"
-          className="hidden"
-          onChange={handleMediaUpload}
-        />
+        </div>
       </div>
       <EditorContent editor={editor} className="community-rich-editor flex-1 px-3 py-2" />
+      <CommunityPollDialog
+        open={pollOpen}
+        onClose={() => setPollOpen(false)}
+        onInsert={(data: CommunityPollData) => {
+          editor.chain().focus().insertCommunityPoll(data).run()
+          onHtmlChange(editor.getHTML())
+        }}
+      />
+      <CommunityYoutubeDialog
+        open={youtubeOpen}
+        onClose={() => setYoutubeOpen(false)}
+        onInsert={(videoId) => {
+          editor.chain().focus().insertCommunityYoutube(videoId).run()
+          onHtmlChange(editor.getHTML())
+        }}
+      />
     </div>
   )
 }
+

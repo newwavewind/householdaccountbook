@@ -2,11 +2,15 @@ import DOMPurify from 'dompurify'
 
 const SANITIZE_OPTS = {
   ALLOWED_TAGS: [
-    'p', 'br', 'strong', 'em', 's', 'strike', 'code', 'pre', 'span',
+    'p', 'br', 'strong', 'em', 's', 'strike', 'code', 'pre', 'span', 'div',
     'h1', 'h2', 'h3', 'ul', 'ol', 'li', 'blockquote', 'a',
-    'img', 'video', 'source',
+    'img', 'video', 'source', 'iframe',
   ],
-  ALLOWED_ATTR: ['href', 'target', 'rel', 'src', 'alt', 'style', 'controls', 'type'],
+  ALLOWED_ATTR: [
+    'href', 'target', 'rel', 'src', 'alt', 'style', 'controls', 'type',
+    'data-community-poll', 'data-poll', 'data-community-youtube', 'data-video-id',
+    'contenteditable', 'class', 'allow', 'allowfullscreen', 'title', 'frameborder',
+  ],
 }
 
 let linkHooksInstalled = false
@@ -15,9 +19,17 @@ function ensureSafeLinkHook() {
   if (linkHooksInstalled) return
   linkHooksInstalled = true
   DOMPurify.addHook('afterSanitizeAttributes', (node) => {
-    if (node.tagName !== 'A') return
-    node.setAttribute('target', '_blank')
-    node.setAttribute('rel', 'noopener noreferrer')
+    if (node.tagName === 'A') {
+      node.setAttribute('target', '_blank')
+      node.setAttribute('rel', 'noopener noreferrer')
+      return
+    }
+    if (node.tagName === 'IFRAME') {
+      const src = node.getAttribute('src') ?? ''
+      if (!/^https:\/\/www\.youtube-nocookie\.com\/embed\/[a-zA-Z0-9_-]{11}/.test(src)) {
+        node.remove()
+      }
+    }
   })
 }
 
