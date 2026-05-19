@@ -1,3 +1,9 @@
+import { parseStickyBoardCoord } from './stickyMemoLayout'
+import {
+  parseStickyMemoHeight,
+  parseStickyMemoWidth,
+} from './stickyMemoSize'
+
 export const CALENDAR_STICKY_NOTES_KEY = 'gaegyeobu-calendar-sticky-v1'
 export const CALENDAR_STICKY_VIEW_KEY = 'gaegyeobu-calendar-sticky-view-v1'
 
@@ -19,6 +25,14 @@ export type CalendarStickyNote = {
   /** TipTap HTML */
   bodyHtml?: string
   tint: StickyTint
+  /** 컴팩트 미리보기 너비(px) */
+  widthPx?: number
+  /** 컴팩트 미리보기 높이(px) */
+  heightPx?: number
+  /** 보드 캔버스 X(px) */
+  xPx?: number
+  /** 보드 캔버스 Y(px) */
+  yPx?: number
   updatedAt: string
 }
 
@@ -74,7 +88,21 @@ export function parseStickyNotesPayload(raw: unknown): CalendarStickyNote[] {
     const tint = normalizeTint(o.tint)
     const updatedAt =
       typeof o.updatedAt === 'string' ? o.updatedAt : new Date().toISOString()
-    out.push({ id, body, bodyHtml, tint, updatedAt })
+    const widthPx = parseStickyMemoWidth(o.widthPx)
+    const heightPx = parseStickyMemoHeight(o.heightPx)
+    const xPx = parseStickyBoardCoord(o.xPx)
+    const yPx = parseStickyBoardCoord(o.yPx)
+    out.push({
+      id,
+      body,
+      bodyHtml,
+      tint,
+      ...(widthPx != null ? { widthPx } : {}),
+      ...(heightPx != null ? { heightPx } : {}),
+      ...(xPx != null ? { xPx } : {}),
+      ...(yPx != null ? { yPx } : {}),
+      updatedAt,
+    })
   }
   return out
 }

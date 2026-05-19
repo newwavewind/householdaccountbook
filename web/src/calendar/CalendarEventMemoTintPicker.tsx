@@ -134,6 +134,7 @@ export function CalendarEventMemoTintPicker({
   const menuPanel = open ? (
     <div
       ref={menuRef}
+      data-sticky-tint-menu
       role="listbox"
       aria-label={listLabel}
       style={

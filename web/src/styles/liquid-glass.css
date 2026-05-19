@@ -1,0 +1,200 @@
+/*
+  Apple Liquid Glass (iOS 26 style) — global overlay on theme1/2/3.
+  Mode: .liquid-glass-clear (투명 유리)
+*/
+
+@custom-variant liquidGlass (&:where(.liquid-glass, .liquid-glass *));
+@custom-variant liquidGlassClear (&:where(.liquid-glass-clear, .liquid-glass-clear *));
+
+/* ── Tokens ── */
+html.liquid-glass {
+  --lg-blur: 22px;
+  --lg-saturate: 165%;
+  --lg-bright: 1.07;
+  --lg-radius: 14px;
+  --lg-border: rgba(255, 255, 255, 0.52);
+  --lg-border-outer: rgba(255, 255, 255, 0.28);
+  --lg-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  --lg-shadow:
+    0 0.5px 0 rgba(255, 255, 255, 0.65) inset,
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    0 8px 28px rgba(0, 0, 0, 0.07);
+  --lg-text-shadow: 0 1px 12px rgba(255, 255, 255, 0.35);
+
+  /* Clear: 거의 투명한 유리 */
+  --lg-fill: rgba(255, 255, 255, 0.18);
+  --lg-fill-strong: rgba(255, 255, 255, 0.26);
+  --lg-fill-subtle: rgba(255, 255, 255, 0.1);
+}
+
+/* ── Ambient canvas (유리 뒤 배경) ── */
+html.liquid-glass,
+html.liquid-glass body,
+html.liquid-glass #root {
+  background-color: #e8e6e1;
+  background-image:
+    radial-gradient(ellipse 90% 55% at 8% -5%, rgba(0, 117, 74, 0.14), transparent 58%),
+    radial-gradient(ellipse 70% 50% at 95% 8%, rgba(120, 160, 255, 0.12), transparent 52%),
+    radial-gradient(ellipse 75% 60% at 50% 105%, rgba(203, 162, 88, 0.1), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 70% 45%, rgba(255, 255, 255, 0.5), transparent 70%),
+    linear-gradient(165deg, #f0ede6 0%, #e4e1d9 45%, #ebe8e2 100%);
+  background-attachment: fixed;
+}
+
+html.liquid-glass.theme2 body,
+html.liquid-glass.theme2 #root {
+  background-image:
+    radial-gradient(ellipse 85% 50% at 12% 0%, rgba(0, 0, 0, 0.06), transparent 55%),
+    radial-gradient(ellipse 65% 45% at 88% 20%, rgba(100, 100, 120, 0.08), transparent 50%),
+    linear-gradient(180deg, #f5f5f5 0%, #ebebeb 100%);
+}
+
+html.liquid-glass.theme3 body,
+html.liquid-glass.theme3 #root {
+  background-image:
+    radial-gradient(ellipse 80% 55% at 5% -8%, rgba(0, 98, 65, 0.1), transparent 55%),
+    radial-gradient(ellipse 60% 50% at 92% 15%, rgba(180, 200, 190, 0.15), transparent 52%),
+    linear-gradient(180deg, #eeefe9 0%, #e4e6e0 100%);
+}
+
+/* ── Glass surface mixin (via selector list) ── */
+html.liquid-glass :where(
+    header.sticky,
+    section[class*='rounded'],
+    article[class*='rounded'],
+    aside[class*='rounded'],
+    nav[class*='rounded'],
+    [role='dialog'],
+    [role='menu'],
+    [role='listbox'],
+    .community-poll-card,
+    .sticky-memo-popout-panel
+  ) {
+  position: relative;
+  isolation: isolate;
+  border-radius: var(--lg-radius) !important;
+  border-color: var(--lg-border-outer) !important;
+  background: var(--lg-fill) !important;
+  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate))
+    brightness(var(--lg-bright));
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate))
+    brightness(var(--lg-bright));
+  box-shadow: var(--lg-highlight), var(--lg-shadow);
+}
+
+/* 헤더·네비는 조금 더 불투명 */
+html.liquid-glass header.sticky {
+  background: var(--lg-fill-strong) !important;
+  border-bottom-color: var(--lg-border) !important;
+}
+
+/* ── 공통 배경 유틸 → 유리로 ── */
+html.liquid-glass :where(
+    .bg-surface-raised,
+    .bg-white,
+    .bg-neutral-cool,
+    .bg-neutral-warm,
+    .bg-ceramic,
+    .bg-well,
+    .bg-green-light,
+    .bg-black\/\[0\.03\],
+    .bg-black\/\[0\.04\],
+    .bg-gradient-to-b
+  ) {
+  background: var(--lg-fill) !important;
+  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate))
+    brightness(var(--lg-bright));
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate))
+    brightness(var(--lg-bright));
+}
+
+html.liquid-glass :where(.bg-green-light) {
+  background: color-mix(
+    in srgb,
+    var(--color-green-light) 55%,
+    var(--lg-fill)
+  ) !important;
+}
+
+/* ── 폼·버튼 ── */
+html.liquid-glass :where(
+    select,
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='color']
+      ),
+    textarea
+  ) {
+  background: var(--lg-fill-strong) !important;
+  backdrop-filter: blur(14px) saturate(var(--lg-saturate));
+  -webkit-backdrop-filter: blur(14px) saturate(var(--lg-saturate));
+  border-color: var(--lg-border) !important;
+  box-shadow: var(--lg-highlight);
+}
+
+html.liquid-glass :where(button, [role='button']) {
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+}
+
+html.liquid-glass :where(
+    button.border-green-accent.bg-green-accent,
+    .bg-green-accent
+  ) {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* ── 카드·모달 테두리 ── */
+html.liquid-glass :where(
+    [class*='border-border'],
+    [class*='border-charcoal']
+  ) {
+  border-color: color-mix(in srgb, var(--lg-border) 75%, transparent) !important;
+}
+
+/* ── 그림자 토큰 ── */
+html.liquid-glass {
+  --shadow-card: var(--lg-shadow);
+  --shadow-nav: var(--lg-shadow);
+  --shadow-frap-base: 0 2px 12px rgba(0, 0, 0, 0.08);
+  --shadow-frap-stack:
+    0 2px 12px rgba(0, 0, 0, 0.08), 0 12px 32px rgba(0, 0, 0, 0.06);
+}
+
+/* ── 에디터·메모 본문은 가독성 유지 ── */
+html.liquid-glass :where(
+    .ProseMirror,
+    .sticky-compact-preview,
+    .calendar-rich-editor .ProseMirror
+  ) {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: transparent !important;
+}
+
+html.liquid-glass :where(.sticky-memo-popout-panel) {
+  border-radius: var(--lg-radius);
+}
+
+/* ── 토글 버튼 자체 (헤더) ── */
+html.liquid-glass .liquid-glass-toggle.is-active {
+  background: var(--lg-fill-strong) !important;
+  border-color: var(--lg-border) !important;
+  box-shadow: var(--lg-highlight), 0 0 0 1px rgba(0, 117, 74, 0.2);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html.liquid-glass :where(header, section, article, nav, select, input, textarea) {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(255, 255, 255, 0.92) !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  html.liquid-glass :where(header, section, article, nav) {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: var(--color-surface-raised, #fff) !important;
+  }
+}

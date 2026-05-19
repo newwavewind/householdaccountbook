@@ -1,39 +1,69 @@
-﻿import { useEffect, useRef, useState } from 'react'
-import { Button } from '../components/ui/Button'
+﻿import { useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarStickyMemoCard } from './CalendarStickyMemoCard'
+import { StickyNoteDraggable } from './StickyNoteDraggable'
 import {
-  loadStickyViewMode,
   type CalendarStickyNote,
   nextTint,
-  saveStickyViewMode,
 } from './calendarStickyNotesStorage'
+import {
+  clampStickyNotePosition,
+  computeStickyBoardHeight,
+  nextStickyNotePosition,
+  resolveStickyNotePosition,
+  stickyNoteFootprint,
+} from './stickyMemoLayout'
 
 type Props = {
   notes: CalendarStickyNote[]
   patchNotes: (fn: (prev: CalendarStickyNote[]) => CalendarStickyNote[]) => void
 }
 
+const titlePillClass =
+  'inline-flex shrink-0 items-center rounded-full border border-green-accent bg-transparent px-2.5 py-1 text-[10px] font-semibold text-green-accent md:px-3 md:py-1.5 md:text-xs'
+
 export default function CalendarStickyNotesBoard({ notes, patchNotes }: Props) {
-  const [viewMode, setViewMode] = useState<'compact' | 'expanded'>(() =>
-    loadStickyViewMode(),
-  )
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set())
   const noteCountRef = useRef(0)
+  const canvasRef = useRef<HTMLDivElement>(null)
+  const [canvasWidth, setCanvasWidth] = useState(0)
 
   useEffect(() => {
     noteCountRef.current = notes.length
   }, [notes.length])
 
-  const setView = (mode: 'compact' | 'expanded') => {
-    setViewMode(mode)
-    saveStickyViewMode(mode)
-  }
+  useEffect(() => {
+    setExpandedIds((prev) => {
+      const noteIdSet = new Set(notes.map((n) => n.id))
+      return new Set([...prev].filter((id) => noteIdSet.has(id)))
+    })
+  }, [notes])
+
+  useEffect(() => {
+    const el = canvasRef.current
+    if (!el) return
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width
+      if (w != null) setCanvasWidth(w)
+    })
+    ro.observe(el)
+    setCanvasWidth(el.clientWidth)
+    return () => ro.disconnect()
+  }, [notes.length])
+
+  const boardHeight = useMemo(
+    () => computeStickyBoardHeight(notes, expandedIds),
+    [notes, expandedIds],
+  )
 
   const addNote = (afterId?: string) => {
+    const pos = nextStickyNotePosition(notes, afterId)
     const n: CalendarStickyNote = {
       id: crypto.randomUUID(),
       body: '',
       bodyHtml: undefined,
       tint: nextTint(noteCountRef.current),
+      xPx: pos.xPx,
+      yPx: pos.yPx,
       updatedAt: new Date().toISOString(),
     }
     patchNotes((prev) => {
@@ -53,97 +83,95 @@ export default function CalendarStickyNotesBoard({ notes, patchNotes }: Props) {
 
   const removeNote = (id: string) => {
     patchNotes((prev) => prev.filter((x) => x.id !== id))
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
   }
 
-  const compact = viewMode === 'compact'
+  const toggleExpand = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const moveNote = (id: string, xPx: number, yPx: number) => {
+    const note = notes.find((n) => n.id === id)
+    if (!note) return
+    const expanded = expandedIds.has(id)
+    const { width, height } = stickyNoteFootprint(note, expanded)
+    const clamped = clampStickyNotePosition(
+      xPx,
+      yPx,
+      width,
+      height,
+      canvasWidth || 900,
+    )
+    patchNote(id, clamped)
+  }
+
+  const hasNotes = notes.length > 0
 
   return (
     <section
       aria-label="스티커 메모"
       className="rounded-[var(--radius-card)] border border-border-subtle bg-gradient-to-b from-ceramic/60 to-surface-raised px-3 py-3 md:px-5 md:py-4"
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="font-serif-display text-lg font-semibold text-starbucks-green md:text-xl">
-            스티커 메모
-          </h2>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div
-            className="inline-flex rounded-full border border-border-default bg-surface-raised p-0.5 text-xs font-semibold shadow-sm"
-            role="group"
-            aria-label="보기 방식"
-          >
+      {!hasNotes ? (
+        <div className="flex flex-col gap-3 sm:grid sm:grid-cols-[auto_1fr_auto] sm:items-center sm:gap-4">
+          <h2 className={titlePillClass}>스티커 메모</h2>
+          <p className="text-center text-sm text-text-soft sm:px-2">
             <button
               type="button"
-              onClick={() => setView('compact')}
-              className={`rounded-full px-3 py-1.5 transition-colors ${
-                compact
-                  ? 'bg-starbucks-green text-white'
-                  : 'text-text-soft hover:bg-neutral-cool'
-              }`}
+              className="inline font-semibold text-green-accent underline-offset-2 hover:underline focus-visible:outline focus-visible:ring-2 focus-visible:ring-green-accent/40"
+              onClick={() => addNote()}
             >
-              간략히
+              + 메모
             </button>
-            <button
-              type="button"
-              onClick={() => setView('expanded')}
-              className={`rounded-full px-3 py-1.5 transition-colors ${
-                !compact
-                  ? 'bg-starbucks-green text-white'
-                  : 'text-text-soft hover:bg-neutral-cool'
-              }`}
-            >
-              펼치기
-            </button>
-          </div>
-          <Button
-            type="button"
-            variant="outlined"
-            className="!rounded-full !px-3 !py-1.5 !text-xs md:!text-sm"
-            onClick={() => addNote()}
-          >
-            + 메모
-          </Button>
+            를 눌러 스티커를 추가해 보세요.
+          </p>
+          <span className="hidden sm:block" aria-hidden />
         </div>
-      </div>
+      ) : null}
 
-      {notes.length === 0 ? (
-        <p className="mt-4 rounded-lg border border-dashed border-border-default bg-surface-raised/60 px-4 py-6 text-center text-sm text-text-soft">
-          + 메모를 눌러 스티커를 추가해 보세요.
-        </p>
-      ) : compact ? (
-        <div className="mt-4 flex gap-4 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {notes.map((n, idx) => (
-            <div
-              key={n.id}
-              className="shrink-0"
-              style={{ transform: `rotate(${idx % 2 === 0 ? -0.6 : 0.55}deg)` }}
-            >
-              <CalendarStickyMemoCard
-                note={n}
-                compact
-                onPatch={patchNote}
-                onRemove={removeNote}
-                onAddAfter={(id) => addNote(id)}
-              />
-            </div>
-          ))}
+      {hasNotes ? (
+        <div
+          ref={canvasRef}
+          className="relative w-full touch-pan-y"
+          style={{ minHeight: boardHeight }}
+        >
+          {notes.map((n, index) => {
+            const expanded = expandedIds.has(n.id)
+            const { xPx, yPx } = resolveStickyNotePosition(n, index)
+            return (
+              <StickyNoteDraggable
+                key={n.id}
+                x={xPx}
+                y={yPx}
+                zIndex={expanded ? 20 : 10 + index}
+                dragEnabled
+                onMove={(x, y) => moveNote(n.id, x, y)}
+                onTap={() => {
+                  if (!expanded) toggleExpand(n.id)
+                }}
+              >
+                <CalendarStickyMemoCard
+                  note={n}
+                  expanded={expanded}
+                  onToggleExpand={() => toggleExpand(n.id)}
+                  onPatch={patchNote}
+                  onRemove={removeNote}
+                  onAddAfter={(id) => addNote(id)}
+                />
+              </StickyNoteDraggable>
+            )
+          })}
         </div>
-      ) : (
-        <div className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-          {notes.map((n) => (
-            <CalendarStickyMemoCard
-              key={n.id}
-              note={n}
-              compact={false}
-              onPatch={patchNote}
-              onRemove={removeNote}
-              onAddAfter={(id) => addNote(id)}
-            />
-          ))}
-        </div>
-      )}
+      ) : null}
     </section>
   )
 }

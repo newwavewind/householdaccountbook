@@ -16,6 +16,7 @@
   font-display: swap;
 }
 @import "tailwindcss";
+@import "./styles/liquid-glass.css";
 
 /* Brainfish — html.theme2; PostHog — html.theme3 */
 @custom-variant theme2 (&:where(.theme2, .theme2 *));
@@ -516,5 +517,44 @@
     animation: none;
     box-shadow: 0 0 3px rgba(0, 180, 120, 0.25);
     border-color: rgba(0, 160, 100, 0.4);
+  }
+}
+
+/* 스티커 메모 — 위로 펼쳐지는 팝오버 */
+@keyframes sticky-memo-popout-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes sticky-memo-popout-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+}
+
+.sticky-memo-popout-panel {
+  transform-origin: bottom right;
+  animation: sticky-memo-popout-in 0.28s cubic-bezier(0.34, 1.45, 0.64, 1) both;
+}
+
+.sticky-memo-popout-panel--exit {
+  animation: sticky-memo-popout-out 0.22s ease-in forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sticky-memo-popout-panel,
+  .sticky-memo-popout-panel--exit {
+    animation: none;
   }
 }

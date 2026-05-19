@@ -6,6 +6,7 @@ import {
   useCommunityBackendReadyMessage,
 } from '../community/CommunityAuthContext'
 import { communityBackendMode } from '../lib/communityBackend'
+import { LiquidGlassToggle } from '../theme/LiquidGlassToggle'
 import { ThemeToggle } from '../theme/ThemeToggle'
 
 function SettingsGearButton({ onClick }: { onClick: () => void }) {
@@ -149,6 +150,7 @@ export default function RootLayout() {
           </div>
           <div className="absolute right-3 top-1/2 z-10 flex -translate-y-1/2 flex-nowrap items-center justify-end gap-1 md:static md:z-0 md:translate-y-0 md:gap-2">
             <ThemeToggle />
+            <LiquidGlassToggle />
             <SettingsGearButton onClick={() => nav('/settings')} />
             {authControls}
           </div>
