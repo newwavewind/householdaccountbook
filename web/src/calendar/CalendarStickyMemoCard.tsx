@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { CalendarEventRichField } from './CalendarEventRichField'
 import {
   htmlToPlain,
@@ -7,7 +7,14 @@ import {
 import type { CalendarStickyNote } from './calendarStickyNotesStorage'
 import { CalendarEventMemoTintPicker } from './CalendarEventMemoTintPicker'
 import { STICKY_THEMES, stickyTintCardChrome } from './stickyNoteTheme'
-import { stickyMemoHeight, stickyMemoWidth } from './stickyMemoSize'
+import {
+  clampCompactMemoHeight,
+  clampCompactMemoWidth,
+  compactSizeEmpty,
+  compactSizeFromContent,
+  STICKY_MEMO_MIN_COMPACT_HEIGHT,
+  STICKY_MEMO_MIN_COMPACT_WIDTH,
+} from './stickyMemoSize'
 
 function deriveEditorHtml(html: string | undefined, plain: string): string {
   const h = html?.trim()
@@ -74,20 +81,55 @@ function StickyMemoCompactPreview({
   const plain = htmlToPlain(safe)
   const empty = !plain
 
-  const storedW = stickyMemoWidth(note.widthPx)
-  const storedH = stickyMemoHeight(note.heightPx)
-  const [size, setSize] = useState({ w: storedW, h: storedH })
+  const contentRef = useRef<HTMLDivElement>(null)
+  const isResizingRef = useRef(false)
+
+  const [size, setSize] = useState(() => {
+    if (note.widthPx != null && note.heightPx != null) {
+      return {
+        w: clampCompactMemoWidth(note.widthPx),
+        h: clampCompactMemoHeight(note.heightPx),
+      }
+    }
+    return {
+      w: STICKY_MEMO_MIN_COMPACT_WIDTH,
+      h: STICKY_MEMO_MIN_COMPACT_HEIGHT,
+    }
+  })
   const sizeRef = useRef(size)
   sizeRef.current = size
 
-  useEffect(() => {
-    setSize({ w: storedW, h: storedH })
-  }, [storedW, storedH])
+  const applyMeasuredSize = useCallback(
+    (w: number, h: number) => {
+      const cw = clampCompactMemoWidth(w)
+      const ch = clampCompactMemoHeight(h)
+      if (sizeRef.current.w === cw && sizeRef.current.h === ch) return
+      setSize({ w: cw, h: ch })
+      if (note.widthPx !== cw || note.heightPx !== ch) {
+        onResize(cw, ch)
+      }
+    },
+    [note.widthPx, note.heightPx, onResize],
+  )
+
+  useLayoutEffect(() => {
+    if (isResizingRef.current) return
+    if (empty) {
+      const { width, height } = compactSizeEmpty()
+      applyMeasuredSize(width, height)
+      return
+    }
+    const el = contentRef.current
+    if (!el) return
+    const { width, height } = compactSizeFromContent(el.scrollWidth, el.scrollHeight)
+    applyMeasuredSize(width, height)
+  }, [empty, safe, plain, applyMeasuredSize])
 
   const startResize = useCallback(
     (edge: ResizeEdge, e: React.PointerEvent<HTMLDivElement>) => {
       e.preventDefault()
       e.stopPropagation()
+      isResizingRef.current = true
       const startX = e.clientX
       const startY = e.clientY
       const startW = sizeRef.current.w
@@ -104,7 +146,10 @@ function StickyMemoCompactPreview({
         if (edge.includes('w')) w = startW - dx
         if (edge.includes('s')) h = startH + dy
         if (edge.includes('n')) h = startH - dy
-        setSize({ w: stickyMemoWidth(w), h: stickyMemoHeight(h) })
+        setSize({
+          w: clampCompactMemoWidth(w),
+          h: clampCompactMemoHeight(h),
+        })
       }
 
       const onUp = () => {
@@ -112,6 +157,7 @@ function StickyMemoCompactPreview({
         window.removeEventListener('pointermove', onMove)
         window.removeEventListener('pointerup', onUp)
         window.removeEventListener('pointercancel', onUp)
+        isResizingRef.current = false
         const { w, h } = sizeRef.current
         onResize(w, h)
       }
@@ -129,12 +175,13 @@ function StickyMemoCompactPreview({
       style={{ width: size.w, height: size.h }}
     >
       <div
-        className={`absolute inset-2 flex flex-col overflow-hidden rounded-[5px] ${theme.bodyClass}`}
+        className={`absolute inset-1 overflow-hidden rounded-[5px] ${theme.bodyClass}`}
         aria-hidden={empty}
       >
         {!empty ? (
           <div
-            className={`sticky-compact-preview min-h-0 flex-1 overflow-hidden p-2 text-[0.72rem] leading-snug sm:text-[0.76rem] ${
+            ref={contentRef}
+            className={`sticky-compact-preview inline-block w-max max-w-[min(calc(100vw-5rem),20rem)] p-1.5 text-[0.72rem] leading-snug sm:text-[0.76rem] ${
               note.tint === 'charcoal' ? 'text-white/90' : 'text-text-primary'
             } [&_img]:max-h-16 [&_img]:w-auto [&_img]:max-w-full [&_img]:rounded [&_ul]:list-disc [&_ul]:pl-3.5`}
             dangerouslySetInnerHTML={{ __html: safe }}

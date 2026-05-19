@@ -1,10 +1,47 @@
 import {
+  htmlToPlain,
+  sanitizeStickyNoteHtml,
+} from './calendarHtmlSanitize'
+import {
+  clampCompactMemoHeight,
+  clampCompactMemoWidth,
+  compactSizeEmpty,
+  compactSizeFromContent,
   STICKY_MEMO_DEFAULT_SIZE,
   stickyMemoHeight,
   stickyMemoWidth,
 } from './stickyMemoSize'
 import type { CalendarStickyNote } from './calendarStickyNotesStorage'
 
+function derivePlain(note: CalendarStickyNote): string {
+  const rawHtml = note.bodyHtml?.trim()
+    ? note.bodyHtml
+    : note.body
+      ? `<p>${note.body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`
+      : ''
+  const safe = sanitizeStickyNoteHtml(rawHtml || '<p></p>')
+  return htmlToPlain(safe).trim()
+}
+
+/** 저장된 크기가 없을 때 본문 기준 추정(보드 높이 계산용) */
+export function estimateCompactFootprint(note: CalendarStickyNote): {
+  width: number
+  height: number
+} {
+  if (note.widthPx != null && note.heightPx != null) {
+    return {
+      width: clampCompactMemoWidth(note.widthPx),
+      height: clampCompactMemoHeight(note.heightPx),
+    }
+  }
+  const plain = derivePlain(note)
+  if (!plain) return compactSizeEmpty()
+  const charW = 7.5
+  const lineH = 15
+  const lines = plain.split(/\n/)
+  const longest = Math.max(1, ...lines.map((l) => l.length))
+  return compactSizeFromContent(longest * charW, lines.length * lineH)
+}
 const GAP = 16
 const COLS = 3
 const MAX_BOARD_COORD = 2400
@@ -39,11 +76,19 @@ export function stickyNoteFootprint(
   note: CalendarStickyNote,
   expanded: boolean,
 ): { width: number; height: number } {
-  const width = stickyMemoWidth(note.widthPx)
-  const height = expanded
-    ? Math.max(stickyMemoHeight(note.heightPx), 288)
-    : stickyMemoHeight(note.heightPx)
-  return { width, height }
+  if (expanded) {
+    return {
+      width: stickyMemoWidth(note.widthPx),
+      height: Math.max(stickyMemoHeight(note.heightPx), 288),
+    }
+  }
+  if (note.widthPx != null && note.heightPx != null) {
+    return {
+      width: clampCompactMemoWidth(note.widthPx),
+      height: clampCompactMemoHeight(note.heightPx),
+    }
+  }
+  return estimateCompactFootprint(note)
 }
 
 export function computeStickyBoardHeight(

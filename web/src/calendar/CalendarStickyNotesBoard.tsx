@@ -116,7 +116,9 @@ export default function CalendarStickyNotesBoard({ notes, patchNotes }: Props) {
   return (
     <section
       aria-label="스티커 메모"
-      className="overflow-hidden rounded-[var(--radius-card)] border border-border-subtle bg-gradient-to-b from-ceramic/60 to-surface-raised px-3 py-3 md:px-5 md:py-4"
+      className={`overflow-hidden rounded-[var(--radius-card)] border border-border-subtle bg-gradient-to-b from-ceramic/60 to-surface-raised px-3 md:px-5 ${
+        hasNotes ? 'py-2 md:py-2.5' : 'py-3 md:py-4'
+      }`}
     >
       {!hasNotes ? (
         <p className="text-center text-[11px] leading-snug text-text-soft sm:text-sm">
