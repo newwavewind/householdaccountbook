@@ -632,26 +632,59 @@ export default function LedgerApp() {
                 공유코드
               </Button>
               {settingsOpen ? (
-                <div className="absolute right-0 top-full z-50 mt-2 w-64 rounded-[var(--radius-card)] border border-border-subtle bg-surface-raised p-3 shadow-[var(--shadow-card)]">
-                  <p className="px-3 py-1 text-xs font-medium text-text-soft">가족 코드</p>
-                  <div className="flex items-center gap-2 px-3 py-1">
-                    <span className="flex-1 rounded-lg bg-emerald-50 px-3 py-2 text-center text-base font-bold tracking-[0.25em] text-emerald-700">
+                <div className="absolute right-0 top-full z-50 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-[var(--radius-card)] border border-border-subtle bg-surface-raised p-4 shadow-[var(--shadow-card)]">
+                  <p className="text-sm font-semibold text-starbucks-green">가족 공유코드</p>
+                  <p className="mt-1.5 text-xs leading-relaxed text-text-secondary">
+                    같은 가구에 속한 사람끼리 장부·일정을 함께 보는 6자리 코드예요. 로그인한
+                    계정마다 따로 저장되는 것이 아니라, 이 코드로 한 가구를 묶습니다.
+                  </p>
+                  <ul className="mt-2.5 space-y-1 text-xs leading-relaxed text-text-secondary">
+                    <li className="flex gap-1.5">
+                      <span className="shrink-0 text-green-accent" aria-hidden>
+                        ·
+                      </span>
+                      <span>가계부 수입·지출 내역 (실시간 동기화)</span>
+                    </li>
+                    <li className="flex gap-1.5">
+                      <span className="shrink-0 text-green-accent" aria-hidden>
+                        ·
+                      </span>
+                      <span>가족 구성원 목록·필터</span>
+                    </li>
+                    <li className="flex gap-1.5">
+                      <span className="shrink-0 text-green-accent" aria-hidden>
+                        ·
+                      </span>
+                      <span>캘린더 일정·메모·D-day</span>
+                    </li>
+                  </ul>
+                  <p className="mt-2.5 text-xs leading-relaxed text-text-soft">
+                    <span className="font-medium text-text-secondary">가족이 참여하는 방법</span>
+                    <br />
+                    1. 가계부 앱에 로그인
+                    <br />
+                    2. 처음이면 「코드로 참여」에서 아래 코드 입력
+                    <br />
+                    3. 참여 후 같은 장부·캘린더가 보여요
+                  </p>
+                  <div className="mt-3 flex items-center gap-2">
+                    <span className="flex-1 rounded-lg bg-emerald-50 px-3 py-2.5 text-center text-base font-bold tracking-[0.25em] text-emerald-700">
                       {householdCode}
                     </span>
                     <button
                       type="button"
-                      className="rounded-lg border border-border-subtle px-3 py-2 text-xs text-text-soft hover:bg-neutral-cool"
+                      className="shrink-0 rounded-lg border border-border-subtle px-3 py-2.5 text-xs font-medium text-text-secondary hover:bg-neutral-cool"
                       onClick={() => {
                         void navigator.clipboard.writeText(householdCode)
-                        alert('코드를 복사했어요!')
-                        setSettingsOpen(false)
+                        alert('공유코드를 복사했어요. 카톡 등으로 가족에게 보내 주세요.')
                       }}
                     >
                       복사
                     </button>
                   </div>
-                  <p className="px-3 pb-1 text-[11px] text-text-soft">
-                    가족에게 이 코드를 공유하세요.
+                  <p className="mt-2 text-[11px] leading-snug text-text-soft">
+                    코드는 가족에게만 알려 주세요. 본인만 다른 가구에 참여하려면 로그아웃 후 다시
+                    「코드로 참여」를 선택하면 됩니다.
                   </p>
                 </div>
               ) : null}

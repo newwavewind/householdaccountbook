@@ -37,4 +37,5 @@ export type CommunityUser = {
   email: string
   displayName: string
   avatarUrl?: string
+  communityGrade?: number
 }

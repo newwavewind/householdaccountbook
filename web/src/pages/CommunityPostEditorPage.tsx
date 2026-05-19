@@ -11,6 +11,7 @@ import { resolveCommunityRepository } from '../community/repository'
 import { readMockSession } from '../community/mockSessionStorage'
 import { CommunityRichTextEditor } from '../components/community/CommunityRichTextEditor'
 import { postBodyToPlainText } from '../lib/communityPostHtml'
+import { gradeLabel } from '../community/communityGrades'
 import type { PostVisibility } from '../community/types'
 
 export default function CommunityPostEditorPage({
@@ -35,6 +36,7 @@ export default function CommunityPostEditorPage({
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [visibility, setVisibility] = useState<PostVisibility>('public')
+  const [isNotice, setIsNotice] = useState(false)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
@@ -52,6 +54,7 @@ export default function CommunityPostEditorPage({
       setTitle(post.title)
       setBody(post.body)
       setVisibility(post.visibility)
+      setIsNotice(Boolean(post.isNotice))
     })
   }, [mode, post, busy])
 
@@ -89,6 +92,7 @@ export default function CommunityPostEditorPage({
             authorId: auth.user?.id ?? null,
             authorDisplayName: displayName,
             visibility: isGuest ? 'public' : visibility,
+            isNotice: auth.canWriteNotice ? isNotice : false,
           })
           nav(`/community/${row.id}`, { replace: true })
         } else if (id) {
@@ -96,6 +100,7 @@ export default function CommunityPostEditorPage({
             title,
             body: body.trim(),
             visibility: isGuest ? undefined : visibility,
+            isNotice: auth.canWriteNotice ? isNotice : undefined,
           })
           nav(`/community/${id}`, { replace: true })
         }
@@ -162,12 +167,30 @@ export default function CommunityPostEditorPage({
           </div>
           {err ? <p className="text-sm text-danger">{err}</p> : null}
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-muted/80 pt-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-3">
             <PostVisibilityPicker
               value={visibility}
               onChange={setVisibility}
               disabled={saving}
               isGuest={isGuest}
             />
+            {auth.canWriteNotice ? (
+              <label className="inline-flex cursor-pointer items-center gap-1.5 text-[11px] font-medium text-text-secondary">
+                <input
+                  type="checkbox"
+                  checked={isNotice}
+                  onChange={(e) => setIsNotice(e.target.checked)}
+                  disabled={saving}
+                  className="accent-amber-600"
+                />
+                공지 등록
+              </label>
+            ) : auth.user ? (
+              <span className="text-[11px] text-text-soft" title={`현재 등급: ${gradeLabel(auth.communityGrade)}`}>
+                공지는 우수 등급 이상
+              </span>
+            ) : null}
+            </div>
             <div className="flex shrink-0 gap-2">
               <Button type="submit" variant="primary" disabled={saving}>
                 {saving ? '\uc800\uc7a5 \uc911\u2026' : '\uc800\uc7a5'}

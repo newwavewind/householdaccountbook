@@ -13,6 +13,7 @@ import { getCommunitySupabase } from '../lib/communitySupabaseClient'
 import { probeGoogleOAuth, supabaseAuthV1CallbackUrl } from '../lib/supabaseOAuthProbe'
 import { oauthCallbackFullUrl } from '../lib/appUrls'
 import { setPrismaApiToken, getPrismaApiToken } from '../lib/prismaApi'
+import { canWriteNotice } from './communityGrades'
 import type { CommunityUser, ProfileRole } from './types'
 import {
   readMockSession,
@@ -24,6 +25,8 @@ type CommunityAuthState = {
   loading: boolean
   user: CommunityUser | null
   role: ProfileRole
+  communityGrade: number
+  canWriteNotice: boolean
   demoSignIn: (asAdmin: boolean) => void
   signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>
@@ -43,6 +46,7 @@ const DEMO_ADMIN: MockSession = {
   email: 'demo.admin@example.com',
   displayName: '데모 관리자',
   role: 'admin',
+  communityGrade: 3,
 }
 
 function mockSessionToUser(s: MockSession): CommunityUser {
@@ -51,6 +55,7 @@ function mockSessionToUser(s: MockSession): CommunityUser {
     email: s.email,
     displayName: s.displayName,
     avatarUrl: s.avatarUrl,
+    communityGrade: s.communityGrade ?? 0,
   }
 }
 
@@ -74,11 +79,13 @@ export function CommunityAuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<ProfileRole>(() =>
     mode === 'mock' ? initialMockRole() : 'user',
   )
+  const [communityGrade, setCommunityGrade] = useState(0)
 
   const syncMockFromStorage = useCallback(() => {
     const s = readMockSession()
     setUser(s ? mockSessionToUser(s) : null)
     setRole(s?.role === 'admin' ? 'admin' : 'user')
+    setCommunityGrade(s?.communityGrade ?? 0)
     setLoading(false)
   }, [])
 
@@ -144,14 +151,18 @@ export function CommunityAuthProvider({ children }: { children: ReactNode }) {
     const loadProfile = async (uid: string) => {
       const { data, error } = await client
         .from('profiles')
-        .select('role')
+        .select('role, community_grade')
         .eq('id', uid)
         .maybeSingle()
       if (error) {
         setRole('user')
+        setCommunityGrade(0)
         return
       }
+      const grade = data?.community_grade ?? 0
       setRole(data?.role === 'admin' ? 'admin' : 'user')
+      setCommunityGrade(grade)
+      return grade
     }
 
     const applySession = async () => {
@@ -159,10 +170,12 @@ export function CommunityAuthProvider({ children }: { children: ReactNode }) {
       if (!session?.user) {
         setUser(null)
         setRole('user')
+        setCommunityGrade(0)
         setLoading(false)
         return
       }
       const u = session.user
+      const grade = (await loadProfile(u.id)) ?? 0
       setUser({
         id: u.id,
         email: u.email ?? '',
@@ -171,8 +184,8 @@ export function CommunityAuthProvider({ children }: { children: ReactNode }) {
           (u.user_metadata?.name as string | undefined) ??
           (u.email?.split('@')[0] ?? '사용자'),
         avatarUrl: u.user_metadata?.avatar_url as string | undefined,
+        communityGrade: grade,
       })
-      await loadProfile(u.id)
       setLoading(false)
     }
 
@@ -183,10 +196,12 @@ export function CommunityAuthProvider({ children }: { children: ReactNode }) {
         if (!session?.user) {
           setUser(null)
           setRole('user')
+          setCommunityGrade(0)
           setLoading(false)
           return
         }
         const u = session.user
+        const grade = (await loadProfile(u.id)) ?? 0
         setUser({
           id: u.id,
           email: u.email ?? '',
@@ -195,8 +210,8 @@ export function CommunityAuthProvider({ children }: { children: ReactNode }) {
             (u.user_metadata?.name as string | undefined) ??
             (u.email?.split('@')[0] ?? '사용자'),
           avatarUrl: u.user_metadata?.avatar_url as string | undefined,
+          communityGrade: grade,
         })
-        await loadProfile(u.id)
         setLoading(false)
       })()
     })
@@ -319,11 +334,13 @@ export function CommunityAuthProvider({ children }: { children: ReactNode }) {
       loading,
       user,
       role,
+      communityGrade,
+      canWriteNotice: canWriteNotice(role, communityGrade),
       demoSignIn,
       signInWithGoogle,
       signOut,
     }),
-    [demoSignIn, loading, role, signInWithGoogle, signOut, user],
+    [communityGrade, demoSignIn, loading, role, signInWithGoogle, signOut, user],
   )
 
   return (

@@ -8,7 +8,9 @@ import {
   resolveVoterId,
   setGuestNickname,
 } from '../community/communityGuest'
+import { isConceptPost } from '../community/communityGrades'
 import { visibilityLabel } from '../community/postVisibility'
+import { CommunityConceptBadge } from '../components/community/CommunityConceptBadge'
 import { CommunityNicknameField } from '../components/community/CommunityNicknameField'
 import { useCommunityPost } from '../community/useCommunityPosts'
 import { isProbablyRichHtml } from '../lib/communityPostHtml'
@@ -290,7 +292,10 @@ export default function CommunityPostDetailPage() {
               {post.hidden ? (
                 <p className="mt-3 text-xs text-warning">숨김 처리된 글입니다.</p>
               ) : null}
-              <h1 className="mt-4 font-serif-display text-starbucks-green">{post.title}</h1>
+              <h1 className="mt-4 flex flex-wrap items-center gap-2 font-serif-display text-starbucks-green">
+                {post.title}
+                {isConceptPost(post) ? <CommunityConceptBadge /> : null}
+              </h1>
               {isProbablyRichHtml(post.body) ? (
                 <CommunityPostBody
                   body={post.body}

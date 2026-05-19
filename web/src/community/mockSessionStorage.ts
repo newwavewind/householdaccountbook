@@ -8,6 +8,7 @@ export type MockSession = {
   displayName: string
   avatarUrl?: string
   role: MockRole
+  communityGrade?: number
 }
 
 export function readMockSession(): MockSession | null {

@@ -1,6 +1,6 @@
 import { postBodyToPlainText } from '../lib/communityPostHtml'
+import { isConceptPost } from './communityGrades'
 import {
-  CONCEPT_LIKE_THRESHOLD,
   type CommunityBoardTab,
   type CommunityPageSize,
   type CommunitySearchScope,
@@ -22,9 +22,7 @@ export type PostListQueryResult = {
 
 function matchesTab(post: CommunityPost, tab: CommunityBoardTab): boolean {
   if (tab === 'notice') return !!post.isNotice
-  if (tab === 'concept') {
-    return !post.isNotice && post.likeCount >= CONCEPT_LIKE_THRESHOLD
-  }
+  if (tab === 'concept') return isConceptPost(post)
   return true
 }
 

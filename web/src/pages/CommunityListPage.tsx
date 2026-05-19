@@ -10,7 +10,9 @@ import {
   type CommunitySearchScope,
 } from '../community/boardConstants'
 import { useCommunityBoard } from '../community/useCommunityBoard'
+import { conceptCriteriaText, isConceptPost } from '../community/communityGrades'
 import { detectPostContentFlags } from '../lib/communityPostContentFlags'
+import { CommunityConceptBadge } from '../components/community/CommunityConceptBadge'
 import { CommunityPostContentIcons } from '../components/community/CommunityPostContentIcons'
 
 function fmtListDate(iso: string) {
@@ -172,6 +174,11 @@ export default function CommunityListPage() {
             </button>
           ))}
         </div>
+        {board.tab === 'concept' ? (
+          <p className="border-b border-border-muted/60 bg-sky-50/40 px-3 py-1.5 text-[11px] text-sky-900/80">
+            {conceptCriteriaText()}인 글만 표시됩니다.
+          </p>
+        ) : null}
 
         <form
           onSubmit={onSearch}
@@ -244,7 +251,7 @@ export default function CommunityListPage() {
                   <tr
                     key={p.id}
                     className={`border-b border-border-muted/80 transition-colors hover:bg-green-light/15 ${
-                      p.isNotice ? 'bg-amber-50/60' : ''
+                      p.isNotice ? 'bg-amber-50/60' : isConceptPost(p) ? 'bg-sky-50/40' : ''
                     }`}
                   >
                     <td className="px-2 py-2.5 text-center text-xs tabular-nums text-text-soft">
@@ -260,6 +267,7 @@ export default function CommunityListPage() {
                         className="flex min-w-0 items-center font-medium text-text-primary hover:text-starbucks-green hover:underline"
                       >
                         <span className="truncate">{p.title}</span>
+                        {isConceptPost(p) ? <CommunityConceptBadge className="ml-1" /> : null}
                         <CommunityPostContentIcons {...detectPostContentFlags(p.body)} />
                         {p.commentCount > 0 ? (
                           <span className="ml-1 shrink-0 text-xs font-semibold text-green-accent">

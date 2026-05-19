@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { CommunityPost, CommunityComment, PostVisibility } from './types'
+import { canWriteNotice } from './communityGrades'
 import { parseVoterRef } from './communityGuest'
 import { canReadPostVisibility } from './postVisibility'
 import {
@@ -51,11 +52,13 @@ export interface CommunityRepository {
     authorId: string | null
     authorDisplayName: string
     visibility?: PostVisibility
+    isNotice?: boolean
   }): Promise<CommunityPost>
   updatePost(
     id: string,
-    input: { title: string; body: string; visibility?: PostVisibility },
+    input: { title: string; body: string; visibility?: PostVisibility; isNotice?: boolean },
   ): Promise<void>
+  setCommunityGrade(userId: string, grade: number): Promise<void>
   deletePost(id: string): Promise<void>
   setHidden(id: string, hidden: boolean): Promise<void>
   setNotice(id: string, isNotice: boolean): Promise<void>
@@ -231,7 +234,15 @@ class MockCommunityRepository implements CommunityRepository {
     authorId: string | null
     authorDisplayName: string
     visibility?: PostVisibility
+    isNotice?: boolean
   }): Promise<CommunityPost> {
+    const wantNotice = Boolean(input.isNotice)
+    if (
+      wantNotice &&
+      !canWriteNotice(this.session?.role ?? 'user', this.session?.communityGrade ?? 0)
+    ) {
+      throw new Error('\uacf5\uc9c0 \uc791\uc131 \uad8c\ud55c\uc774 \uc5c6\uc2b5\ub2c8\ub2e4. (\uc6b0\uc218 \ub4f1\uae09 \uc774\uc0c1)')
+    }
     const list = readMockPosts()
     const now = new Date().toISOString()
     const visibility = input.authorId ? (input.visibility ?? 'public') : 'public'
@@ -243,7 +254,7 @@ class MockCommunityRepository implements CommunityRepository {
       body: input.body,
       hidden: false,
       visibility,
-      isNotice: false,
+      isNotice: wantNotice,
       createdAt: now,
       updatedAt: now,
       likeCount: 0,
@@ -269,7 +280,16 @@ class MockCommunityRepository implements CommunityRepository {
     writeMockPosts(list)
   }
 
-  async updatePost(id: string, input: { title: string; body: string; visibility?: PostVisibility }) {
+  async updatePost(
+    id: string,
+    input: { title: string; body: string; visibility?: PostVisibility; isNotice?: boolean },
+  ) {
+    if (
+      input.isNotice === true &&
+      !canWriteNotice(this.session?.role ?? 'user', this.session?.communityGrade ?? 0)
+    ) {
+      throw new Error('\uacf5\uc9c0 \uc791\uc131 \uad8c\ud55c\uc774 \uc5c6\uc2b5\ub2c8\ub2e4. (\uc6b0\uc218 \ub4f1\uae09 \uc774\uc0c1)')
+    }
     const list = readMockPosts()
     const i = list.findIndex((p) => p.id === id)
     if (i === -1) throw new Error('글을 찾을 수 없습니다.')
@@ -278,9 +298,16 @@ class MockCommunityRepository implements CommunityRepository {
       title: input.title.trim(),
       body: input.body,
       visibility: input.visibility ?? list[i].visibility,
+      isNotice: input.isNotice ?? list[i].isNotice,
       updatedAt: new Date().toISOString(),
     }
     writeMockPosts(list)
+  }
+
+  async setCommunityGrade(userId: string, grade: number): Promise<void> {
+    if (this.session?.role !== 'admin') throw new Error('\uad8c\ud55c\uc774 \uc5c6\uc2b5\ub2c8\ub2e4.')
+    void userId
+    void grade
   }
 
   async deletePost(id: string) {
@@ -466,6 +493,10 @@ class ApiCommunityRepository implements CommunityRepository {
   }
 
   async recordView(_postId: string): Promise<void> {}
+
+  async setCommunityGrade(_userId: string, _grade: number): Promise<void> {
+    throw new Error('Prisma API에서는 회원 등급 변경을 지원하지 않습니다.')
+  }
 }
 
 class SupabaseCommunityRepository implements CommunityRepository {
@@ -581,6 +612,7 @@ class SupabaseCommunityRepository implements CommunityRepository {
     authorId: string | null
     authorDisplayName: string
     visibility?: PostVisibility
+    isNotice?: boolean
   }): Promise<CommunityPost> {
     const visibility = input.authorId ? (input.visibility ?? 'public') : 'public'
     const { data, error } = await this.client
@@ -592,6 +624,7 @@ class SupabaseCommunityRepository implements CommunityRepository {
         body: input.body,
         hidden: false,
         visibility,
+        is_notice: Boolean(input.isNotice),
       })
       .select(
         'id, author_id, author_display_name, title, body, hidden, visibility, created_at, updated_at',
@@ -601,12 +634,16 @@ class SupabaseCommunityRepository implements CommunityRepository {
     return mapSupabaseRow(data as Parameters<typeof mapSupabaseRow>[0])
   }
 
-  async updatePost(id: string, input: { title: string; body: string; visibility?: PostVisibility }) {
-    const patch: Record<string, string> = {
+  async updatePost(
+    id: string,
+    input: { title: string; body: string; visibility?: PostVisibility; isNotice?: boolean },
+  ) {
+    const patch: Record<string, string | boolean> = {
       title: input.title.trim(),
       body: input.body,
     }
     if (input.visibility) patch.visibility = input.visibility
+    if (input.isNotice !== undefined) patch.is_notice = input.isNotice
     const { error } = await this.client
       .from('posts')
       .update(patch)
@@ -633,6 +670,14 @@ class SupabaseCommunityRepository implements CommunityRepository {
       .update({ is_notice: isNotice })
       .eq('id', id)
     if (error) throw new Error(translatePostError(error.message))
+  }
+
+  async setCommunityGrade(userId: string, grade: number): Promise<void> {
+    const { error } = await this.client
+      .from('profiles')
+      .update({ community_grade: grade })
+      .eq('id', userId)
+    if (error) throw new Error(error.message)
   }
 
   async listComments(postId: string): Promise<CommunityComment[]> {
@@ -755,6 +800,12 @@ class SupabaseCommunityRepository implements CommunityRepository {
 }
 
 function translatePostError(msg: string): string {
+  if (/insufficient_grade_for_notice/i.test(msg)) {
+    return '공지 작성 권한이 없습니다. 우수 등급(2) 이상 또는 관리자만 공지를 등록할 수 있습니다.'
+  }
+  if (/notice_requires_login/i.test(msg)) {
+    return '공지는 로그인한 회원만 등록할 수 있습니다.'
+  }
   if (/row-level security|RLS/i.test(msg)) {
     return '권한이 없거나 로그인이 필요합니다.'
   }
@@ -835,6 +886,10 @@ class UnconfiguredSupabaseCommunityRepository implements CommunityRepository {
     throw new Error(UnconfiguredSupabaseCommunityRepository.msg)
   }
   async recordView(_postId: string): Promise<void> {}
+
+  async setCommunityGrade(_userId: string, _grade: number): Promise<void> {
+    throw new Error(UnconfiguredSupabaseCommunityRepository.msg)
+  }
 }
 
 export function seedMockPostsIfEmpty() {

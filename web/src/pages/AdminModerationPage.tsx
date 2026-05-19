@@ -1,6 +1,7 @@
 ﻿import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { Link } from 'react-router-dom'
+import { AdminMemberGradePanel } from '../components/community/AdminMemberGradePanel'
 import { useCommunityPosts } from '../community/useCommunityPosts'
 
 function fmtDate(iso: string) {
@@ -112,6 +113,7 @@ export default function AdminModerationPage() {
           ))}
         </ul>
       )}
+      <AdminMemberGradePanel repo={repo} />
     </main>
   )
 }
