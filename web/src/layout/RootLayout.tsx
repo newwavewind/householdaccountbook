@@ -1,4 +1,4 @@
-import { Fragment, useMemo } from 'react'
+import { Fragment, useMemo, type ReactNode } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import {
@@ -7,6 +7,13 @@ import {
 } from '../community/CommunityAuthContext'
 import { communityBackendMode } from '../lib/communityBackend'
 import { AppearanceMenu } from '../theme/AppearanceMenu'
+import {
+  AdminNavIcon,
+  CommunityNavIcon,
+  DiaryNavIcon,
+  LedgerNavIcon,
+} from './navIcons'
+import { useScrollHeaderVisibility } from './useScrollHeaderVisibility'
 
 function SettingsGearButton({ onClick }: { onClick: () => void }) {
   return (
@@ -39,6 +46,7 @@ function SettingsGearButton({ onClick }: { onClick: () => void }) {
 type NavItem = {
   to: string
   label: string
+  icon: ReactNode
   end?: boolean
 }
 
@@ -52,16 +60,16 @@ function desktopNavLinkClass({ isActive }: { isActive: boolean }) {
 
 function mobileNavLinkClass({ isActive }: { isActive: boolean }) {
   const base =
-    'relative flex min-h-[3.25rem] flex-1 flex-col items-center justify-center gap-0.5 px-1 py-2 text-[11px] font-semibold leading-tight transition-colors'
+    'relative flex min-h-[3.25rem] flex-1 flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-[10px] font-semibold leading-tight transition-colors'
   return isActive
     ? `${base} text-green-accent theme2:text-green-accent theme3:text-green-accent`
     : `${base} text-text-soft active:bg-well/80`
 }
 
 const MAIN_NAV_ITEMS: NavItem[] = [
-  { to: '/calendar', label: '다이어리' },
-  { to: '/', label: '가계부', end: true },
-  { to: '/community', label: '커뮤니티' },
+  { to: '/calendar', label: '다이어리', icon: <DiaryNavIcon /> },
+  { to: '/', label: '가계부', icon: <LedgerNavIcon />, end: true },
+  { to: '/community', label: '커뮤니티', icon: <CommunityNavIcon /> },
 ]
 
 function DesktopMainNav({ items }: { items: NavItem[] }) {
@@ -109,6 +117,7 @@ function MobileBottomNav({ items }: { items: NavItem[] }) {
                     aria-hidden
                   />
                 ) : null}
+                {item.icon}
                 <span>{item.label}</span>
               </>
             )}
@@ -124,11 +133,14 @@ export default function RootLayout() {
   const mode = communityBackendMode()
   const backendMsg = useCommunityBackendReadyMessage()
   const auth = useCommunityAuth()
+  const headerVisible = useScrollHeaderVisibility()
 
   const navItems = useMemo<NavItem[]>(
     () => [
       ...MAIN_NAV_ITEMS,
-      ...(auth.role === 'admin' ? [{ to: '/admin', label: '관리' }] : []),
+      ...(auth.role === 'admin'
+        ? [{ to: '/admin', label: '관리', icon: <AdminNavIcon /> }]
+        : []),
     ],
     [auth.role],
   )
@@ -193,7 +205,13 @@ export default function RootLayout() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-border-muted bg-neutral-warm/90 backdrop-blur-md">
+      <header
+        className={[
+          'sticky top-0 z-40 border-b border-border-muted bg-neutral-warm/90 backdrop-blur-md',
+          'transition-transform duration-300 ease-out will-change-transform',
+          headerVisible ? 'translate-y-0' : '-translate-y-full pointer-events-none',
+        ].join(' ')}
+      >
         <div className="mx-auto flex max-w-5xl items-center justify-end gap-2 px-4 py-2.5 md:justify-between md:px-6 md:py-3">
           <DesktopMainNav items={navItems} />
           <div className="flex flex-nowrap items-center justify-end gap-1 md:gap-2">
