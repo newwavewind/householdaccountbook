@@ -14,7 +14,7 @@ const PANEL_MIN_W = 176
 const PANEL_MAX_W = 280
 const PANEL_MAX_H = 288
 
-export type BulkListPickerRole = 'category' | 'card'
+export type BulkListPickerRole = 'category' | 'card' | 'member'
 
 export type BulkListPickerRow = { value: string; label: string }
 
@@ -61,7 +61,9 @@ export function BulkListPicker({
   const dataTriggerProps =
     pickerRole === 'category'
       ? { 'data-bulk-category-trigger': true as const }
-      : { 'data-bulk-card-trigger': true as const }
+      : pickerRole === 'card'
+        ? { 'data-bulk-card-trigger': true as const }
+        : { 'data-bulk-member-trigger': true as const }
 
   const updatePosition = useCallback(() => {
     const el = triggerRef.current
@@ -191,7 +193,8 @@ export function BulkListPicker({
       : rowsList.find((r: BulkListPickerRow) => r.value === value)?.label ??
         value
 
-  const optPrefix = pickerRole === 'category' ? 'cat' : 'card'
+  const optPrefix =
+    pickerRole === 'category' ? 'cat' : pickerRole === 'card' ? 'card' : 'member'
 
   const panel =
     isOpen &&

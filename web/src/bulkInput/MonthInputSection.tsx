@@ -1,18 +1,40 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+﻿import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
+import type { BulkDraftRow, BulkRowsUpdater } from './draftRow'
+import { BulkInputDraftRow } from './BulkInputDraftRow'
+import { BulkInputHistoryRow } from './BulkInputHistoryRow'
+import { BulkInputTableHead } from './BulkInputTableHead'
 import {
-  EXPENSE_CATEGORIES,
-  INCOME_CATEGORIES,
-} from '../constants/categories'
-import type { BulkDraftRow } from './draftRow'
-import { BulkCardPicker } from './BulkCardPicker'
-import { BulkCategoryPicker } from './BulkCategoryPicker'
+  BULK_TABLE_CLASS,
+  BULK_TABLE_INNER,
+  BULK_TABLE_MIN_WIDTH,
+  BULK_TABLE_SCROLL,
+} from './bulkInputTableLayout'
 import { emptyDraftRow } from './draftRow'
-import { daysInMonth, monthLabel } from './monthUtils'
+import {
+  ensureWorkingRowOnTop,
+  isBlankDraftRow,
+  migrateLegacyMonthRowOrder,
+  moveRowBelowTopAfterConfirm,
+} from './draftRowOrder'
+import { daysInMonth } from './monthUtils'
 import type { DraftLedgerComparison } from './compareMonthDraftLedger'
 import { draftMonthTotalsForDisplay } from './draftMonthTotals'
-import type { PaymentMethod } from '../types/transaction'
+
+type BulkListPageSize = 5 | 10 | 30 | 'all'
+
+const BULK_LIST_PAGE_SIZE_OPTIONS: { value: BulkListPageSize; label: string }[] = [
+  { value: 5, label: '5개씩 보기' },
+  { value: 10, label: '10개씩 보기' },
+  { value: 30, label: '30개씩 보기' },
+  { value: 'all', label: '전체 보기' },
+]
+
+function bulkListPageCount(rowCount: number, pageSize: BulkListPageSize): number {
+  if (pageSize === 'all' || rowCount === 0) return 1
+  return Math.max(1, Math.ceil(rowCount / pageSize))
+}
 
 function won(n: number): string {
   return `${n.toLocaleString('ko-KR')}원`
@@ -42,16 +64,18 @@ function collectRowFocusables(tr: HTMLTableRowElement): HTMLElement[] {
       continue
     }
     const bulkPickerBtn = td.querySelector(
-      ':scope > button[data-bulk-category-trigger], :scope > button[data-bulk-card-trigger]',
+      ':scope > button[data-bulk-category-trigger], :scope > button[data-bulk-card-trigger], :scope > button[data-bulk-member-trigger]',
     )
     if (bulkPickerBtn instanceof HTMLButtonElement && !bulkPickerBtn.disabled) {
       out.push(bulkPickerBtn)
       continue
     }
     // 확인 버튼도 Tab/Enter 네비게이션에 포함 (마지막 포커스 위치)
-    const confirmBtn = td.querySelector(':scope > button[data-confirm-row]')
-    if (confirmBtn instanceof HTMLButtonElement && !confirmBtn.disabled) {
-      out.push(confirmBtn)
+    const actionBtn = td.querySelector(
+      ':scope > button[data-confirm-row], :scope > button[data-save-row]',
+    )
+    if (actionBtn instanceof HTMLButtonElement && !actionBtn.disabled) {
+      out.push(actionBtn)
       continue
     }
   }
@@ -78,10 +102,6 @@ function focusPrevInTable(current: HTMLElement, tbody: HTMLTableSectionElement) 
   }
 }
 
-export type BulkRowsUpdater =
-  | BulkDraftRow[]
-  | ((prev: BulkDraftRow[]) => BulkDraftRow[])
-
 type Props = {
   year: number
   monthIndex: number
@@ -91,9 +111,6 @@ type Props = {
   onApplyMonth: (rows: BulkDraftRow[]) => void
   /** 선택 연·월 장부 vs 입력 유효 줄 집합 비교 */
   draftLedgerCompare: DraftLedgerComparison
-  /** 직전 연도 동일 월 장부 수입·지출 (없으면 null) */
-  priorYearMonthLedgerTotals: { income: number; expense: number } | null
-  priorCalendarYear: number | null
   members?: string[]
 }
 
@@ -104,14 +121,13 @@ export function MonthInputSection({
   onChangeRows,
   onApplyMonth,
   draftLedgerCompare,
-  priorYearMonthLedgerTotals,
-  priorCalendarYear,
   members = [],
 }: Props) {
   // rows의 최신값을 ref로 추적 — render 중 갱신되므로 rAF 콜백에서 읽으면 항상 최신
   const rowsRef = useRef(rows)
   rowsRef.current = rows
-  const tbodyRef = useRef<HTMLTableSectionElement | null>(null)
+  const workingTbodyRef = useRef<HTMLTableSectionElement | null>(null)
+  const historyTbodyRef = useRef<HTMLTableSectionElement | null>(null)
   const [amountFocusLocalKey, setAmountFocusLocalKey] = useState<string | null>(
     null,
   )
@@ -119,21 +135,66 @@ export function MonthInputSection({
     null,
   )
   const [cardOpenLocalKey, setCardOpenLocalKey] = useState<string | null>(null)
+  const [memberOpenLocalKey, setMemberOpenLocalKey] = useState<string | null>(
+    null,
+  )
   const [confirmFlashLocalKey, setConfirmFlashLocalKey] = useState<string | null>(
     null,
   )
+  const [historyRowMenuKey, setHistoryRowMenuKey] = useState<string | null>(null)
+  const [editingHistoryKey, setEditingHistoryKey] = useState<string | null>(null)
+  const editingSnapshotRef = useRef<BulkDraftRow | null>(null)
   /** 인앱 확인 (window.confirm은 일부 브라우저/미리보기에서 무시될 수 있음) */
   const [bulkRowDeleteKey, setBulkRowDeleteKey] = useState<string | null>(null)
+  const [listPageSize, setListPageSize] = useState<BulkListPageSize>(10)
+  const [listPage, setListPage] = useState(1)
   const confirmFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const maxDay = daysInMonth(year, monthIndex)
-  const title = monthLabel(monthIndex)
-  const hasPriorLedgerMonth =
-    priorYearMonthLedgerTotals != null && priorCalendarYear != null
 
   const draftMonthTotals = useMemo(
     () => draftMonthTotalsForDisplay(year, monthIndex, rows),
     [year, monthIndex, rows],
   )
+
+  const workingRow = rows[0] ?? emptyDraftRow()
+  const historyRows = rows.length > 1 ? rows.slice(1) : []
+
+  const listPageCount = useMemo(
+    () => bulkListPageCount(historyRows.length, listPageSize),
+    [historyRows.length, listPageSize],
+  )
+
+  const historySliceStart = useMemo(() => {
+    if (listPageSize === 'all') return 0
+    return (listPage - 1) * listPageSize
+  }, [listPage, listPageSize])
+
+  const visibleHistoryRows = useMemo(() => {
+    if (listPageSize === 'all') return historyRows
+    return historyRows.slice(
+      historySliceStart,
+      historySliceStart + listPageSize,
+    )
+  }, [historyRows, listPageSize, historySliceStart])
+
+  useEffect(() => {
+    setListPage((p) => Math.min(Math.max(1, p), listPageCount))
+  }, [listPageCount])
+
+  useEffect(() => {
+    setListPage(1)
+    setEditingHistoryKey(null)
+    setHistoryRowMenuKey(null)
+    editingSnapshotRef.current = null
+  }, [year, monthIndex])
+
+  useEffect(() => {
+    if (rows.length <= 1) return
+    const needs =
+      !isBlankDraftRow(rows[0]!) && isBlankDraftRow(rows[rows.length - 1]!)
+    if (!needs) return
+    onChangeRows(migrateLegacyMonthRowOrder(rows))
+  }, [year, monthIndex, rows, onChangeRows])
 
   useEffect(
     () => () => {
@@ -145,12 +206,22 @@ export function MonthInputSection({
     [],
   )
 
-  /** 확인 클릭/Enter: 짧은 피드백 후 장부 반영·다음 행 첫 칸 포커스(마지막 행이면 행 추가) */
-  const confirmApplyAndAdvanceToNextRow = useCallback(
-    (currentTr: HTMLTableRowElement, rowLocalKey: string) => {
-      const tbody = tbodyRef.current
-      if (!tbody) return
+  const focusTopRowFirstField = useCallback(() => {
+    const tbody = workingTbodyRef.current
+    if (!tbody) return
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const firstTr = tbody.querySelector('tr[data-bulk-working-row]')
+        if (firstTr instanceof HTMLTableRowElement) {
+          collectRowFocusables(firstTr)[0]?.focus()
+        }
+      })
+    })
+  }, [])
 
+  /** 확인·행 끝 Enter: 장부 반영 후 작업 줄은 아래로, 맨 위에 새 입력 줄 */
+  const confirmApplyAndFocusTop = useCallback(
+    (rowLocalKey: string) => {
       if (confirmFlashTimerRef.current) {
         clearTimeout(confirmFlashTimerRef.current)
         confirmFlashTimerRef.current = null
@@ -161,76 +232,86 @@ export function MonthInputSection({
         confirmFlashTimerRef.current = null
       }, 480)
 
-      onApplyMonth(rowsRef.current)
-
-      const allRows = [
-        ...tbody.querySelectorAll<HTMLTableRowElement>(':scope > tr'),
-      ]
-      const rowIdx = allRows.indexOf(currentTr)
-      const nextRow = allRows[rowIdx + 1]
-      if (nextRow) {
-        collectRowFocusables(nextRow)[0]?.focus()
-        return
-      }
-      onChangeRows((prev) => [...prev, emptyDraftRow()])
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const lastTr = tbody.querySelector('tr:last-child')
-          if (lastTr instanceof HTMLTableRowElement) {
-            collectRowFocusables(lastTr)[0]?.focus()
-          }
-        })
+      onChangeRows((prev) => {
+        const next = moveRowBelowTopAfterConfirm(prev, rowLocalKey)
+        onApplyMonth(next)
+        return next
       })
+      setListPage(1)
+      focusTopRowFirstField()
     },
-    [onApplyMonth, onChangeRows],
+    [onApplyMonth, onChangeRows, focusTopRowFirstField],
   )
+
+  const startHistoryEdit = useCallback((localKey: string) => {
+    setCategoryOpenLocalKey(null)
+    setCardOpenLocalKey(null)
+    setMemberOpenLocalKey(null)
+    const row = rowsRef.current.find((r) => r.localKey === localKey)
+    if (row) editingSnapshotRef.current = { ...row }
+    setEditingHistoryKey(localKey)
+  }, [])
+
+  const cancelHistoryEdit = useCallback(() => {
+    const key = editingHistoryKey
+    const snap = editingSnapshotRef.current
+    if (key && snap) {
+      onChangeRows((prev) =>
+        prev.map((r) => (r.localKey === key ? snap : r)),
+      )
+    }
+    setEditingHistoryKey(null)
+    editingSnapshotRef.current = null
+  }, [editingHistoryKey, onChangeRows])
+
+  const saveHistoryEdit = useCallback(() => {
+    onApplyMonth(rowsRef.current)
+    setEditingHistoryKey(null)
+    editingSnapshotRef.current = null
+  }, [onApplyMonth])
 
   const focusNextField = useCallback(
     (current: HTMLElement) => {
-      const tbody = tbodyRef.current
-      if (!tbody) return
       const tr = current.closest('tr')
       if (!(tr instanceof HTMLTableRowElement)) return
-      const allRows = [
-        ...tbody.querySelectorAll<HTMLTableRowElement>(':scope > tr'),
-      ]
-      const rowIdx = allRows.indexOf(tr)
       const list = collectRowFocusables(tr)
       const idx = list.indexOf(current)
       if (idx >= 0 && idx < list.length - 1) {
         list[idx + 1]!.focus()
         return
       }
-      // End of row — auto-apply (rowsRef.current = latest rows after any React re-render)
-      onApplyMonth(rowsRef.current)
-      const nextRow = allRows[rowIdx + 1]
-      if (nextRow) {
-        const nextList = collectRowFocusables(nextRow)
-        nextList[0]?.focus()
+      const rowKey = tr.getAttribute('data-bulk-row')?.trim() ?? ''
+      if (tr.hasAttribute('data-bulk-working-row')) {
+        confirmApplyAndFocusTop(rowKey)
         return
       }
-      onChangeRows((prev) => [...prev, emptyDraftRow()])
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const lastTr = tbody.querySelector('tr:last-child')
-          if (lastTr instanceof HTMLTableRowElement) {
-            collectRowFocusables(lastTr)[0]?.focus()
-          }
-        })
-      })
+      if (tr.hasAttribute('data-bulk-history-edit')) {
+        saveHistoryEdit()
+        return
+      }
+      const tbody = historyTbodyRef.current
+      if (!tbody) return
+      onApplyMonth(rowsRef.current)
+      const allRows = [
+        ...tbody.querySelectorAll<HTMLTableRowElement>(':scope > tr'),
+      ]
+      const rowIdx = allRows.indexOf(tr)
+      const nextRow = allRows[rowIdx + 1]
+      if (nextRow) {
+        collectRowFocusables(nextRow)[0]?.focus()
+      }
     },
-    [onChangeRows, onApplyMonth],
+    [onApplyMonth, confirmApplyAndFocusTop, saveHistoryEdit],
   )
 
   const handleFieldKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLElement>) => {
       if (e.nativeEvent.isComposing) return
-      const tbody = tbodyRef.current
-      if (!tbody) return
+      const tbody = e.currentTarget.closest('tbody')
+      if (!(tbody instanceof HTMLTableSectionElement)) return
 
       if (e.key === 'Enter') {
         if (e.currentTarget.tagName === 'SELECT') {
-          // select에서 Enter: onChange가 먼저 실행되므로 rAF로 상태 커밋 후 이동
           const el = e.currentTarget
           const tr = el.closest('tr')
           if (!(tr instanceof HTMLTableRowElement)) return
@@ -239,22 +320,22 @@ export function MonthInputSection({
           if (e.shiftKey) {
             requestAnimationFrame(() => focusPrevInTable(el, tbody))
           } else if (idx < list.length - 1) {
-            // 중간 select: 다음 필드(구성원 → 확인 등)
             requestAnimationFrame(() => list[idx + 1]?.focus())
           } else {
-            // 마지막 포커스 칸이 확인 버튼만 남은 경우: 확인과 동일
             const last = list[list.length - 1]
-            if (
-              last instanceof HTMLButtonElement &&
-              last.hasAttribute('data-confirm-row')
-            ) {
-              e.preventDefault()
-              const rowKey =
-                tr.getAttribute('data-bulk-row')?.trim() ?? ''
-              requestAnimationFrame(() =>
-                confirmApplyAndAdvanceToNextRow(tr, rowKey),
-              )
-              return
+            if (last instanceof HTMLButtonElement) {
+              if (last.hasAttribute('data-confirm-row')) {
+                e.preventDefault()
+                const rowKey =
+                  tr.getAttribute('data-bulk-row')?.trim() ?? ''
+                requestAnimationFrame(() => confirmApplyAndFocusTop(rowKey))
+                return
+              }
+              if (last.hasAttribute('data-save-row')) {
+                e.preventDefault()
+                requestAnimationFrame(() => saveHistoryEdit())
+                return
+              }
             }
             requestAnimationFrame(() => focusNextField(el))
           }
@@ -268,287 +349,173 @@ export function MonthInputSection({
         }
       }
     },
-    [focusNextField, confirmApplyAndAdvanceToNextRow],
+    [focusNextField, confirmApplyAndFocusTop, saveHistoryEdit],
   )
+
+  const draftRowProps = {
+    monthIndex,
+    members,
+    rows,
+    onChangeRows,
+    amountFocusLocalKey,
+    setAmountFocusLocalKey,
+    categoryOpenLocalKey,
+    setCategoryOpenLocalKey,
+    cardOpenLocalKey,
+    setCardOpenLocalKey,
+    memberOpenLocalKey,
+    setMemberOpenLocalKey,
+    confirmFlashLocalKey,
+    onConfirm: confirmApplyAndFocusTop,
+    onFieldKeyDown: handleFieldKeyDown,
+    onNavigateAfterPick: focusNextField,
+    formatAmountCommas,
+    amountDigitsOnly,
+  }
 
   return (
     <Card className="rounded-[var(--radius-card)] border border-border-subtle bg-surface-raised p-4 shadow-[var(--shadow-card)] md:p-6">
-      <div className="mb-3 flex flex-col gap-2 border-b border-border-muted pb-3 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
-        <h2 className="text-lg font-semibold tabular-nums text-starbucks-green">
-          {year}년 {title}
-        </h2>
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5 text-xs text-text-soft sm:items-end">
-          <p className="tabular-nums">
-            <span className="font-semibold text-text-muted">입력 표</span>{' '}
-            <span className="font-semibold text-text-secondary">
-              수입 {won(draftMonthTotals.income)}
-            </span>
-            <span className="mx-1 text-text-muted/70">·</span>
-            <span className="font-semibold text-text-secondary">
-              지출 {won(draftMonthTotals.expense)}
-            </span>
-          </p>
-          {hasPriorLedgerMonth && priorYearMonthLedgerTotals ? (
-            <p className="tabular-nums text-[0.65rem] opacity-85">
-              {priorCalendarYear}년 동월 장부 수입{' '}
-              {won(priorYearMonthLedgerTotals.income)} · 지출{' '}
-              {won(priorYearMonthLedgerTotals.expense)}
-            </p>
-          ) : null}
-        </div>
-      </div>
-      <div className="mb-2 overflow-x-auto">
-          <table className="w-full min-w-[520px] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-border-subtle text-left text-xs uppercase text-text-soft">
-                <th className="py-2 pr-2 font-medium">일</th>
-                <th className="py-2 pr-2 font-medium">구분</th>
-                <th className="py-2 pr-2 font-medium">금액</th>
-                <th className="py-2 pr-2 font-medium">카테고리</th>
-                <th className="py-2 pr-2 font-medium">메모</th>
-                <th className="py-2 pr-2 font-medium">결제</th>
-                <th className="py-2 pr-2 font-medium">카드</th>
-                {members.length > 0 && <th className="py-2 pr-2 font-medium">구성원</th>}
-                <th className="py-2 pr-2 font-medium" />
-                <th className="w-10 py-2 font-medium" />
-              </tr>
-            </thead>
-            <tbody ref={tbodyRef}>
-              {rows.map((r, i) => (
-                <tr key={r.localKey} data-bulk-row={r.localKey} className="border-b border-border-muted/80 align-middle">
-                  <td className="py-2 pr-2">
-                    <input
-                      aria-label={`${monthIndex + 1}월 일`}
-                      inputMode="numeric"
-                      placeholder="일"
-                      className="w-10 rounded-lg border border-input-border px-1.5 py-1.5 tabular-nums outline-none focus:border-green-accent"
-                      maxLength={2}
-                      value={r.day}
-                      onChange={(e) => {
-                        const next = [...rows]
-                        next[i] = { ...r, day: e.target.value.replace(/\D/g, '') }
-                        onChangeRows(next)
-                      }}
-                      onKeyDown={handleFieldKeyDown}
-                    />
-                  </td>
-                  <td className="py-2 pr-2">
-                    <select
-                      aria-label={`${monthIndex + 1}월 구분`}
-                      className="rounded-lg border border-input-border px-2 py-1.5 outline-none focus:border-green-accent"
-                      value={r.kind}
-                      onChange={(e) => {
-                        const k = e.target.value === 'income' ? 'income' : 'expense'
-                        setCategoryOpenLocalKey(null)
-                        setCardOpenLocalKey(null)
-                        const next = [...rows]
-                        next[i] = {
-                          ...r,
-                          kind: k,
-                          category: '',
-                          ...(k === 'income'
-                            ? { paymentMethod: 'cash', cardBrand: '' }
-                            : {}),
-                        }
-                        onChangeRows(next)
-                      }}
-                      onKeyDown={handleFieldKeyDown}
-                    >
-                      <option value="expense">지출</option>
-                      <option value="income">수입</option>
-                    </select>
-                  </td>
-                  <td className="py-2 pr-2">
-                    <input
-                      aria-label="금액"
-                      inputMode="numeric"
-                      placeholder="0"
-                      className="min-w-[7.25rem] w-[7.25rem] shrink-0 rounded-lg border border-input-border px-2 py-1.5 tabular-nums outline-none focus:border-green-accent sm:min-w-[7.75rem] sm:w-[7.75rem]"
-                      value={
-                        amountFocusLocalKey === r.localKey
-                          ? amountDigitsOnly(r.amount)
-                          : formatAmountCommas(r.amount)
-                      }
-                      onChange={(e) => {
-                        const raw = amountDigitsOnly(e.target.value)
-                        const next = [...rows]
-                        next[i] = { ...r, amount: raw }
-                        onChangeRows(next)
-                      }}
-                      onFocus={() => setAmountFocusLocalKey(r.localKey)}
-                      onBlur={() => setAmountFocusLocalKey(null)}
-                      onKeyDown={handleFieldKeyDown}
-                    />
-                  </td>
-                  <td className="py-2 pr-2">
-                    <BulkCategoryPicker
-                      ariaLabel={`${monthIndex + 1}월 카테고리`}
-                      rowLocalKey={r.localKey}
-                      options={
-                        r.kind === 'income'
-                          ? INCOME_CATEGORIES
-                          : EXPENSE_CATEGORIES
-                      }
-                      value={r.category}
-                      isOpen={categoryOpenLocalKey === r.localKey}
-                      onOpenThis={() => {
-                        setCardOpenLocalKey(null)
-                        setCategoryOpenLocalKey(r.localKey)
-                      }}
-                      onClose={() => setCategoryOpenLocalKey(null)}
-                      onPick={(category) => {
-                        const next = [...rows]
-                        next[i] = { ...r, category }
-                        onChangeRows(next)
-                      }}
-                      onFieldKeyDown={handleFieldKeyDown}
-                      onNavigateAfterPick={focusNextField}
-                    />
-                  </td>
-                  <td className="py-2 pr-2">
-                    <input
-                      aria-label="메모"
-                      className="w-full max-w-[10.5rem] min-w-[6rem] rounded-lg border border-input-border px-2 py-1.5 outline-none focus:border-green-accent sm:max-w-[11rem]"
-                      value={r.memo}
-                      onChange={(e) => {
-                        const next = [...rows]
-                        next[i] = { ...r, memo: e.target.value }
-                        onChangeRows(next)
-                      }}
-                      onKeyDown={handleFieldKeyDown}
-                    />
-                  </td>
-                  <td className="py-2 pr-2">
-                    <select
-                      aria-label="결제 수단"
-                      disabled={r.kind !== 'expense'}
-                      className="rounded-lg border border-input-border px-2 py-1.5 outline-none focus:border-green-accent disabled:opacity-40"
-                      value={r.paymentMethod}
-                      onChange={(e) => {
-                        const v = e.target.value
-                        const pm: PaymentMethod =
-                          v === 'cash' ? 'cash' : v === 'ieum' ? 'ieum' : 'card'
-                        if (pm === 'cash' || pm === 'ieum') setCardOpenLocalKey(null)
-                        const next = [...rows]
-                        next[i] = {
-                          ...r,
-                          paymentMethod: pm,
-                          ...(pm === 'cash' || pm === 'ieum'
-                            ? { cardBrand: '' }
-                            : {}),
-                        }
-                        onChangeRows(next)
-                      }}
-                      onKeyDown={handleFieldKeyDown}
-                    >
-                      <option value="card">카드</option>
-                      <option value="ieum">이음카드</option>
-                      <option value="cash">현금</option>
-                    </select>
-                  </td>
-                  <td className="py-2 pr-2">
-                    <BulkCardPicker
-                      ariaLabel="카드사"
-                      rowLocalKey={r.localKey}
-                      value={r.cardBrand}
-                      disabled={
-                        r.kind !== 'expense' || r.paymentMethod !== 'card'
-                      }
-                      isOpen={cardOpenLocalKey === r.localKey}
-                      onOpenThis={() => {
-                        setCategoryOpenLocalKey(null)
-                        setCardOpenLocalKey(r.localKey)
-                      }}
-                      onClose={() => setCardOpenLocalKey(null)}
-                      onPick={(cardBrand) => {
-                        const next = [...rows]
-                        next[i] = { ...r, cardBrand }
-                        onChangeRows(next)
-                      }}
-                      onFieldKeyDown={handleFieldKeyDown}
-                      onNavigateAfterPick={focusNextField}
-                    />
-                  </td>
-                  {members.length > 0 && (
-                    <td className="py-2 pr-2">
-                      <select
-                        aria-label="구성원"
-                        className="rounded-lg border border-input-border px-2 py-1.5 text-sm outline-none focus:border-green-accent"
-                        value={r.memberName}
-                        onChange={(e) => {
-                          const next = [...rows]
-                          next[i] = { ...r, memberName: e.target.value }
-                          onChangeRows(next)
-                        }}
-                        onKeyDown={handleFieldKeyDown}
-                      >
-                        <option value="">—</option>
-                        {members.map((m) => (
-                          <option key={m} value={m}>{m}</option>
-                        ))}
-                      </select>
-                    </td>
-                  )}
-                  <td className="py-2 pr-2">
-                    {/* 확인 버튼: React 상태가 완전히 반영된 시점에 호출되므로 stale 없음 */}
+      <div className={BULK_TABLE_SCROLL}>
+        <div
+          className={BULK_TABLE_INNER}
+          style={{ minWidth: BULK_TABLE_MIN_WIDTH }}
+        >
+          <section
+            aria-label="입력 칸"
+            className="sticky top-0 z-10 border-b-2 border-green-accent/40 bg-green-light/45 shadow-sm backdrop-blur-sm"
+          >
+            <table className={BULK_TABLE_CLASS}>
+              <BulkInputTableHead
+                showMembers={members.length > 0}
+                showConfirm
+              />
+              <tbody ref={workingTbodyRef}>
+                <BulkInputDraftRow
+                  {...draftRowProps}
+                  r={workingRow}
+                  rowIndex={0}
+                />
+              </tbody>
+            </table>
+          </section>
+
+          <section aria-label="확인된 내역">
+            <div className="flex flex-col gap-2 border-b border-border-muted bg-neutral-cool/25 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+              <div className="flex min-w-0 flex-col gap-0.5 text-xs text-text-soft">
+                <p className="tabular-nums leading-relaxed">
+                  <span className="font-medium text-text-secondary">
+                    수입 {won(draftMonthTotals.income)}
+                  </span>
+                  <span className="mx-1.5 text-text-muted/60">·</span>
+                  <span className="font-medium text-text-secondary">
+                    지출 {won(draftMonthTotals.expense)}
+                  </span>
+                </p>
+              </div>
+              <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+                <label className="flex items-center gap-2 text-xs text-text-soft">
+                  <span className="font-medium text-text-muted">목록 개수</span>
+                  <select
+                    aria-label="확인된 내역 목록 개수"
+                    value={listPageSize}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      const next: BulkListPageSize =
+                        v === 'all' ? 'all' : (Number(v) as 5 | 10 | 30)
+                      setListPageSize(next)
+                      setListPage(1)
+                    }}
+                    className="h-8 rounded-lg border border-border-subtle bg-surface-raised px-2 text-xs font-semibold text-text-secondary outline-none focus:border-green-accent"
+                  >
+                    {BULK_LIST_PAGE_SIZE_OPTIONS.map((opt) => (
+                      <option key={String(opt.value)} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {listPageSize !== 'all' && historyRows.length > 0 ? (
+                  <nav
+                    className="flex items-center justify-center gap-2"
+                    aria-label="확인된 내역 페이지"
+                  >
                     <button
                       type="button"
-                      data-confirm-row="true"
-                      className={`rounded-md bg-starbucks-green px-2.5 py-1 text-xs font-medium text-white outline-none transition-all duration-200 hover:bg-starbucks-green/80 focus:outline-none focus:ring-2 focus:ring-starbucks-green/50 active:scale-95 ${
-                        confirmFlashLocalKey === r.localKey
-                          ? 'scale-95 ring-4 ring-amber-200/95 shadow-md brightness-110'
-                          : ''
-                      }`}
-                      onClick={(e) => {
-                        const tr = e.currentTarget.closest('tr')
-                        if (tr instanceof HTMLTableRowElement) {
-                          confirmApplyAndAdvanceToNextRow(tr, r.localKey)
-                        }
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.nativeEvent.isComposing) return
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault()
-                          const tr = e.currentTarget.closest('tr')
-                          if (tr instanceof HTMLTableRowElement) {
-                            confirmApplyAndAdvanceToNextRow(tr, r.localKey)
-                          }
-                        }
-                      }}
+                      disabled={listPage <= 1}
+                      onClick={() => setListPage((p) => Math.max(1, p - 1))}
+                      className="flex h-8 min-w-8 items-center justify-center rounded-lg border border-border-subtle bg-surface-raised text-xs font-semibold text-text-secondary outline-none transition-colors hover:bg-green-light/30 disabled:opacity-40 focus:border-green-accent"
+                      aria-label="이전 페이지"
                     >
-                      확인
+                      ◀
                     </button>
-                  </td>
-                  <td className="py-2 text-right">
+                    <span className="min-w-[4.5rem] text-center text-xs font-semibold tabular-nums text-text-secondary">
+                      {listPage} / {listPageCount}
+                    </span>
                     <button
                       type="button"
-                      className="text-xs text-danger underline decoration-danger/30"
-                      onClick={() => {
-                        setCategoryOpenLocalKey(null)
-                        setCardOpenLocalKey(null)
-                        setBulkRowDeleteKey(r.localKey)
-                      }}
+                      disabled={listPage >= listPageCount}
+                      onClick={() =>
+                        setListPage((p) => Math.min(listPageCount, p + 1))
+                      }
+                      className="flex h-8 min-w-8 items-center justify-center rounded-lg border border-border-subtle bg-surface-raised text-xs font-semibold text-text-secondary outline-none transition-colors hover:bg-green-light/30 disabled:opacity-40 focus:border-green-accent"
+                      aria-label="다음 페이지"
                     >
-                      삭제
+                      ▶
                     </button>
+                  </nav>
+                ) : null}
+              </div>
+            </div>
+            <table className={BULK_TABLE_CLASS}>
+              <BulkInputTableHead
+                showMembers={members.length > 0}
+                showActions
+              />
+              <tbody ref={historyTbodyRef}>
+              {visibleHistoryRows.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={(members.length > 0 ? 8 : 7) + 1}
+                    className="bg-surface-raised py-8 text-center text-xs text-text-soft"
+                  >
+                    아직 확인된 내역이 없습니다.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                visibleHistoryRows.map((r, vi) => {
+                  const rowIndex = rows.findIndex(
+                    (row) => row.localKey === r.localKey,
+                  )
+                  const isEditing = editingHistoryKey === r.localKey
+                  return (
+                    <Fragment key={r.localKey}>
+                      {isEditing && rowIndex >= 0 ? (
+                        <BulkInputDraftRow
+                          {...draftRowProps}
+                          r={rows[rowIndex]!}
+                          rowIndex={rowIndex}
+                          mode="history-edit"
+                          onSaveHistory={saveHistoryEdit}
+                          onCancelHistory={cancelHistoryEdit}
+                        />
+                      ) : (
+                        <BulkInputHistoryRow
+                          r={r}
+                          showMembers={members.length > 0}
+                          rowIndex={historySliceStart + vi}
+                          isEditing={isEditing}
+                          onOpenMenu={setHistoryRowMenuKey}
+                        />
+                      )}
+                    </Fragment>
+                  )
+                })
+              )}
             </tbody>
-          </table>
+            </table>
+          </section>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outlined"
-            className="!py-2 !text-xs !px-3"
-            onClick={() =>
-              onChangeRows((prev) => [...prev, emptyDraftRow()])
-            }
-          >
-            행 추가
-          </Button>
-        </div>
+      </div>
         <div
           className={`mt-2 rounded-lg border px-3 py-2 text-xs leading-relaxed ${
             draftLedgerCompare.multisetMatch
@@ -585,6 +552,60 @@ export function MonthInputSection({
             </div>
           )}
         </div>
+        {historyRowMenuKey ? (
+          <div
+            className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="bulk-history-menu-title"
+            onClick={() => setHistoryRowMenuKey(null)}
+          >
+            <div
+              className="w-full max-w-[16rem] rounded-[var(--radius-card)] bg-surface-raised p-5 shadow-[var(--shadow-card)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p
+                id="bulk-history-menu-title"
+                className="text-center text-base font-semibold text-text-primary"
+              >
+                항목 관리
+              </p>
+              <div className="mt-4 flex flex-col gap-2">
+                <Button
+                  type="button"
+                  variant="primary"
+                  className="w-full"
+                  onClick={() => {
+                    const key = historyRowMenuKey
+                    setHistoryRowMenuKey(null)
+                    startHistoryEdit(key)
+                  }}
+                >
+                  수정
+                </Button>
+                <Button
+                  type="button"
+                  variant="outlined"
+                  className="w-full !border-danger !text-danger hover:!bg-danger/10"
+                  onClick={() => {
+                    setBulkRowDeleteKey(historyRowMenuKey)
+                    setHistoryRowMenuKey(null)
+                  }}
+                >
+                  삭제
+                </Button>
+                <Button
+                  type="button"
+                  variant="outlined"
+                  className="w-full"
+                  onClick={() => setHistoryRowMenuKey(null)}
+                >
+                  취소
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
         {bulkRowDeleteKey ? (
           <div
             className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4"
@@ -625,10 +646,23 @@ export function MonthInputSection({
                       return
                     }
                     const snapshot = rowsRef.current
-                    const rest = snapshot.filter((_, j) => j !== idx)
-                    onChangeRows(rest.length > 0 ? rest : [emptyDraftRow()])
+                    const rest = ensureWorkingRowOnTop(
+                      snapshot.filter((_, j) => j !== idx),
+                    )
+                    onChangeRows(rest)
+                    const historyCount = Math.max(0, rest.length - 1)
+                    if (listPage > 1) {
+                      setListPage((p) =>
+                        Math.min(
+                          p,
+                          bulkListPageCount(historyCount, listPageSize),
+                        ),
+                      )
+                    }
                     onApplyMonth(rest)
                     setBulkRowDeleteKey(null)
+                    setEditingHistoryKey(null)
+                    editingSnapshotRef.current = null
                   }}
                 >
                   삭제
@@ -648,7 +682,9 @@ export function MonthInputSection({
             Shift+Enter
           </kbd>
           로 이전 칸으로 이동합니다.{' '}
-          <span className="font-medium text-starbucks-green">확인</span> 버튼을 누르면 해당 달 전체가 장부에 반영됩니다.
+          맨 위 <span className="font-medium text-starbucks-green">입력</span> 칸에서 새 내용을 넣고{' '}
+          <span className="font-medium text-starbucks-green">확인</span>을 누르면 아래 목록으로 내려갑니다.
+          아래 목록의 <span className="font-medium">⋯</span>에서 수정·삭제할 수 있습니다. 해당 달 전체가 장부에 반영됩니다.
         </p>
       </Card>
   )

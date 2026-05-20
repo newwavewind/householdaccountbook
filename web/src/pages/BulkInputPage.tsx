@@ -8,10 +8,7 @@ import {
   loadBulkInputBundle,
   saveBulkInputBundle,
 } from '../bulkInput/bulkInputStorage'
-import {
-  compareDraftMultisetToLedgerMonth,
-  ledgerMonthIncomeExpenseSums,
-} from '../bulkInput/compareMonthDraftLedger'
+import { compareDraftMultisetToLedgerMonth } from '../bulkInput/compareMonthDraftLedger'
 import { draftMonthTotalsForDisplay } from '../bulkInput/draftMonthTotals'
 import { monthLabel } from '../bulkInput/monthUtils'
 import {
@@ -75,8 +72,6 @@ export default function BulkInputPage() {
 
   const canGoOlder = year > YEAR_NAV_MIN
   const canGoNewer = year < YEAR_NAV_MAX
-  const priorYear = year - 1
-  const hasPriorYear = priorYear >= YEAR_NAV_MIN
 
   const draftsMatrix = useMemo(
     () => st.years[year] ?? initialMonths(),
@@ -263,16 +258,6 @@ export default function BulkInputPage() {
             monthIndex={activeMonthIndex}
             rows={draftsMatrix[activeMonthIndex] ?? [emptyDraftRow()]}
             draftLedgerCompare={monthDraftLedgerCmp[activeMonthIndex]}
-            priorYearMonthLedgerTotals={
-              hasPriorYear
-                ? ledgerMonthIncomeExpenseSums(
-                    transactions,
-                    priorYear,
-                    activeMonthIndex,
-                  )
-                : null
-            }
-            priorCalendarYear={hasPriorYear ? priorYear : null}
             members={cloudMembers}
             onChangeRows={(payload) =>
               setSt((prev) => {

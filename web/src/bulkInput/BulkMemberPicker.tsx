@@ -1,26 +1,25 @@
-﻿import { useMemo } from 'react'
+import { useMemo } from 'react'
 import type { KeyboardEvent } from 'react'
-import { CARD_BRANDS } from '../constants/cardBrands'
 import { BulkListPicker, type BulkListPickerRow } from './BulkListPicker'
 
 type Props = {
   ariaLabel: string
   rowLocalKey: string
+  members: readonly string[]
   value: string
-  disabled?: boolean
   isOpen: boolean
   onOpenThis: () => void
   onClose: () => void
-  onPick: (cardBrandId: string) => void
+  onPick: (memberName: string) => void
   onFieldKeyDown: (e: KeyboardEvent<HTMLElement>) => void
   onNavigateAfterPick?: (fromTrigger: HTMLButtonElement) => void
 }
 
-export function BulkCardPicker({
+export function BulkMemberPicker({
   ariaLabel,
   rowLocalKey,
+  members,
   value,
-  disabled,
   isOpen,
   onOpenThis,
   onClose,
@@ -29,28 +28,24 @@ export function BulkCardPicker({
   onNavigateAfterPick,
 }: Props) {
   const rows = useMemo((): BulkListPickerRow[] => {
-    const head: BulkListPickerRow = { value: '', label: '카드 선택' }
-    return [
-      head,
-      ...CARD_BRANDS.map((b) => ({ value: b.id, label: b.label })),
-    ]
-  }, [])
+    const head: BulkListPickerRow = { value: '', label: '—' }
+    return [head, ...members.map((m) => ({ value: m, label: m }))]
+  }, [members])
 
   return (
     <BulkListPicker
       ariaLabel={ariaLabel}
       rowLocalKey={rowLocalKey}
-      pickerRole="card"
+      pickerRole="member"
       rows={rows}
       value={value}
       isOpen={isOpen}
-      disabled={disabled}
       onOpenThis={onOpenThis}
       onClose={onClose}
       onPick={onPick}
       onFieldKeyDown={onFieldKeyDown}
       onNavigateAfterPick={onNavigateAfterPick}
-      triggerClassName="h-9 min-h-9 w-full min-w-0 truncate rounded-lg border border-input-border bg-surface-raised px-2 text-center text-sm outline-none focus:border-green-accent disabled:opacity-40"
+      triggerClassName="h-9 min-h-9 w-full min-w-0 truncate rounded-lg border border-input-border bg-surface-raised px-2 text-center text-sm outline-none focus:border-green-accent"
     />
   )
 }

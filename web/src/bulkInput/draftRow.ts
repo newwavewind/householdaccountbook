@@ -1,5 +1,9 @@
 import type { PaymentMethod } from '../types/transaction'
 
+export type BulkRowsUpdater =
+  | BulkDraftRow[]
+  | ((prev: BulkDraftRow[]) => BulkDraftRow[])
+
 export type BulkDraftRow = {
   localKey: string
   day: string

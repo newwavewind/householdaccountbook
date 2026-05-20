@@ -1,6 +1,7 @@
 import type { BulkDraftRow } from './draftRow'
 import type { PaymentMethod } from '../types/transaction'
 import { emptyDraftRow } from './draftRow'
+import { migrateLegacyMonthRowOrder } from './draftRowOrder'
 
 /** JSON 직렬화 시 연도는 문자열 키가 됩니다. */
 export type BulkInputBundle = {
@@ -48,7 +49,7 @@ export function normalizeDraftRow(raw: unknown): BulkDraftRow {
 /** 한 달의 행 배열 안전 처리 */
 export function normalizeMonthRows(raw: unknown): BulkDraftRow[] {
   if (!Array.isArray(raw) || raw.length === 0) return [emptyDraftRow()]
-  return raw.map(normalizeDraftRow)
+  return migrateLegacyMonthRowOrder(raw.map(normalizeDraftRow))
 }
 
 /** 12개월 고정 행렬 */

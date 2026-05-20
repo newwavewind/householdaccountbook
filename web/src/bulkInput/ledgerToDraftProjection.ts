@@ -42,7 +42,7 @@ export function transactionToBulkDraftRow(tx: Transaction): BulkDraftRow {
   }
 }
 
-/** 해당 달 장부 거래 → 입력 표 (맨 아래 빈 줄 한 줄 포함) */
+/** 해당 달 장부 거래 → 입력 표 (맨 위 빈 작업 줄, 아래로 확인된 줄) */
 export function ledgerMonthDraftRows(
   year: number,
   monthIndex: number,
@@ -57,7 +57,7 @@ export function ledgerMonthDraftRows(
     })
 
   const mapped = rows.map(transactionToBulkDraftRow)
-  return [...mapped, emptyDraftRow()]
+  return [emptyDraftRow(), ...mapped.reverse()]
 }
 
 function yearFromTxDate(date: string): number | undefined {
