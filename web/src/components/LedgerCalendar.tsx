@@ -15,6 +15,10 @@ const WEEK = ['일', '월', '화', '수', '목', '금', '토'] as const
 
 const CELL_MIN_H = 'min-h-[6.25rem] md:min-h-[7.5rem]'
 
+/** 다이어리 달력과 동일한 격자·칸 테두리 (rounded-none, gap 격자선) */
+const LEDGER_DAY_CELL =
+  'calendar-day-cell relative flex w-full flex-col overflow-hidden rounded-none border-0 px-0.5 py-1.5 text-left transition-colors active:scale-[0.98] md:px-1 md:py-2'
+
 function pad2(n: number) {
   return String(n).padStart(2, '0')
 }
@@ -117,7 +121,7 @@ export const LedgerCalendar = memo(function LedgerCalendar({
     'text-[0.625rem] font-semibold tabular-nums leading-tight md:text-[0.6875rem]'
 
   return (
-    <div className="w-full">
+    <div className="ledger-calendar w-full">
       <div className="mb-2 grid grid-cols-7 gap-1 text-center text-sm font-medium text-text-soft md:text-base">
         {WEEK.map((d, i) => (
           <div
@@ -128,7 +132,8 @@ export const LedgerCalendar = memo(function LedgerCalendar({
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-7 gap-1">
+      <div className="calendar-days-frame relative">
+        <div className="calendar-days-grid relative z-[1]">
         {cells.map(({ iso, day, inMonth }, cellIdx) => {
           const hoverHandlers = {
             onMouseEnter: (e: MouseEvent<HTMLButtonElement>) =>
@@ -149,8 +154,9 @@ export const LedgerCalendar = memo(function LedgerCalendar({
                 onClick={() => onSelectDay(iso)}
                 {...hoverHandlers}
                 className={[
-                  'relative flex w-full flex-col overflow-hidden rounded-lg border border-border-subtle bg-surface-raised px-0.5 py-1.5 text-left md:py-2',
+                  LEDGER_DAY_CELL,
                   CELL_MIN_H,
+                  'bg-surface-raised hover:bg-green-light/25',
                 ].join(' ')}
               >
                 <span
@@ -170,7 +176,6 @@ export const LedgerCalendar = memo(function LedgerCalendar({
             celebrateNoSpend && noSpendDays.has(iso)
 
           const r = rollups.get(iso)
-          const hasTx = r && r.count > 0
           const contentRows = ledgerContentRows(r)
           const amounts = ledgerAmountSummary(r)
           const hasContent = contentRows.length > 0
@@ -194,15 +199,14 @@ export const LedgerCalendar = memo(function LedgerCalendar({
               }
               onClick={() => onSelectDay(iso)}
               {...hoverHandlers}
+              aria-pressed={isSel}
               className={[
-                'relative flex w-full flex-col overflow-hidden rounded-lg border border-border-subtle bg-surface-raised px-0.5 py-1.5 text-left md:py-2',
+                LEDGER_DAY_CELL,
                 CELL_MIN_H,
+                'bg-surface-raised hover:bg-green-light/30',
                 isNoSpendCelebrate ? 'ledger-no-spend-celebrate z-[2]' : '',
-                hasTx ? 'shadow-[0_0_0_1px_rgba(0,117,74,0.25)]' : '',
-                isToday
-                  ? 'outline outline-2 outline-offset-[-2px] outline-green-accent/70'
-                  : '',
-                isSel ? 'bg-green-light/50' : '',
+                isToday ? 'calendar-day-cell--today' : '',
+                isSel ? 'calendar-day-cell--selected' : '',
               ]
                 .filter(Boolean)
                 .join(' ')}
@@ -271,6 +275,7 @@ export const LedgerCalendar = memo(function LedgerCalendar({
             </button>
           )
         })}
+        </div>
       </div>
     </div>
   )

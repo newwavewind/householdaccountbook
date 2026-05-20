@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useSearchParams } from 'react-router-dom'
 import { Button } from './components/ui/Button'
@@ -198,20 +198,6 @@ const EXPENSE_PAY_FILTERS: { id: ExpensePayFilter; label: string }[] = [
   { id: 'ieum', label: '이음카드' },
   { id: 'card', label: '신용카드' },
 ]
-
-function LedgerSectionTitle({ title }: { title: string }) {
-  return (
-    <div className="flex items-center gap-3">
-      <span
-        className="h-8 w-1 shrink-0 rounded-full bg-gradient-to-b from-starbucks-green to-house-green"
-        aria-hidden
-      />
-      <h2 className="!m-0 text-lg font-bold tracking-tight text-starbucks-green md:text-xl">
-        {title}
-      </h2>
-    </div>
-  )
-}
 
 function ExpensePayFilterBar({
   value,
@@ -488,8 +474,6 @@ export default function LedgerApp() {
   const [formOpen, setFormOpen] = useState(false)
   const [formInitial, setFormInitial] = useState<Transaction | null>(null)
   const [formDefaultDate, setFormDefaultDate] = useState<string | undefined>()
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const settingsWrapRef = useRef<HTMLDivElement>(null)
   const [selectedMember, setSelectedMember] = useState<string | null>(null)
   const [newMemberName, setNewMemberName] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState<{ member: string; step: 1 | 2 } | null>(null)
@@ -519,16 +503,6 @@ export default function LedgerApp() {
     },
     [setCloudMembers],
   )
-
-  useEffect(() => {
-    if (!settingsOpen) return
-    const onDown = (e: MouseEvent) => {
-      const el = settingsWrapRef.current
-      if (el && !el.contains(e.target as Node)) setSettingsOpen(false)
-    }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [settingsOpen])
 
   const fmtKrw = useMemo(
     () =>
@@ -933,102 +907,7 @@ export default function LedgerApp() {
             >
               PC입력
             </NavLink>
-            {syncState.mode === 'cloud' ? (
-              <span
-                title={
-                  syncState.status === 'error' && syncState.errorMessage
-                    ? syncState.errorMessage
-                    : syncState.status === 'loading'
-                      ? '서버에서 데이터를 불러오는 중입니다.'
-                      : syncState.cloudBackend === 'prisma'
-                        ? '로컬 SQLite API와 연결되어 있어요. 같은 API를 쓰는 브라우저와 장부를 맞출 수 있어요.'
-                        : '내 계정(Supabase)에 저장됩니다. 어떤 기기에서 로그인해도 같은 장부를 볼 수 있어요.'
-                }
-                className={
-                  syncState.status === 'error'
-                    ? 'shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-800 md:text-xs'
-                    : syncState.status === 'loading'
-                      ? 'shrink-0 rounded-full bg-neutral-cool px-2 py-0.5 text-[11px] font-medium text-text-soft md:text-xs'
-                      : 'shrink-0 rounded-full bg-starbucks-green/15 px-2 py-0.5 text-[11px] font-medium text-starbucks-green md:text-xs'
-                }
-              >
-                {syncState.status === 'error'
-                  ? '동기화 오류'
-                  : syncState.status === 'loading'
-                    ? '연결 중…'
-                    : '공유됨'}
-              </span>
-            ) : null}
           </div>
-          {householdCode && (
-            <div ref={settingsWrapRef} className="relative flex items-center gap-2">
-              <Button
-                variant="darkOutlined"
-                className="!py-2 !text-sm"
-                type="button"
-                onClick={() => setSettingsOpen((v) => !v)}
-              >
-                공유코드
-              </Button>
-              {settingsOpen ? (
-                <div className="absolute right-0 top-full z-50 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-[var(--radius-card)] border border-border-subtle bg-surface-raised p-4 shadow-[var(--shadow-card)]">
-                  <p className="text-sm font-semibold text-starbucks-green">가족 공유코드</p>
-                  <p className="mt-1.5 text-xs leading-relaxed text-text-secondary">
-                    같은 가구에 속한 사람끼리 장부·일정을 함께 보는 6자리 코드예요. 로그인한
-                    계정마다 따로 저장되는 것이 아니라, 이 코드로 한 가구를 묶습니다.
-                  </p>
-                  <ul className="mt-2.5 space-y-1 text-xs leading-relaxed text-text-secondary">
-                    <li className="flex gap-1.5">
-                      <span className="shrink-0 text-green-accent" aria-hidden>
-                        ·
-                      </span>
-                      <span>가계부 수입·지출 내역 (실시간 동기화)</span>
-                    </li>
-                    <li className="flex gap-1.5">
-                      <span className="shrink-0 text-green-accent" aria-hidden>
-                        ·
-                      </span>
-                      <span>가족 구성원 목록·필터</span>
-                    </li>
-                    <li className="flex gap-1.5">
-                      <span className="shrink-0 text-green-accent" aria-hidden>
-                        ·
-                      </span>
-                      <span>캘린더 일정·메모·D-day</span>
-                    </li>
-                  </ul>
-                  <p className="mt-2.5 text-xs leading-relaxed text-text-soft">
-                    <span className="font-medium text-text-secondary">가족이 참여하는 방법</span>
-                    <br />
-                    1. 가계부 앱에 로그인
-                    <br />
-                    2. 처음이면 「코드로 참여」에서 아래 코드 입력
-                    <br />
-                    3. 참여 후 같은 장부·캘린더가 보여요
-                  </p>
-                  <div className="mt-3 flex items-center gap-2">
-                    <span className="flex-1 rounded-lg bg-emerald-50 px-3 py-2.5 text-center text-base font-bold tracking-[0.25em] text-emerald-700">
-                      {householdCode}
-                    </span>
-                    <button
-                      type="button"
-                      className="shrink-0 rounded-lg border border-border-subtle px-3 py-2.5 text-xs font-medium text-text-secondary hover:bg-neutral-cool"
-                      onClick={() => {
-                        void navigator.clipboard.writeText(householdCode)
-                        alert('공유코드를 복사했어요. 카톡 등으로 가족에게 보내 주세요.')
-                      }}
-                    >
-                      복사
-                    </button>
-                  </div>
-                  <p className="mt-2 text-[11px] leading-snug text-text-soft">
-                    코드는 가족에게만 알려 주세요. 본인만 다른 가구에 참여하려면 로그아웃 후 다시
-                    「코드로 참여」를 선택하면 됩니다.
-                  </p>
-                </div>
-              ) : null}
-            </div>
-          )}
         </div>
       </header>
 
@@ -1036,53 +915,40 @@ export default function LedgerApp() {
 
         {/* 가족 구성원 관리 + 필터 */}
         <section aria-label="가족 구성원">
-          <Card className="overflow-hidden">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle/60 pb-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <LedgerSectionTitle title="가족 구성원" />
-                {cloudMembers.length > 0 ? (
-                  <Button
-                    type="button"
-                    variant="outlined"
-                    className="!inline-flex !items-center !gap-1.5 !rounded-full !px-3 !py-1 !text-xs"
-                    onClick={() => setMemberManageOpen(true)}
-                  >
-                    <BulkRowManageIcon className="size-3.5" />
-                    관리
-                  </Button>
-                ) : null}
-              </div>
-              <form
-                className="flex gap-2 rounded-2xl border border-border-subtle/70 bg-ceramic/40 p-1.5 shadow-sm"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  const trimmed = newMemberName.trim()
-                  if (!trimmed) return
-                  if (cloudMembers.includes(trimmed)) return
-                  setCloudMembers((prev) =>
-                    prev.includes(trimmed) ? prev : [...prev, trimmed],
-                  )
-                  setNewMemberName('')
-                }}
-              >
-                <input
-                  value={newMemberName}
-                  onChange={(e) => setNewMemberName(e.target.value)}
-                  placeholder="이름 입력"
-                  maxLength={20}
-                  className="w-28 rounded-full border border-input-border px-3 py-1 text-sm outline-none focus:border-green-accent"
-                />
-                <Button type="submit" variant="outlined" className="!rounded-full !px-3 !py-1 !text-sm">
-                  추가
+          <Card className="overflow-hidden !p-2.5 md:!p-3">
+            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <h2 className="m-0 text-sm font-bold tracking-tight text-starbucks-green">
+                  가족 구성원
+                </h2>
+                <Button
+                  type="button"
+                  variant="outlined"
+                  className="!inline-flex !h-7 !min-h-0 !items-center !gap-1 !rounded-full !px-2.5 !py-0 !text-[11px]"
+                  onClick={() => setMemberManageOpen(true)}
+                >
+                  <BulkRowManageIcon className="size-3" />
+                  관리
                 </Button>
-              </form>
+              </div>
+              <NoSpendChallengeBanner
+                compact
+                count={noSpendStats.count}
+                eligibleDayCount={noSpendStats.eligibleDayCount}
+                monthLabel={formatMonthLabel(cursor.y, cursor.m)}
+                active={noSpendCelebrate}
+                onToggleCelebrate={() => {
+                  goThisMonth()
+                  toggleNoSpendCelebrate()
+                }}
+              />
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-2 flex flex-wrap gap-1.5">
               <button
                 type="button"
                 onClick={() => setSelectedMember(null)}
-                className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
+                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                   selectedMember === null
                     ? 'border-starbucks-green/40 bg-starbucks-green/10 text-starbucks-green ring-1 ring-starbucks-green/25'
                     : 'border-border-pill bg-surface-raised text-text-soft hover:bg-neutral-cool/60'
@@ -1097,7 +963,7 @@ export default function LedgerApp() {
                     key={m}
                     type="button"
                     onClick={() => setSelectedMember(active ? null : m)}
-                    className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
+                    className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                       active
                         ? 'border-starbucks-green/40 bg-starbucks-green/10 text-starbucks-green ring-1 ring-starbucks-green/25'
                         : 'border-border-pill bg-surface-raised text-text-primary hover:bg-neutral-cool/60'
@@ -1123,22 +989,106 @@ export default function LedgerApp() {
               role="dialog"
               aria-modal
               aria-labelledby="member-manage-title"
-              className="flex max-h-[min(85dvh,24rem)] w-full max-w-sm flex-col rounded-[var(--radius-card)] bg-surface-raised shadow-[var(--shadow-card)]"
+              className="flex max-h-[min(85dvh,32rem)] w-full max-w-md flex-col rounded-[var(--radius-card)] bg-surface-raised shadow-[var(--shadow-card)]"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="border-b border-border-muted px-5 py-4">
-                <h3
-                  id="member-manage-title"
-                  className="text-base font-semibold text-starbucks-green"
-                >
-                  구성원 관리
-                </h3>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3
+                    id="member-manage-title"
+                    className="text-base font-semibold text-starbucks-green"
+                  >
+                    구성원 관리
+                  </h3>
+                  {syncState.mode === 'cloud' ? (
+                    <span
+                      title={
+                        syncState.status === 'error' && syncState.errorMessage
+                          ? syncState.errorMessage
+                          : syncState.status === 'loading'
+                            ? '서버에서 데이터를 불러오는 중입니다.'
+                            : syncState.cloudBackend === 'prisma'
+                              ? '로컬 SQLite API와 연결되어 있어요. 같은 API를 쓰는 브라우저와 장부를 맞출 수 있어요.'
+                              : '내 계정(Supabase)에 저장됩니다. 어떤 기기에서 로그인해도 같은 장부를 볼 수 있어요.'
+                      }
+                      className={
+                        syncState.status === 'error'
+                          ? 'shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-800'
+                          : syncState.status === 'loading'
+                            ? 'shrink-0 rounded-full bg-neutral-cool px-2 py-0.5 text-[11px] font-medium text-text-soft'
+                            : 'shrink-0 rounded-full bg-starbucks-green/15 px-2 py-0.5 text-[11px] font-medium text-starbucks-green'
+                      }
+                    >
+                      {syncState.status === 'error'
+                        ? '동기화 오류'
+                        : syncState.status === 'loading'
+                          ? '연결 중…'
+                          : '공유됨'}
+                    </span>
+                  ) : null}
+                </div>
                 <p className="mt-1 text-xs text-text-soft">
-                  위·아래로 순서를 바꿀 수 있습니다. 삭제는 목록에서 이름을
-                  지웁니다.
+                  구성원 추가·공유코드·순서 변경·삭제를 한곳에서 할 수 있어요.
                 </p>
               </div>
-              <ul className="min-h-0 flex-1 divide-y divide-border-subtle/80 overflow-y-auto px-3 py-2">
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+                <form
+                  className="flex gap-2 rounded-2xl border border-border-subtle/70 bg-ceramic/40 p-1.5"
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    const trimmed = newMemberName.trim()
+                    if (!trimmed) return
+                    if (cloudMembers.includes(trimmed)) return
+                    setCloudMembers((prev) =>
+                      prev.includes(trimmed) ? prev : [...prev, trimmed],
+                    )
+                    setNewMemberName('')
+                  }}
+                >
+                  <input
+                    value={newMemberName}
+                    onChange={(e) => setNewMemberName(e.target.value)}
+                    placeholder="이름 입력"
+                    maxLength={20}
+                    className="min-w-0 flex-1 rounded-full border border-input-border px-3 py-1 text-sm outline-none focus:border-green-accent"
+                  />
+                  <Button
+                    type="submit"
+                    variant="outlined"
+                    className="!shrink-0 !rounded-full !px-3 !py-1 !text-sm"
+                  >
+                    추가
+                  </Button>
+                </form>
+                {householdCode ? (
+                  <div className="rounded-xl border border-border-subtle/80 bg-ceramic/30 p-3">
+                    <p className="text-sm font-semibold text-starbucks-green">
+                      가족 공유코드
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-text-secondary">
+                      같은 코드로 가입한 가족과 장부·일정을 함께 봅니다.
+                    </p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="flex-1 rounded-lg bg-emerald-50 px-3 py-2 text-center text-base font-bold tracking-[0.25em] text-emerald-700">
+                        {householdCode}
+                      </span>
+                      <button
+                        type="button"
+                        className="shrink-0 rounded-lg border border-border-subtle px-3 py-2 text-xs font-medium text-text-secondary hover:bg-neutral-cool"
+                        onClick={() => {
+                          void navigator.clipboard.writeText(householdCode)
+                          alert(
+                            '공유코드를 복사했어요. 카톡 등으로 가족에게 보내 주세요.',
+                          )
+                        }}
+                      >
+                        복사
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+                {cloudMembers.length > 0 ? (
+                  <ul className="divide-y divide-border-subtle/80 rounded-xl border border-border-subtle/60">
                 {cloudMembers.map((m, index) => (
                   <li
                     key={m}
@@ -1180,7 +1130,13 @@ export default function LedgerApp() {
                     </Button>
                   </li>
                 ))}
-              </ul>
+                  </ul>
+                ) : (
+                  <p className="text-center text-xs text-text-soft">
+                    이름을 입력해 구성원을 추가해 보세요.
+                  </p>
+                )}
+              </div>
               <div className="border-t border-border-muted p-4">
                 <Button
                   type="button"
@@ -1259,27 +1215,15 @@ export default function LedgerApp() {
               <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
                 <CalendarMonthHeading year={cursor.y} monthIndex={cursor.m} />
               </div>
-              <div className="relative z-[1] ml-auto flex shrink-0 items-center gap-1.5 md:gap-2">
-                <NoSpendChallengeBanner
-                  count={noSpendStats.count}
-                  eligibleDayCount={noSpendStats.eligibleDayCount}
-                  monthLabel={formatMonthLabel(cursor.y, cursor.m)}
-                  active={noSpendCelebrate}
-                  onToggleCelebrate={() => {
-                    goThisMonth()
-                    toggleNoSpendCelebrate()
-                  }}
-                />
-                <Button
-                  variant="outlined"
-                  className="!min-h-11 !min-w-11 shrink-0 !rounded-xl !px-0"
-                  aria-label="다음 달"
-                  type="button"
-                  onClick={goNextMonth}
-                >
-                  ›
-                </Button>
-              </div>
+              <Button
+                variant="outlined"
+                className="relative z-[1] ml-auto !min-h-11 !min-w-11 shrink-0 !rounded-xl !px-0"
+                aria-label="다음 달"
+                type="button"
+                onClick={goNextMonth}
+              >
+                ›
+              </Button>
             </div>
 
             <LedgerCalendar
