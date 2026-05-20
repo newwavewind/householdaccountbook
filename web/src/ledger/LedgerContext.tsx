@@ -487,13 +487,24 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
   /** 가족 구성원 이름 목록 — localStorage 초기값, Supabase 유저 메타·가구 동기화 */
   const [cloudMembers, setCloudMembersState] = useState<string[]>(loadMembersFromStorage)
 
+  /** 저장된 순서를 유지하고, 거래에만 있는 이름은 맨 뒤에 추가 */
   const mergeMemberNamesWithTransactions = useCallback((base: string[]): string[] => {
-    const names = new Set(base.map((s) => s.trim()).filter(Boolean))
+    const seen = new Set<string>()
+    const out: string[] = []
+    for (const raw of base) {
+      const s = raw.trim()
+      if (!s || seen.has(s)) continue
+      seen.add(s)
+      out.push(s)
+    }
     for (const t of transactionsRef.current) {
       const m = t.memberName?.trim()
-      if (m) names.add(m)
+      if (m && !seen.has(m)) {
+        seen.add(m)
+        out.push(m)
+      }
     }
-    return Array.from(names).sort((a, b) => a.localeCompare(b, 'ko'))
+    return out
   }, [])
 
   const setCloudMembers = useCallback((update: SetStateAction<string[]>) => {

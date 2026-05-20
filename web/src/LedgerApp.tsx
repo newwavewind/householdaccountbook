@@ -8,6 +8,7 @@ import { LedgerCalendar } from './components/LedgerCalendar'
 import { NoSpendChallengeBanner } from './components/NoSpendChallengeBanner'
 import { CalendarHoverTooltip } from './components/CalendarHoverTooltip'
 import { TransactionFormModal } from './components/TransactionFormModal'
+import { BulkRowManageIcon } from './bulkInput/BulkRowManageIcon'
 import { CategoryLabel } from './components/CategoryLabel'
 import { DayDetailModal } from './components/DayDetailModal'
 import { ExpenseCategoryBreakdown } from './components/ExpenseCategoryBreakdown'
@@ -490,6 +491,20 @@ export default function LedgerApp() {
   const [selectedMember, setSelectedMember] = useState<string | null>(null)
   const [newMemberName, setNewMemberName] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState<{ member: string; step: 1 | 2 } | null>(null)
+  const [memberManageOpen, setMemberManageOpen] = useState(false)
+
+  const moveMember = useCallback(
+    (index: number, dir: -1 | 1) => {
+      setCloudMembers((prev) => {
+        const j = index + dir
+        if (j < 0 || j >= prev.length) return prev
+        const next = [...prev]
+        ;[next[index], next[j]] = [next[j]!, next[index]!]
+        return next
+      })
+    },
+    [setCloudMembers],
+  )
 
   useEffect(() => {
     if (!settingsOpen) return
@@ -995,7 +1010,20 @@ export default function LedgerApp() {
         <section aria-label="가족 구성원">
           <Card className="overflow-hidden">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle/60 pb-4">
-              <LedgerSectionTitle title="가족 구성원" />
+              <div className="flex flex-wrap items-center gap-2">
+                <LedgerSectionTitle title="가족 구성원" />
+                {cloudMembers.length > 0 ? (
+                  <Button
+                    type="button"
+                    variant="outlined"
+                    className="!inline-flex !items-center !gap-1.5 !rounded-full !px-3 !py-1 !text-xs"
+                    onClick={() => setMemberManageOpen(true)}
+                  >
+                    <BulkRowManageIcon className="size-3.5" />
+                    관리
+                  </Button>
+                ) : null}
+              </div>
               <form
                 className="flex gap-2 rounded-2xl border border-border-subtle/70 bg-ceramic/40 p-1.5 shadow-sm"
                 onSubmit={(e) => {
@@ -1041,10 +1069,6 @@ export default function LedgerApp() {
                     key={m}
                     type="button"
                     onClick={() => setSelectedMember(active ? null : m)}
-                    onContextMenu={(e) => {
-                      e.preventDefault()
-                      setDeleteConfirm({ member: m, step: 1 })
-                    }}
                     className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
                       active
                         ? 'border-starbucks-green/40 bg-starbucks-green/10 text-starbucks-green ring-1 ring-starbucks-green/25'
@@ -1099,6 +1123,89 @@ export default function LedgerApp() {
             </div>
           </Card>
         </section>
+
+        {/* 구성원 관리 모달 — 순서·삭제 */}
+        {memberManageOpen ? (
+          <div
+            className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4"
+            role="presentation"
+            onClick={() => setMemberManageOpen(false)}
+          >
+            <div
+              role="dialog"
+              aria-modal
+              aria-labelledby="member-manage-title"
+              className="flex max-h-[min(85dvh,24rem)] w-full max-w-sm flex-col rounded-[var(--radius-card)] bg-surface-raised shadow-[var(--shadow-card)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="border-b border-border-muted px-5 py-4">
+                <h3
+                  id="member-manage-title"
+                  className="text-base font-semibold text-starbucks-green"
+                >
+                  구성원 관리
+                </h3>
+                <p className="mt-1 text-xs text-text-soft">
+                  위·아래로 순서를 바꿀 수 있습니다. 삭제는 목록에서 이름을
+                  지웁니다.
+                </p>
+              </div>
+              <ul className="min-h-0 flex-1 divide-y divide-border-subtle/80 overflow-y-auto px-3 py-2">
+                {cloudMembers.map((m, index) => (
+                  <li
+                    key={m}
+                    className="flex items-center gap-1.5 py-2.5 first:pt-1"
+                  >
+                    <div className="flex shrink-0 flex-col gap-0.5">
+                      <button
+                        type="button"
+                        disabled={index === 0}
+                        aria-label={`${m} 위로`}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border-subtle bg-surface-raised text-xs font-semibold text-text-secondary outline-none transition-colors hover:bg-green-light/40 disabled:opacity-35"
+                        onClick={() => moveMember(index, -1)}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        disabled={index === cloudMembers.length - 1}
+                        aria-label={`${m} 아래로`}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border-subtle bg-surface-raised text-xs font-semibold text-text-secondary outline-none transition-colors hover:bg-green-light/40 disabled:opacity-35"
+                        onClick={() => moveMember(index, 1)}
+                      >
+                        ↓
+                      </button>
+                    </div>
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-text-primary">
+                      {m}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="darkOutlined"
+                      className="!shrink-0 !rounded-full !border-danger !px-3 !py-1 !text-xs !text-danger"
+                      onClick={() => {
+                        setMemberManageOpen(false)
+                        setDeleteConfirm({ member: m, step: 1 })
+                      }}
+                    >
+                      삭제
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+              <div className="border-t border-border-muted p-4">
+                <Button
+                  type="button"
+                  variant="outlined"
+                  className="w-full"
+                  onClick={() => setMemberManageOpen(false)}
+                >
+                  닫기
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {/* 구성원 삭제 확인 모달 */}
         {deleteConfirm && (
