@@ -227,10 +227,13 @@ export const LedgerCalendar = memo(function LedgerCalendar({
           const isToday = iso === todayIso
           const isSel = iso === selectedIso
           const isSunday = cellIdx % 7 === 0
+          const isSaturday = cellIdx % 7 === 6
 
           const watermarkClass = isSunday
             ? 'text-red-500/[0.11]'
-            : 'text-text-primary/[0.08]'
+            : isSaturday
+              ? 'text-blue-500/[0.11]'
+              : 'text-text-primary/[0.08]'
 
           return (
             <button
