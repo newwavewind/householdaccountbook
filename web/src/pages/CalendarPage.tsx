@@ -1,4 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { KakaoTalkShareIconButton } from '../components/KakaoTalkShareIconButton'
@@ -71,6 +72,16 @@ const WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
 
 const CALENDAR_DAY_CELL =
   'calendar-day-cell relative flex min-h-[5rem] w-full cursor-pointer flex-col overflow-hidden rounded-none border-0 px-1 py-1.5 text-left transition-colors active:scale-[0.98] md:min-h-[6.25rem] md:px-1.5 md:py-2'
+
+function onCalendarDayCellKeyDown(
+  e: ReactKeyboardEvent,
+  onActivate: () => void,
+) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault()
+    onActivate()
+  }
+}
 
 function pad2(n: number) {
   return String(n).padStart(2, '0')
@@ -1194,6 +1205,7 @@ export default function CalendarPage() {
                   cellTickerRows.push({
                     id: `label-${e.kind}-${e.name}`,
                     ariaLabel: e.name,
+                    forceMarquee: e.name.length >= 6,
                     node: (
                       <span
                         className={`text-[0.62rem] font-medium leading-tight md:text-[0.68rem] ${calendarLabelTextClass(e.kind)} ${cellTextShadow}`}
@@ -1211,6 +1223,7 @@ export default function CalendarPage() {
                   cellTickerRows.push({
                     id: `event-${e.id}`,
                     ariaLabel: preview.text,
+                    forceMarquee: preview.text.length >= 6,
                     node: (
                       <span
                         className={[
@@ -1236,6 +1249,7 @@ export default function CalendarPage() {
                 cellTickerRows.push({
                   id: `dday-${d.id}`,
                   ariaLabel: d.title,
+                  forceMarquee: d.title.length >= 6,
                   node: (
                     <span
                       className={`text-[0.58rem] font-semibold leading-tight text-gold md:text-[0.62rem] ${cellTextShadow}`}
@@ -1289,21 +1303,24 @@ export default function CalendarPage() {
                       ? 'text-blue-500/[0.11]'
                       : 'text-text-primary/[0.08]'
 
+              const dayAriaLabel =
+                starImportant
+                  ? lunarView && lunar
+                    ? `${iso} 양력 ${day}일, 음력 ${lunar.label}, 중요 일정 있음`
+                    : `${iso} 메모·일정, 중요 일정 있음`
+                  : lunarView && lunar
+                    ? `${iso} 양력 ${day}일, 음력 ${lunar.label}`
+                    : `${iso} 메모·일정`
+
               return (
-                <button
+                <div
                   key={iso}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => onPickDay(iso)}
+                  onKeyDown={(e) => onCalendarDayCellKeyDown(e, () => onPickDay(iso))}
                   aria-pressed={isSel}
-                  aria-label={
-                    starImportant
-                      ? lunarView && lunar
-                        ? `${iso} 양력 ${day}일, 음력 ${lunar.label}, 중요 일정 있음`
-                        : `${iso} 메모·일정, 중요 일정 있음`
-                      : lunarView && lunar
-                        ? `${iso} 양력 ${day}일, 음력 ${lunar.label}`
-                        : `${iso} 메모·일정`
-                  }
+                  aria-label={dayAriaLabel}
                   className={[
                     CALENDAR_DAY_CELL,
                     inMonthBase,
@@ -1370,7 +1387,7 @@ export default function CalendarPage() {
                       title={`이 날 장부 거래 ${txCount}건`}
                     />
                   ) : null}
-                </button>
+                </div>
               )
             })}
             </div>

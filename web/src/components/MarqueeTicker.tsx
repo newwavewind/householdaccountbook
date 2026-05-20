@@ -20,7 +20,12 @@ type Props = {
   className?: string
   pauseOnHover?: boolean
   staggerKey?: string
+  /** 달력 칸 등 — 측정 전에도 긴 글자면 마키 활성화 */
+  forceMarquee?: boolean
 }
+
+/** 달력 칸 — 이 길이 이상이면 너비 측정과 무관하게 마키 */
+const CELL_MARQUEE_MIN_CHARS = 6
 
 function staggerDelaySec(key: string | undefined): number {
   if (!key) return 0
@@ -62,6 +67,7 @@ export function MarqueeTicker({
   className = '',
   pauseOnHover = true,
   staggerKey,
+  forceMarquee = false,
 }: Props) {
   const reducedMotion = usePrefersReducedMotion()
   const [hoverPause, setHoverPause] = useState(false)
@@ -72,6 +78,9 @@ export function MarqueeTicker({
   const labelId = useId()
 
   const isCell = variant === 'cell'
+  const cellLongText =
+    isCell &&
+    (forceMarquee || ariaLabel.trim().length >= CELL_MARQUEE_MIN_CHARS)
   const separatorClass = isCell
     ? 'mx-1.5 select-none text-text-soft/45'
     : 'mx-5 select-none text-gold/50'
@@ -109,14 +118,27 @@ export function MarqueeTicker({
     if (!container || !measure) return
 
     const check = () => {
-      setNeedsMarquee(measure.scrollWidth > container.clientWidth + 2)
+      const overflow = measure.scrollWidth > container.clientWidth + 2
+      setNeedsMarquee(cellLongText || overflow)
     }
     check()
+    let raf1 = 0
+    let raf2 = 0
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(check)
+    })
     const ro = new ResizeObserver(check)
     ro.observe(container)
     ro.observe(measure)
-    return () => ro.disconnect()
-  }, [segmentsWithNodes])
+    const fonts = document.fonts
+    const onFonts = () => check()
+    fonts?.ready?.then(onFonts).catch(() => {})
+    return () => {
+      cancelAnimationFrame(raf1)
+      cancelAnimationFrame(raf2)
+      ro.disconnect()
+    }
+  }, [segmentsWithNodes, cellLongText])
 
   useEffect(() => {
     const el = containerRef.current
@@ -136,8 +158,8 @@ export function MarqueeTicker({
     id: `dup-${s.id}`,
   }))
 
-  const paused =
-    (pauseOnHover && hoverPause) || !inView || !needsMarquee
+  const marqueeActive = needsMarquee || cellLongText
+  const paused = (pauseOnHover && hoverPause) || !inView || !marqueeActive
 
   const trackClass = [
     'marquee-ticker-track',
@@ -182,13 +204,14 @@ export function MarqueeTicker({
         />
       </div>
 
-      {reducedMotion || !needsMarquee ? (
+      {reducedMotion || !marqueeActive ? (
         <div
           className={[
             'overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
             isCell ? 'py-0' : 'flex w-full items-center px-3',
+            isCell && marqueeActive ? 'marquee-ticker-touch-scroll' : '',
           ].join(' ')}
-          tabIndex={needsMarquee ? 0 : undefined}
+          tabIndex={marqueeActive ? 0 : undefined}
         >
           <div className="flex w-max items-center whitespace-nowrap">
             <SegmentRow

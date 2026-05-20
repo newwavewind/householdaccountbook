@@ -4,6 +4,7 @@ export type MarqueeTickerRow = {
   id: string
   node: MarqueeSegment['node']
   ariaLabel: string
+  forceMarquee?: boolean
 }
 
 type Props = {
@@ -32,6 +33,7 @@ export function MarqueeTickerRows({
           variant="cell"
           segments={[{ id: row.id, node: row.node }]}
           ariaLabel={row.ariaLabel}
+          forceMarquee={row.forceMarquee}
           staggerKey={
             staggerKeyPrefix ? `${staggerKeyPrefix}-${row.id}` : row.id
           }
