@@ -178,7 +178,7 @@ export function AppearanceMenu() {
       window.removeEventListener('resize', reposition)
       window.removeEventListener('scroll', reposition, true)
     }
-  }, [open, showDiaryDecorate, decoration.imageUrl])
+  }, [open, showDiaryDecorate, decoration.imageUrl, decoration.photoScope, decoration.photoFit])
 
   useEffect(() => {
     if (!open) return

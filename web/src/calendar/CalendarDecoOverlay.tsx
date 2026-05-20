@@ -14,9 +14,10 @@ export function CalendarDecoOverlay({
   strength = 'card',
   className = '',
 }: Props) {
-  const { decorated, photoPageOverlay, layerStyle } = useCalendarDecoration()
+  const { decoration, decorated, layerStyle } = useCalendarDecoration()
   const style = layerStyle(strength)
-  if (!decorated || !style || photoPageOverlay) return null
+  if (!decorated || !style) return null
+  if (decoration.photoScope === 'page') return null
 
   return (
     <div

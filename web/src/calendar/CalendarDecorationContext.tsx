@@ -21,6 +21,7 @@ import {
   calendarDecorationHostStyle,
   calendarDecorationLayerStyle,
   isCalendarDecorated,
+  useCalendarCardPhotoOverlay,
   usePageLevelPhotoOverlay,
   type CalendarDecoStrength,
 } from './calendarDecorationStyles'
@@ -28,10 +29,9 @@ import {
 type CalendarDecorationContextValue = {
   decoration: CalendarDecoration
   setDecoration: (next: CalendarDecoration) => void
-  /** 배경 사진 적용 중 */
   decorated: boolean
-  /** @deprecated decorated 와 동일 — 하위 호환 */
   photoPageOverlay: boolean
+  photoCardOverlay: boolean
   layerStyle: (strength: CalendarDecoStrength) => CSSProperties | undefined
   hostStyle: CSSProperties | undefined
 }
@@ -70,6 +70,7 @@ export function CalendarDecorationProvider({ children }: { children: ReactNode }
   const photoActive = hasCalendarPhoto(decoration)
   const decorated = isCalendarDecorated(decoration)
   const photoPageOverlay = usePageLevelPhotoOverlay(decoration)
+  const photoCardOverlay = useCalendarCardPhotoOverlay(decoration)
 
   const layerStyle = useCallback(
     (strength: CalendarDecoStrength) => {
@@ -93,10 +94,19 @@ export function CalendarDecorationProvider({ children }: { children: ReactNode }
       setDecoration,
       decorated,
       photoPageOverlay,
+      photoCardOverlay,
       layerStyle,
       hostStyle,
     }),
-    [decoration, setDecoration, decorated, photoPageOverlay, layerStyle, hostStyle],
+    [
+      decoration,
+      setDecoration,
+      decorated,
+      photoPageOverlay,
+      photoCardOverlay,
+      layerStyle,
+      hostStyle,
+    ],
   )
 
   return (

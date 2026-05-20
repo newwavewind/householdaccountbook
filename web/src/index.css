@@ -814,6 +814,84 @@
   ) !important;
 }
 
+/* 배경 사진 — 날짜 격자도 사진 톤에 맞게 얇은 스크림만 */
+.calendar-card--decorated.calendar-card--photo-page .calendar-days-frame,
+.calendar-card--decorated.calendar-card--photo-card .calendar-days-frame {
+  border-color: color-mix(in srgb, var(--color-calendar-grid) 55%, transparent);
+  background-color: color-mix(in srgb, var(--color-calendar-grid) 40%, transparent);
+}
+
+.calendar-card--decorated.calendar-card--photo-page .calendar-days-grid,
+.calendar-card--decorated.calendar-card--photo-card .calendar-days-grid {
+  background-color: color-mix(in srgb, var(--color-calendar-grid) 40%, transparent);
+}
+
+.calendar-card--decorated.calendar-card--photo-page .calendar-day-cell,
+.calendar-card--decorated.calendar-card--photo-card .calendar-day-cell {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.dark .calendar-card--decorated.calendar-card--photo-page .calendar-day-cell,
+.dark .calendar-card--decorated.calendar-card--photo-card .calendar-day-cell {
+  background-color: rgba(0, 0, 0, 0.2) !important;
+}
+
+.calendar-card--decorated.calendar-card--photo-page .calendar-day-cell--deco,
+.calendar-card--decorated.calendar-card--photo-card .calendar-day-cell--deco {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.dark .calendar-card--decorated.calendar-card--photo-page .calendar-day-cell--deco,
+.dark .calendar-card--decorated.calendar-card--photo-card .calendar-day-cell--deco {
+  background-color: rgba(0, 0, 0, 0.2) !important;
+}
+
+.calendar-card--decorated.calendar-card--photo-page .calendar-month-toolbar,
+.calendar-card--decorated.calendar-card--photo-card .calendar-month-toolbar {
+  background-color: rgba(255, 255, 255, 0.14) !important;
+  backdrop-filter: blur(4px);
+}
+
+.dark .calendar-card--decorated.calendar-card--photo-page .calendar-month-toolbar,
+.dark .calendar-card--decorated.calendar-card--photo-card .calendar-month-toolbar {
+  background-color: rgba(0, 0, 0, 0.22) !important;
+}
+
+.calendar-card--decorated.calendar-card--photo-page
+  .calendar-month-toolbar
+  .calendar-toolbar-chip,
+.calendar-card--decorated.calendar-card--photo-page
+  .calendar-month-toolbar
+  .calendar-toolbar-btn,
+.calendar-card--decorated.calendar-card--photo-card
+  .calendar-month-toolbar
+  .calendar-toolbar-chip,
+.calendar-card--decorated.calendar-card--photo-card
+  .calendar-month-toolbar
+  .calendar-toolbar-btn {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.dark .calendar-card--decorated.calendar-card--photo-page
+  .calendar-month-toolbar
+  .calendar-toolbar-chip,
+.dark .calendar-card--decorated.calendar-card--photo-page
+  .calendar-month-toolbar
+  .calendar-toolbar-btn,
+.dark .calendar-card--decorated.calendar-card--photo-card
+  .calendar-month-toolbar
+  .calendar-toolbar-chip,
+.dark .calendar-card--decorated.calendar-card--photo-card
+  .calendar-month-toolbar
+  .calendar-toolbar-btn {
+  background-color: rgba(0, 0, 0, 0.28) !important;
+}
+
+/* 달력만 모드 — 카드 바깥은 기본 배경 */
+.calendar-card--photo-card {
+  isolation: isolate;
+}
+
 /* 다이어리 꾸미기 — 달력 카드와 동일 스크림(월 헤더·툴바 칩 기준) */
 .calendar-deco-host--active.dday-ticker-shell {
   background: rgba(var(--calendar-deco-bg-rgb, 248, 245, 238), 0.32) !important;

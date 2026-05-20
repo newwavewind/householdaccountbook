@@ -12,9 +12,14 @@ export function isCalendarPhotoDeco(deco: CalendarDecoration): boolean {
   return hasCalendarPhoto(deco)
 }
 
-/** 사진은 달력 페이지 main에만 오버레이 — 하위 호스트는 스크림만 */
+/** 사진 — 페이지 main 단일 오버레이 */
 export function usePageLevelPhotoOverlay(deco: CalendarDecoration): boolean {
-  return hasCalendarPhoto(deco)
+  return hasCalendarPhoto(deco) && deco.photoScope === 'page'
+}
+
+/** 사진 — 월 달력 카드 안에만 */
+export function useCalendarCardPhotoOverlay(deco: CalendarDecoration): boolean {
+  return hasCalendarPhoto(deco) && deco.photoScope === 'calendar'
 }
 
 /** 사진 위 반투명 면·칸 스크림용 CSS 변수 */
@@ -25,7 +30,7 @@ export function calendarDecorationHostStyle(
   return {
     ['--calendar-deco-bg-rgb' as string]: '248, 245, 238',
     ['--calendar-deco-bg-gradient' as string]: 'none',
-    ['--calendar-deco-bg-fill' as string]: '0.78',
+    ['--calendar-deco-bg-fill' as string]: '0.22',
     ['--calendar-deco-page-alpha' as string]: '0.92',
   }
 }
@@ -44,11 +49,13 @@ export function calendarDecorationLayerStyle(
   strength = 1,
 ): CSSProperties | undefined {
   if (!deco.imageUrl) return undefined
-  const op = deco.opacity * strength
+  const opacity = Math.min(0.9, deco.opacity * strength)
+  const contain = deco.photoFit === 'contain'
   return {
     backgroundImage: `url(${deco.imageUrl})`,
-    backgroundSize: 'cover',
+    backgroundSize: contain ? 'min(92%, 100%) auto' : 'cover',
     backgroundPosition: 'center',
-    opacity: Math.min(0.55, op + 0.08),
+    backgroundRepeat: 'no-repeat',
+    opacity,
   }
 }

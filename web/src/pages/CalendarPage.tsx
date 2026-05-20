@@ -779,6 +779,7 @@ export default function CalendarPage() {
   const {
     decorated: calendarDecorated,
     photoPageOverlay,
+    photoCardOverlay,
     layerStyle,
     hostStyle,
   } = useCalendarDecoration()
@@ -1015,10 +1016,19 @@ export default function CalendarPage() {
           className={[
             'relative min-w-0 overflow-hidden p-1.5 md:p-2',
             calendarDecorated ? 'calendar-card--decorated' : '',
+            calendarDecorated && photoPageOverlay ? 'calendar-card--photo-page' : '',
+            calendarDecorated && photoCardOverlay ? 'calendar-card--photo-card' : '',
           ]
             .filter(Boolean)
             .join(' ')}
         >
+          {photoCardOverlay && photoLayerStyle ? (
+            <div
+              className="pointer-events-none absolute inset-0 z-0 rounded-[calc(var(--radius-card)-1px)]"
+              style={photoLayerStyle}
+              aria-hidden
+            />
+          ) : null}
           <div className="relative z-[1] min-w-0">
           <div
             className={[

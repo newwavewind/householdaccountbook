@@ -1,8 +1,23 @@
 import { Button } from '../components/ui/Button'
 import { calendarDecorationLayerStyle } from './calendarDecorationStyles'
-import { hasCalendarPhoto, type CalendarDecoration } from './calendarDecorationStorage'
+import {
+  hasCalendarPhoto,
+  type CalendarDecoration,
+  type CalendarPhotoFit,
+  type CalendarPhotoScope,
+} from './calendarDecorationStorage'
 
 const PHOTO_MAX_BYTES = 5 * 1024 * 1024
+
+const SCOPE_OPTIONS: { value: CalendarPhotoScope; label: string }[] = [
+  { value: 'page', label: '페이지 전체' },
+  { value: 'calendar', label: '달력만' },
+]
+
+const FIT_OPTIONS: { value: CalendarPhotoFit; label: string }[] = [
+  { value: 'full', label: '꽉 채우기' },
+  { value: 'contain', label: '가운데 축소' },
+]
 
 type Props = {
   decoration: CalendarDecoration
@@ -54,7 +69,7 @@ export function CalendarDecoratePanel({
   return (
     <div className="space-y-3">
       <p className="text-[11px] leading-relaxed text-text-soft">
-        달력 페이지 배경에 사진을 넣을 수 있어요.
+        달력 배경에 사진을 넣을 수 있어요.
       </p>
 
       <div
@@ -80,12 +95,52 @@ export function CalendarDecoratePanel({
 
       {decoration.imageUrl ? (
         <>
+          <div className="space-y-1.5">
+            <p className="text-[11px] font-semibold text-text-soft">표시 위치</p>
+            <div className="flex flex-wrap gap-1">
+              {SCOPE_OPTIONS.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => patch({ photoScope: o.value })}
+                  className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                    decoration.photoScope === o.value
+                      ? 'border-green-accent bg-green-light/60 text-starbucks-green'
+                      : 'border-border-subtle bg-ceramic text-text-soft'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <p className="text-[11px] font-semibold text-text-soft">맞춤</p>
+            <div className="flex flex-wrap gap-1">
+              {FIT_OPTIONS.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => patch({ photoFit: o.value })}
+                  className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                    decoration.photoFit === o.value
+                      ? 'border-green-accent bg-green-light/60 text-starbucks-green'
+                      : 'border-border-subtle bg-ceramic text-text-soft'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <label className="block text-[11px] font-semibold text-text-soft">
             사진 농도 ({Math.round(decoration.opacity * 100)}%)
             <input
               type="range"
               min={12}
-              max={55}
+              max={90}
               value={Math.round(decoration.opacity * 100)}
               onChange={(e) =>
                 patch({ opacity: Number(e.target.value) / 100 })
