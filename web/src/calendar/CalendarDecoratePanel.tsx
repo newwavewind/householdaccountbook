@@ -2,7 +2,7 @@ import { Button } from '../components/ui/Button'
 import { calendarDecorationLayerStyle } from './calendarDecorationStyles'
 import { hasCalendarPhoto, type CalendarDecoration } from './calendarDecorationStorage'
 
-const PHOTO_MAX_BYTES = 2.5 * 1024 * 1024
+const PHOTO_MAX_BYTES = 5 * 1024 * 1024
 
 type Props = {
   decoration: CalendarDecoration
@@ -31,7 +31,7 @@ export function CalendarDecoratePanel({
       return
     }
     if (file.size > PHOTO_MAX_BYTES) {
-      setErr('배경 사진은 2.5MB 이하로 올려 주세요.')
+      setErr('배경 사진은 5MB 이하로 올려 주세요.')
       return
     }
     const reader = new FileReader()
