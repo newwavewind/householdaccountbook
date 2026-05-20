@@ -1,29 +1,58 @@
-/** 배경 사진이 깔리는 범위 */
-export type CalendarPhotoScope = 'page' | 'calendar'
-
 /** 배경 사진 맞춤 */
 export type CalendarPhotoFit = 'full' | 'contain'
 
-export type CalendarDecoration = {
+/** 달력 페이지 영역별 배경 사진 */
+export type CalendarPhotoZone = 'dday' | 'sticky' | 'calendar' | 'detail'
+
+export type CalendarZonePhoto = {
   imageUrl?: string
-  /** 배경 사진 농도 (12% ~ 100%) */
   opacity: number
-  photoScope: CalendarPhotoScope
   photoFit: CalendarPhotoFit
+  /** 배경 위치 0~100% */
+  positionX: number
+  positionY: number
 }
 
-const KEY = 'gaegyeobu-calendar-decoration-v2'
+export type CalendarDecoration = {
+  zones: Record<CalendarPhotoZone, CalendarZonePhoto>
+}
+
+export const CALENDAR_PHOTO_ZONES: {
+  id: CalendarPhotoZone
+  label: string
+}[] = [
+  { id: 'dday', label: 'D-Day' },
+  { id: 'sticky', label: '스티커 메모' },
+  { id: 'calendar', label: '달력' },
+  { id: 'detail', label: '일정 상세' },
+]
+
+const KEY = 'gaegyeobu-calendar-decoration-v3'
 
 export const CALENDAR_DECO_CHANGED_EVENT = 'gaegyeobu-calendar-decoration-changed'
 
-export const DEFAULT_CALENDAR_DECORATION: CalendarDecoration = {
-  opacity: 0.26,
-  photoScope: 'page',
-  photoFit: 'full',
-}
-
 const OPACITY_MIN = 0.12
 const OPACITY_MAX = 1
+
+export const DEFAULT_ZONE_PHOTO: CalendarZonePhoto = {
+  opacity: 0.26,
+  photoFit: 'full',
+  positionX: 50,
+  positionY: 50,
+}
+
+function defaultZones(): Record<CalendarPhotoZone, CalendarZonePhoto> {
+  return {
+    dday: { ...DEFAULT_ZONE_PHOTO },
+    sticky: { ...DEFAULT_ZONE_PHOTO },
+    calendar: { ...DEFAULT_ZONE_PHOTO },
+    detail: { ...DEFAULT_ZONE_PHOTO },
+  }
+}
+
+export const DEFAULT_CALENDAR_DECORATION: CalendarDecoration = {
+  zones: defaultZones(),
+}
 
 function storageKey(householdId: string | null | undefined): string {
   return householdId ? `${KEY}:${householdId}` : KEY
@@ -36,7 +65,7 @@ function parseOpacity(raw: unknown): number {
   if (typeof raw === 'number' && raw > OPACITY_MAX && raw <= 1) {
     return OPACITY_MAX
   }
-  return DEFAULT_CALENDAR_DECORATION.opacity
+  return DEFAULT_ZONE_PHOTO.opacity
 }
 
 function parseImageUrl(raw: unknown): string | undefined {
@@ -45,40 +74,75 @@ function parseImageUrl(raw: unknown): string | undefined {
     : undefined
 }
 
-function parsePhotoScope(raw: unknown): CalendarPhotoScope {
-  return raw === 'calendar' ? 'calendar' : 'page'
-}
-
 function parsePhotoFit(raw: unknown): CalendarPhotoFit {
   return raw === 'contain' ? 'contain' : 'full'
 }
 
-/** v1/v2 저장값 로드 */
+function parsePosition(raw: unknown, fallback: number): number {
+  if (typeof raw === 'number' && raw >= 0 && raw <= 100) return raw
+  return fallback
+}
+
+function parseZonePhoto(raw: unknown): CalendarZonePhoto {
+  if (!raw || typeof raw !== 'object') return { ...DEFAULT_ZONE_PHOTO }
+  const z = raw as Record<string, unknown>
+  return {
+    imageUrl: parseImageUrl(z.imageUrl),
+    opacity: parseOpacity(z.opacity),
+    photoFit: parsePhotoFit(z.photoFit),
+    positionX: parsePosition(z.positionX, DEFAULT_ZONE_PHOTO.positionX),
+    positionY: parsePosition(z.positionY, DEFAULT_ZONE_PHOTO.positionY),
+  }
+}
+
+function parseZones(raw: unknown): Record<CalendarPhotoZone, CalendarZonePhoto> {
+  const base = defaultZones()
+  if (!raw || typeof raw !== 'object') return base
+  const obj = raw as Record<string, unknown>
+  for (const { id } of CALENDAR_PHOTO_ZONES) {
+    if (obj[id] != null) base[id] = parseZonePhoto(obj[id])
+  }
+  return base
+}
+
+function migrateLegacyPhoto(p: Record<string, unknown>): CalendarDecoration {
+  const zones = defaultZones()
+  const legacyUrl = parseImageUrl(p.imageUrl)
+  if (!legacyUrl) return { zones }
+
+  const opacity = parseOpacity(p.opacity)
+  const photoFit = parsePhotoFit(p.photoFit)
+  const photoScope = p.photoScope === 'calendar' ? 'calendar' : 'page'
+  const patch = { imageUrl: legacyUrl, opacity, photoFit }
+
+  if (photoScope === 'calendar') {
+    zones.calendar = { ...zones.calendar, ...patch }
+  } else {
+    for (const { id } of CALENDAR_PHOTO_ZONES) {
+      zones[id] = { ...zones[id], ...patch }
+    }
+  }
+  return { zones }
+}
+
 export function loadCalendarDecoration(
   householdId?: string | null,
 ): CalendarDecoration {
   try {
-    const raw = localStorage.getItem(storageKey(householdId))
-    if (!raw) return { ...DEFAULT_CALENDAR_DECORATION }
-    const p = JSON.parse(raw) as Record<string, unknown>
-    const opacity = parseOpacity(p.opacity)
-    const photoScope = parsePhotoScope(p.photoScope)
-    const photoFit = parsePhotoFit(p.photoFit)
-    const imageUrl = parseImageUrl(p.imageUrl)
-    if (imageUrl) {
-      return { imageUrl, opacity, photoScope, photoFit }
+    const v3 = localStorage.getItem(storageKey(householdId))
+    if (v3) {
+      const p = JSON.parse(v3) as Record<string, unknown>
+      return { zones: parseZones(p.zones) }
     }
-    if (p.kind === 'photo') {
-      return {
-        imageUrl: parseImageUrl(p.imageUrl),
-        opacity,
-        photoScope,
-        photoFit,
-      }
+    const v2 = localStorage.getItem(
+      householdId ? `gaegyeobu-calendar-decoration-v2:${householdId}` : 'gaegyeobu-calendar-decoration-v2',
+    )
+    if (v2) {
+      return migrateLegacyPhoto(JSON.parse(v2) as Record<string, unknown>)
     }
-    return { opacity, photoScope, photoFit }
+    return { zones: defaultZones() }
   } catch {
-    return { ...DEFAULT_CALENDAR_DECORATION }
+    return { zones: defaultZones() }
   }
 }
 
@@ -87,19 +151,28 @@ export function saveCalendarDecoration(
   householdId?: string | null,
 ): void {
   try {
-    const payload: CalendarDecoration = {
-      opacity: deco.opacity,
-      photoScope: deco.photoScope,
-      photoFit: deco.photoFit,
-      imageUrl: deco.imageUrl,
-    }
-    localStorage.setItem(storageKey(householdId), JSON.stringify(payload))
+    localStorage.setItem(storageKey(householdId), JSON.stringify(deco))
     window.dispatchEvent(new Event(CALENDAR_DECO_CHANGED_EVENT))
   } catch {
     /* ignore quota */
   }
 }
 
+export function zoneHasPhoto(zone: CalendarZonePhoto): boolean {
+  return !!zone.imageUrl
+}
+
 export function hasCalendarPhoto(deco: CalendarDecoration): boolean {
-  return !!deco.imageUrl
+  return CALENDAR_PHOTO_ZONES.some(({ id }) => zoneHasPhoto(deco.zones[id]))
+}
+
+export function cloneCalendarDecoration(deco: CalendarDecoration): CalendarDecoration {
+  return {
+    zones: {
+      dday: { ...deco.zones.dday },
+      sticky: { ...deco.zones.sticky },
+      calendar: { ...deco.zones.calendar },
+      detail: { ...deco.zones.detail },
+    },
+  }
 }

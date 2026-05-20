@@ -1,23 +1,25 @@
 import type { ReactNode } from 'react'
 import { useCalendarDecoration } from './CalendarDecorationContext'
+import type { CalendarPhotoZone } from './calendarDecorationStorage'
 import type { CalendarDecoStrength } from './calendarDecorationStyles'
 
 type Props = {
+  zone: CalendarPhotoZone
   strength?: CalendarDecoStrength
   className?: string
 }
 
 const DETAIL_RADIUS = 'rounded-[calc(var(--radius-card)-1px)]'
 
-/** 패턴 레이어 — 부모에 `relative overflow-hidden` + `calendar-deco-host` 필요 */
+/** 영역별 배경 사진 레이어 */
 export function CalendarDecoOverlay({
+  zone,
   strength = 'card',
   className = '',
 }: Props) {
-  const { decoration, photoPageScrim, layerStyle } = useCalendarDecoration()
-  const style = layerStyle(strength)
-  if (!photoPageScrim || !style) return null
-  if (decoration.photoScope !== 'page') return null
+  const { zoneLayerStyle, zonePhotoActive } = useCalendarDecoration()
+  const style = zoneLayerStyle(zone, strength)
+  if (!zonePhotoActive(zone) || !style) return null
 
   return (
     <div
@@ -34,7 +36,7 @@ export function calendarDecoHostClass(decorated: boolean): string {
     : ''
 }
 
-/** 일정 상세 헤더·본문·툴바 — 부모/페이지 패턴 위 반투명 스크림만 */
+/** 일정 상세 헤더·본문·툴바 — 사진 위 반투명 스크림 */
 export function CalendarDetailDecoBand({
   className = '',
   children,
@@ -42,12 +44,13 @@ export function CalendarDetailDecoBand({
   className?: string
   children: ReactNode
 }) {
-  const { photoPageScrim } = useCalendarDecoration()
+  const { zonePhotoActive } = useCalendarDecoration()
+  const scrim = zonePhotoActive('detail')
   return (
     <div
       className={[
         'calendar-detail-deco-band relative overflow-hidden',
-        photoPageScrim ? 'calendar-deco-scrim' : '',
+        scrim ? 'calendar-deco-scrim' : '',
         className,
       ]
         .filter(Boolean)
@@ -60,7 +63,7 @@ export function CalendarDetailDecoBand({
   )
 }
 
-/** 일정 패널 블록 — 카드 전체 패턴 위에 반투명 스크림만 */
+/** 일정 패널 블록 */
 export function CalendarDecoSection({
   className = '',
   children,
@@ -72,7 +75,8 @@ export function CalendarDecoSection({
   roundTop?: boolean
   roundBottom?: boolean
 }) {
-  const { photoPageScrim } = useCalendarDecoration()
+  const { zonePhotoActive } = useCalendarDecoration()
+  const scrim = zonePhotoActive('detail')
   const round = [
     roundTop ? DETAIL_RADIUS.replace('rounded-', 'rounded-t-') : '',
     roundBottom ? DETAIL_RADIUS.replace('rounded-', 'rounded-b-') : '',
@@ -82,7 +86,7 @@ export function CalendarDecoSection({
 
   return (
     <div
-      className={[className, photoPageScrim ? 'calendar-deco-scrim' : '', round]
+      className={[className, scrim ? 'calendar-deco-scrim' : '', round]
         .filter(Boolean)
         .join(' ')}
     >

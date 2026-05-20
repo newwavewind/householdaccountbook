@@ -311,25 +311,27 @@ function DayMemoPanel({
 
   const hol = holidayLabel(iso)
   const lunar = lunarCellInfo(iso, hol)
-  const { photoPageScrim } = useCalendarDecoration()
-  const detailHostClass = calendarDecoHostClass(photoPageScrim)
+  const { zonePhotoActive } = useCalendarDecoration()
+  const detailPhoto = zonePhotoActive('detail')
+  const detailHostClass = calendarDecoHostClass(detailPhoto)
 
   return (
     <Card
       id="calendar-day-detail"
-      className={`calendar-detail-shell scroll-mt-24 !p-0 ${detailHostClass}${photoPageScrim ? ' !bg-transparent' : ''}`}
+      className={`calendar-detail-shell scroll-mt-24 !p-0 ${detailHostClass}${detailPhoto ? ' !bg-transparent' : ''}`}
     >
-      {photoPageScrim ? (
+      {detailPhoto ? (
         <CalendarDecoOverlay
+          zone="detail"
           strength="card"
           className="rounded-[calc(var(--radius-card)-1px)]"
         />
       ) : null}
       <div
-        className={`calendar-detail-panel relative z-[1] flex min-w-0 flex-col overflow-hidden ${photoPageScrim ? 'rounded-[calc(var(--radius-card)-1px)]' : ''}`}
+        className={`calendar-detail-panel relative z-[1] flex min-w-0 flex-col overflow-hidden ${detailPhoto ? 'rounded-[calc(var(--radius-card)-1px)]' : ''}`}
       >
         <div
-          className={`calendar-detail-body space-y-3 px-4 py-3 md:px-5${photoPageScrim ? ' rounded-[calc(var(--radius-card)-1px)]' : ''}`}
+          className={`calendar-detail-body space-y-3 px-4 py-3 md:px-5${detailPhoto ? ' rounded-[calc(var(--radius-card)-1px)]' : ''}`}
         >
           <div className="space-y-3">
           {events.map((ev, i) => {
@@ -338,10 +340,10 @@ function DayMemoPanel({
             return (
               <div
                 key={ev.id}
-                className={`calendar-detail-event flex min-h-[18rem] flex-col overflow-hidden rounded-md border ${stickyTintCardChrome(paper)}${photoPageScrim ? ' bg-transparent' : ''}`}
+                className={`calendar-detail-event flex min-h-[18rem] flex-col overflow-hidden rounded-md border ${stickyTintCardChrome(paper)}${detailPhoto ? ' bg-transparent' : ''}`}
               >
                 <CalendarDetailDecoBand
-                  className={`flex shrink-0 flex-col gap-1.5 px-1.5 py-1 ${stickyTintDetailEventChrome(paper, 'header', photoPageScrim)}`}
+                  className={`flex shrink-0 flex-col gap-1.5 px-1.5 py-1 ${stickyTintDetailEventChrome(paper, 'header', detailPhoto)}`}
                 >
                   {i === 0 ? (
                     <div className="calendar-detail-date-row flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-black/[0.08] pb-2.5 dark:border-white/10">
@@ -375,7 +377,7 @@ function DayMemoPanel({
                           type="button"
                           className={[
                             'calendar-detail-add-btn inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[0.7rem] font-semibold tracking-tight transition-colors touch-manipulation',
-                            photoPageScrim
+                            detailPhoto
                               ? 'border-green-accent/30 bg-surface-raised/78 text-starbucks-green hover:border-green-accent/45 hover:bg-green-light/40'
                               : 'border-green-accent/35 bg-green-light/45 text-starbucks-green hover:border-green-accent/50 hover:bg-green-light/55',
                           ].join(' ')}
@@ -426,7 +428,7 @@ function DayMemoPanel({
                     </label>
                     <div
                       className={`calendar-detail-time-field relative flex h-7 w-[7.25rem] max-w-[42vw] shrink-0 items-stretch overflow-hidden rounded border border-black/20 sm:max-w-none dark:border-white/15 ${
-                        photoPageScrim ? '' : 'bg-white/90 dark:bg-surface-raised'
+                        detailPhoto ? '' : 'bg-white/90 dark:bg-surface-raised'
                       }`}
                       title={ev.time?.trim() ? undefined : '시간 미지정'}
                     >
@@ -511,7 +513,7 @@ function DayMemoPanel({
                   </div>
                 </CalendarDetailDecoBand>
                 <CalendarDetailDecoBand
-                  className={`calendar-detail-event-body flex min-h-0 flex-1 flex-col overflow-hidden ${stickyTintDetailEventChrome(paper, 'body', photoPageScrim)}`}
+                  className={`calendar-detail-event-body flex min-h-0 flex-1 flex-col overflow-hidden ${stickyTintDetailEventChrome(paper, 'body', detailPhoto)}`}
                 >
                   <div
                     className={`flex min-h-0 flex-1 flex-col ${calendarEventInkTextClass(
@@ -776,13 +778,8 @@ export default function CalendarPage() {
   const [lunarView, setLunarView] = useState(() => loadCalendarLunarView())
 
   const { transactions, userId, householdId } = useLedger()
-  const {
-    decorated: calendarDecorated,
-    photoPageOverlay,
-    photoCardOverlay,
-    layerStyle,
-    hostStyle,
-  } = useCalendarDecoration()
+  const { zonePhotoActive, hostStyle } = useCalendarDecoration()
+  const calendarPhoto = zonePhotoActive('calendar')
   const { memos, patchMemos, cloudStatus, cloudMessage } =
     useHouseholdCalendarMemos()
 
@@ -834,8 +831,6 @@ export default function CalendarPage() {
       return next
     })
   }, [])
-
-  const photoLayerStyle = layerStyle('card')
 
   useEffect(() => {
     if (!peekIso) return
@@ -953,22 +948,9 @@ export default function CalendarPage() {
 
   return (
     <main
-      className={[
-        'mx-auto w-full max-w-5xl px-4 py-6 md:px-6',
-        photoPageOverlay ? 'calendar-page-photo-host relative' : '',
-      ]
-        .filter(Boolean)
-        .join(' ')}
-      style={hostStyle}
+      className="mx-auto w-full max-w-5xl px-4 py-6 md:px-6"
+      style={calendarPhoto ? hostStyle : undefined}
     >
-      {photoPageOverlay && photoLayerStyle ? (
-        <div
-          className="pointer-events-none absolute inset-0 z-0"
-          style={photoLayerStyle}
-          aria-hidden
-        />
-      ) : null}
-      <div className={photoPageOverlay ? 'relative z-[1]' : undefined}>
       <div className="mb-6 w-full min-w-0">
         <DdaySummaryTicker lines={ddaySummaryLines} />
         {backend === 'supabase' && cloudConfigured ? (
@@ -1015,25 +997,23 @@ export default function CalendarPage() {
         <Card
           className={[
             'relative min-w-0 overflow-hidden p-1.5 md:p-2',
-            calendarDecorated ? 'calendar-card--decorated' : '',
-            calendarDecorated && photoPageOverlay ? 'calendar-card--photo-page' : '',
-            calendarDecorated && photoCardOverlay ? 'calendar-card--photo-card' : '',
+            calendarPhoto ? 'calendar-card--decorated calendar-card--photo-page' : '',
           ]
             .filter(Boolean)
             .join(' ')}
         >
-          {photoCardOverlay && photoLayerStyle ? (
-            <div
-              className="pointer-events-none absolute inset-0 z-0 rounded-[calc(var(--radius-card)-1px)]"
-              style={photoLayerStyle}
-              aria-hidden
+          {calendarPhoto ? (
+            <CalendarDecoOverlay
+              zone="calendar"
+              strength="card"
+              className="rounded-[calc(var(--radius-card)-1px)]"
             />
           ) : null}
           <div className="relative z-[1] min-w-0">
           <div
             className={[
               'calendar-month-toolbar mb-2 flex flex-col gap-2 rounded-[var(--radius-card)] p-2 md:flex-row md:items-center md:justify-between md:p-3',
-              calendarDecorated ? '' : 'bg-ceramic/80',
+              calendarPhoto ? '' : 'bg-ceramic/80',
             ]
               .filter(Boolean)
               .join(' ')}
@@ -1090,7 +1070,7 @@ export default function CalendarPage() {
           <div
             className={[
               'calendar-weekday-row relative mb-1.5',
-              calendarDecorated ? 'overflow-hidden rounded-t-[calc(var(--radius-card)-2px)]' : '',
+              calendarPhoto ? 'overflow-hidden rounded-t-[calc(var(--radius-card)-2px)]' : '',
             ]
               .filter(Boolean)
               .join(' ')}
@@ -1098,7 +1078,7 @@ export default function CalendarPage() {
             <div
               className={[
                 'relative z-[1] grid grid-cols-7 text-center text-sm font-medium md:text-base',
-                calendarDecorated ? 'calendar-weekday-grid' : '',
+                calendarPhoto ? 'calendar-weekday-grid' : '',
               ]
                 .filter(Boolean)
                 .join(' ')}
@@ -1115,7 +1095,7 @@ export default function CalendarPage() {
                     key={d}
                     className={[
                       'flex items-center justify-center',
-                      calendarDecorated
+                      calendarPhoto
                         ? 'calendar-weekday-cell py-0.5'
                         : 'py-0.5',
                     ]
@@ -1124,7 +1104,7 @@ export default function CalendarPage() {
                   >
                     <span
                       className={
-                        calendarDecorated
+                        calendarPhoto
                           ? `calendar-weekday-label ${labelClass}`
                           : labelClass
                       }
@@ -1152,7 +1132,7 @@ export default function CalendarPage() {
                     aria-label={iso}
                     className={[
                       CALENDAR_DAY_CELL,
-                      calendarDecorated
+                      calendarPhoto
                         ? `${calendarDecoDayCellBgClass()} hover:bg-green-light/30`
                         : 'bg-surface-raised hover:bg-green-light/25',
                       isSel ? 'calendar-day-cell--selected' : '',
@@ -1250,15 +1230,15 @@ export default function CalendarPage() {
 
               const inMonthBase = hasMemo
                 ? cellBgImage
-                  ? calendarDecorated
+                  ? calendarPhoto
                     ? 'bg-surface-raised/26 hover:bg-green-light/25'
                     : 'bg-surface-raised/30 hover:bg-green-light/20'
                   : `${stickyTintCalendarCellBg(
                       firstEventPaperTint(memo),
                       true,
-                      calendarDecorated,
+                      calendarPhoto,
                     )} hover:bg-green-light/30`
-                : calendarDecorated
+                : calendarPhoto
                   ? `${calendarDecoDayCellBgClass()} hover:bg-green-light/35`
                   : 'bg-surface-raised hover:bg-green-light/35'
 
@@ -1269,7 +1249,7 @@ export default function CalendarPage() {
                   : ''
               const selectedFillClass =
                 isSel && !hasMemo
-                  ? calendarDecorated
+                  ? calendarPhoto
                     ? 'bg-green-light/45'
                     : 'bg-green-light/50'
                   : ''
@@ -1419,7 +1399,6 @@ export default function CalendarPage() {
             document.body,
           )
         : null}
-      </div>
     </main>
   )
 }

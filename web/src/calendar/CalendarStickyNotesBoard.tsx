@@ -21,8 +21,9 @@ type Props = {
 }
 
 export default function CalendarStickyNotesBoard({ notes, patchNotes }: Props) {
-  const { photoPageScrim } = useCalendarDecoration()
-  const hostClass = calendarDecoHostClass(photoPageScrim)
+  const { zonePhotoActive } = useCalendarDecoration()
+  const stickyPhoto = zonePhotoActive('sticky')
+  const hostClass = calendarDecoHostClass(stickyPhoto)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set())
   const noteCountRef = useRef(0)
   const canvasRef = useRef<HTMLDivElement>(null)
@@ -135,7 +136,7 @@ export default function CalendarStickyNotesBoard({ notes, patchNotes }: Props) {
         hasNotes ? 'py-2 md:py-2.5' : 'py-3 md:py-4'
       }`}
     >
-      <CalendarDecoOverlay strength="card" />
+      <CalendarDecoOverlay zone="sticky" strength="card" />
       <div className="relative z-[1] min-w-0">
       {!hasNotes ? (
         <p className="text-center text-[11px] leading-snug text-text-soft sm:text-sm">

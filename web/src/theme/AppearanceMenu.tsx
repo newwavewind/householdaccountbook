@@ -13,11 +13,7 @@ import {
   isCalendarDecorateActive,
 } from '../calendar/CalendarDecoratePanel'
 import { useCalendarDecoration } from '../calendar/CalendarDecorationContext'
-import {
-  DEFAULT_CALENDAR_DECORATION,
-  saveCalendarDecoration,
-} from '../calendar/calendarDecorationStorage'
-import { useLedger } from '../hooks/useLedger'
+import { DEFAULT_CALENDAR_DECORATION } from '../calendar/calendarDecorationStorage'
 import { useThemePreference } from './ThemeContext'
 import type { ThemePreference } from './themePreference'
 
@@ -29,7 +25,7 @@ const themeLabels: Record<ThemePreference, string> = {
 
 const PANEL_Z = 10000
 const VIEWPORT_PAD = 8
-const PANEL_WIDTH = 288
+const PANEL_WIDTH = 320
 
 const panelSurfaceClass =
   'rounded-md border border-charcoal-border bg-surface-raised p-2.5 shadow-[var(--shadow-frap-stack)] theme2:shadow-[var(--shadow-frap-base)] theme3:border-border-strong dark:border-border-strong'
@@ -99,8 +95,13 @@ function isDiaryDecorateRoute(pathname: string): boolean {
 export function AppearanceMenu() {
   const location = useLocation()
   const showDiaryDecorate = isDiaryDecorateRoute(location.pathname)
-  const { householdId } = useLedger()
-  const { decoration, setDecoration } = useCalendarDecoration()
+  const {
+    decoration,
+    preview,
+    setPreview,
+    applyDecoration,
+    revertPreview,
+  } = useCalendarDecoration()
   const {
     preference,
     setPreference,
@@ -178,17 +179,22 @@ export function AppearanceMenu() {
       window.removeEventListener('resize', reposition)
       window.removeEventListener('scroll', reposition, true)
     }
-  }, [open, showDiaryDecorate, decoration.imageUrl, decoration.photoScope, decoration.photoFit])
+  }, [open, showDiaryDecorate, preview])
+
+  const closePanel = () => {
+    revertPreview()
+    setOpen(false)
+  }
 
   useEffect(() => {
     if (!open) return
     const onDoc = (e: MouseEvent) => {
       const t = e.target as Node
       if (btnRef.current?.contains(t) || panelRef.current?.contains(t)) return
-      setOpen(false)
+      closePanel()
     }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false)
+      if (e.key === 'Escape') closePanel()
     }
     document.addEventListener('mousedown', onDoc, true)
     document.addEventListener('keydown', onKey)
@@ -196,16 +202,21 @@ export function AppearanceMenu() {
       document.removeEventListener('mousedown', onDoc, true)
       document.removeEventListener('keydown', onKey)
     }
-  }, [open])
+  }, [open, revertPreview])
 
-  const onDecoChange = (next: typeof decoration) => {
-    setDecoration(next)
-    saveCalendarDecoration(next, householdId)
+  useEffect(() => {
+    if (!open) revertPreview()
+  }, [open, revertPreview])
+
+  const onDecoSave = () => {
+    applyDecoration(preview)
+    setDecoErr(null)
   }
 
   const onDecoReset = () => {
     const reset = { ...DEFAULT_CALENDAR_DECORATION }
-    onDecoChange(reset)
+    setPreview(reset)
+    applyDecoration(reset)
     setDecoErr(null)
   }
 
@@ -248,9 +259,13 @@ export function AppearanceMenu() {
 
       {showDiaryDecorate ? (
         <div className="mt-3 border-t border-border-muted pt-3">
+          <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wide text-text-soft">
+            배경 사진
+          </p>
           <CalendarDecoratePanel
-            decoration={decoration}
-            onChange={onDecoChange}
+            decoration={preview}
+            onPreview={setPreview}
+            onSave={onDecoSave}
             onReset={onDecoReset}
             err={decoErr}
             setErr={setDecoErr}
@@ -266,7 +281,7 @@ export function AppearanceMenu() {
         <div
           className="fixed inset-0 z-[10000] bg-black/40 md:pointer-events-none md:bg-transparent"
           aria-hidden
-          onClick={() => setOpen(false)}
+          onClick={closePanel}
         />
         <div
           ref={panelRef}

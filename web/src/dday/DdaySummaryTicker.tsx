@@ -21,12 +21,13 @@ function linesToSegments(lines: DdaySummaryLine[]): MarqueeSegment[] {
 
 export function DdaySummaryTicker({ lines }: Props) {
   const [expanded, setExpanded] = useState(false)
-  const { photoPageScrim } = useCalendarDecoration()
-  const hostClass = calendarDecoHostClass(photoPageScrim)
+  const { zonePhotoActive } = useCalendarDecoration()
+  const ddayPhoto = zonePhotoActive('dday')
+  const hostClass = calendarDecoHostClass(ddayPhoto)
 
   const actionBtnClass = [
     'inline-flex min-h-[2.75rem] min-w-[4.5rem] shrink-0 items-center justify-center border-l border-border-subtle px-2.5 text-xs font-semibold text-starbucks-green transition-colors hover:bg-green-light/35 md:min-h-11 md:px-3',
-    photoPageScrim ? '' : 'bg-surface-raised/80',
+    ddayPhoto ? '' : 'bg-surface-raised/80',
   ]
     .filter(Boolean)
     .join(' ')
@@ -39,7 +40,7 @@ export function DdaySummaryTicker({ lines }: Props) {
         <div
           className={`dday-ticker-shell overflow-hidden rounded-xl border border-border-subtle bg-gradient-to-r from-ceramic/95 via-well/50 to-ceramic/95 shadow-sm ${hostClass}`}
         >
-          <CalendarDecoOverlay strength="card" />
+          <CalendarDecoOverlay zone="dday" strength="card" />
           <div className="relative z-[1] flex min-h-[2.75rem] items-stretch">
             <Link
               to="/calendar/dday"
@@ -67,7 +68,7 @@ export function DdaySummaryTicker({ lines }: Props) {
       <div
         className={`dday-ticker-shell overflow-hidden rounded-xl border border-border-subtle bg-gradient-to-r from-ceramic/95 via-well/50 to-ceramic/95 shadow-sm ${hostClass}`}
       >
-        <CalendarDecoOverlay strength="panel" />
+        <CalendarDecoOverlay zone="dday" strength="panel" />
         <div className="relative z-[1] flex min-h-[2.75rem] items-stretch">
           <Link
             to="/calendar/dday"

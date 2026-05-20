@@ -11,30 +11,36 @@ import type { CSSProperties } from 'react'
 import { useLedger } from '../hooks/useLedger'
 import {
   CALENDAR_DECO_CHANGED_EVENT,
-  hasCalendarPhoto,
+  cloneCalendarDecoration,
   loadCalendarDecoration,
   saveCalendarDecoration,
   type CalendarDecoration,
+  type CalendarPhotoZone,
 } from './calendarDecorationStorage'
+import { hasCalendarPhoto } from './calendarDecorationStorage'
 import {
-  CALENDAR_DECO_STRENGTH,
   calendarDecorationHostStyle,
-  calendarDecorationLayerStyle,
   isCalendarDecorated,
-  useCalendarCardPhotoOverlay,
-  usePageLevelPhotoOverlay,
+  zoneLayerStyle,
+  zonePhotoActive,
   type CalendarDecoStrength,
 } from './calendarDecorationStyles'
 
 type CalendarDecorationContextValue = {
+  /** 저장·적용된 설정 */
   decoration: CalendarDecoration
-  setDecoration: (next: CalendarDecoration) => void
+  /** 패널 미리보기(저장 전) */
+  preview: CalendarDecoration
+  setPreview: (next: CalendarDecoration) => void
+  applyDecoration: (next: CalendarDecoration) => void
+  revertPreview: () => void
   decorated: boolean
-  photoPageScrim: boolean
-  photoPageOverlay: boolean
-  photoCardOverlay: boolean
-  layerStyle: (strength: CalendarDecoStrength) => CSSProperties | undefined
   hostStyle: CSSProperties | undefined
+  zoneLayerStyle: (
+    zone: CalendarPhotoZone,
+    strength?: CalendarDecoStrength,
+  ) => CSSProperties | undefined
+  zonePhotoActive: (zone: CalendarPhotoZone) => boolean
 }
 
 const CalendarDecorationContext =
@@ -45,9 +51,14 @@ export function CalendarDecorationProvider({ children }: { children: ReactNode }
   const [decoration, setDecorationState] = useState(() =>
     loadCalendarDecoration(),
   )
+  const [preview, setPreviewState] = useState(() =>
+    cloneCalendarDecoration(loadCalendarDecoration()),
+  )
 
   const reload = useCallback(() => {
-    setDecorationState(loadCalendarDecoration(householdId))
+    const next = loadCalendarDecoration(householdId)
+    setDecorationState(next)
+    setPreviewState(cloneCalendarDecoration(next))
   }, [householdId])
 
   useEffect(() => {
@@ -60,56 +71,60 @@ export function CalendarDecorationProvider({ children }: { children: ReactNode }
     return () => window.removeEventListener(CALENDAR_DECO_CHANGED_EVENT, onChange)
   }, [reload])
 
-  const setDecoration = useCallback(
+  const applyDecoration = useCallback(
     (next: CalendarDecoration) => {
-      setDecorationState(next)
-      saveCalendarDecoration(next, householdId)
+      const cloned = cloneCalendarDecoration(next)
+      setDecorationState(cloned)
+      setPreviewState(cloneCalendarDecoration(cloned))
+      saveCalendarDecoration(cloned, householdId)
     },
     [householdId],
   )
 
-  const photoActive = hasCalendarPhoto(decoration)
-  const decorated = isCalendarDecorated(decoration)
-  const photoPageOverlay = usePageLevelPhotoOverlay(decoration)
-  const photoCardOverlay = useCalendarCardPhotoOverlay(decoration)
-  const photoPageScrim = photoPageOverlay
+  const setPreview = useCallback((next: CalendarDecoration) => {
+    setPreviewState(cloneCalendarDecoration(next))
+  }, [])
 
-  const layerStyle = useCallback(
-    (strength: CalendarDecoStrength) => {
-      if (!photoActive) return undefined
-      return calendarDecorationLayerStyle(
-        decoration,
-        CALENDAR_DECO_STRENGTH[strength],
-      )
-    },
-    [decoration, photoActive],
+  const revertPreview = useCallback(() => {
+    setPreviewState(cloneCalendarDecoration(decoration))
+  }, [decoration])
+
+  const decorated = isCalendarDecorated(preview)
+  const hostStyle = useMemo(() => calendarDecorationHostStyle(preview), [preview])
+
+  const zoneLayer = useCallback(
+    (zone: CalendarPhotoZone, strength: CalendarDecoStrength = 'card') =>
+      zoneLayerStyle(preview, zone, strength),
+    [preview],
   )
 
-  const hostStyle = useMemo(
-    () => (photoPageScrim ? calendarDecorationHostStyle(decoration) : undefined),
-    [decoration, photoPageScrim],
+  const zoneActive = useCallback(
+    (zone: CalendarPhotoZone) => zonePhotoActive(preview, zone),
+    [preview],
   )
 
   const value = useMemo(
     () => ({
       decoration,
-      setDecoration,
-      decorated,
-      photoPageScrim,
-      photoPageOverlay,
-      photoCardOverlay,
-      layerStyle,
+      preview,
+      setPreview,
+      applyDecoration,
+      revertPreview,
+      decorated: decorated || hasCalendarPhoto(decoration),
       hostStyle,
+      zoneLayerStyle: zoneLayer,
+      zonePhotoActive: zoneActive,
     }),
     [
       decoration,
-      setDecoration,
+      preview,
+      setPreview,
+      applyDecoration,
+      revertPreview,
       decorated,
-      photoPageScrim,
-      photoPageOverlay,
-      photoCardOverlay,
-      layerStyle,
       hostStyle,
+      zoneLayer,
+      zoneActive,
     ],
   )
 
