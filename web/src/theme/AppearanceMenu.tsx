@@ -248,9 +248,6 @@ export function AppearanceMenu() {
 
       {showDiaryDecorate ? (
         <div className="mt-3 border-t border-border-muted pt-3">
-          <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wide text-text-soft">
-            배경 사진
-          </p>
           <CalendarDecoratePanel
             decoration={decoration}
             onChange={onDecoChange}
