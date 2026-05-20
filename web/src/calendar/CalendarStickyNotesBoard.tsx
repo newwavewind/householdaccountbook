@@ -21,8 +21,8 @@ type Props = {
 }
 
 export default function CalendarStickyNotesBoard({ notes, patchNotes }: Props) {
-  const { decorated } = useCalendarDecoration()
-  const hostClass = calendarDecoHostClass(decorated)
+  const { photoPageScrim } = useCalendarDecoration()
+  const hostClass = calendarDecoHostClass(photoPageScrim)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set())
   const noteCountRef = useRef(0)
   const canvasRef = useRef<HTMLDivElement>(null)

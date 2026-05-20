@@ -84,7 +84,7 @@ export function CalendarDecoratePanel({
       </div>
 
       <label className="block text-[11px] font-semibold text-text-soft">
-        배경 사진
+        사진선택
         <input
           type="file"
           accept="image/*"

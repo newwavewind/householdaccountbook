@@ -21,12 +21,12 @@ function linesToSegments(lines: DdaySummaryLine[]): MarqueeSegment[] {
 
 export function DdaySummaryTicker({ lines }: Props) {
   const [expanded, setExpanded] = useState(false)
-  const { decorated } = useCalendarDecoration()
-  const hostClass = calendarDecoHostClass(decorated)
+  const { photoPageScrim } = useCalendarDecoration()
+  const hostClass = calendarDecoHostClass(photoPageScrim)
 
   const actionBtnClass = [
     'inline-flex min-h-[2.75rem] min-w-[4.5rem] shrink-0 items-center justify-center border-l border-border-subtle px-2.5 text-xs font-semibold text-starbucks-green transition-colors hover:bg-green-light/35 md:min-h-11 md:px-3',
-    decorated ? '' : 'bg-surface-raised/80',
+    photoPageScrim ? '' : 'bg-surface-raised/80',
   ]
     .filter(Boolean)
     .join(' ')

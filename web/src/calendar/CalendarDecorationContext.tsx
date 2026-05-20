@@ -30,6 +30,7 @@ type CalendarDecorationContextValue = {
   decoration: CalendarDecoration
   setDecoration: (next: CalendarDecoration) => void
   decorated: boolean
+  photoPageScrim: boolean
   photoPageOverlay: boolean
   photoCardOverlay: boolean
   layerStyle: (strength: CalendarDecoStrength) => CSSProperties | undefined
@@ -71,6 +72,7 @@ export function CalendarDecorationProvider({ children }: { children: ReactNode }
   const decorated = isCalendarDecorated(decoration)
   const photoPageOverlay = usePageLevelPhotoOverlay(decoration)
   const photoCardOverlay = useCalendarCardPhotoOverlay(decoration)
+  const photoPageScrim = photoPageOverlay
 
   const layerStyle = useCallback(
     (strength: CalendarDecoStrength) => {
@@ -84,8 +86,8 @@ export function CalendarDecorationProvider({ children }: { children: ReactNode }
   )
 
   const hostStyle = useMemo(
-    () => calendarDecorationHostStyle(decoration),
-    [decoration],
+    () => (photoPageScrim ? calendarDecorationHostStyle(decoration) : undefined),
+    [decoration, photoPageScrim],
   )
 
   const value = useMemo(
@@ -93,6 +95,7 @@ export function CalendarDecorationProvider({ children }: { children: ReactNode }
       decoration,
       setDecoration,
       decorated,
+      photoPageScrim,
       photoPageOverlay,
       photoCardOverlay,
       layerStyle,
@@ -102,6 +105,7 @@ export function CalendarDecorationProvider({ children }: { children: ReactNode }
       decoration,
       setDecoration,
       decorated,
+      photoPageScrim,
       photoPageOverlay,
       photoCardOverlay,
       layerStyle,

@@ -14,10 +14,10 @@ export function CalendarDecoOverlay({
   strength = 'card',
   className = '',
 }: Props) {
-  const { decoration, decorated, layerStyle } = useCalendarDecoration()
+  const { decoration, photoPageScrim, layerStyle } = useCalendarDecoration()
   const style = layerStyle(strength)
-  if (!decorated || !style) return null
-  if (decoration.photoScope === 'page') return null
+  if (!photoPageScrim || !style) return null
+  if (decoration.photoScope !== 'page') return null
 
   return (
     <div
@@ -42,12 +42,12 @@ export function CalendarDetailDecoBand({
   className?: string
   children: ReactNode
 }) {
-  const { decorated } = useCalendarDecoration()
+  const { photoPageScrim } = useCalendarDecoration()
   return (
     <div
       className={[
         'calendar-detail-deco-band relative overflow-hidden',
-        decorated ? 'calendar-deco-scrim' : '',
+        photoPageScrim ? 'calendar-deco-scrim' : '',
         className,
       ]
         .filter(Boolean)
@@ -72,7 +72,7 @@ export function CalendarDecoSection({
   roundTop?: boolean
   roundBottom?: boolean
 }) {
-  const { decorated } = useCalendarDecoration()
+  const { photoPageScrim } = useCalendarDecoration()
   const round = [
     roundTop ? DETAIL_RADIUS.replace('rounded-', 'rounded-t-') : '',
     roundBottom ? DETAIL_RADIUS.replace('rounded-', 'rounded-b-') : '',
@@ -82,7 +82,7 @@ export function CalendarDecoSection({
 
   return (
     <div
-      className={[className, decorated ? 'calendar-deco-scrim' : '', round]
+      className={[className, photoPageScrim ? 'calendar-deco-scrim' : '', round]
         .filter(Boolean)
         .join(' ')}
     >

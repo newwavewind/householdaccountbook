@@ -22,11 +22,11 @@ export function useCalendarCardPhotoOverlay(deco: CalendarDecoration): boolean {
   return hasCalendarPhoto(deco) && deco.photoScope === 'calendar'
 }
 
-/** 사진 위 반투명 면·칸 스크림용 CSS 변수 */
+/** 페이지 전체 모드 — main·D-day·스티커·일정 상세 스크림용 CSS 변수 */
 export function calendarDecorationHostStyle(
   deco: CalendarDecoration,
 ): CSSProperties | undefined {
-  if (!hasCalendarPhoto(deco)) return undefined
+  if (!usePageLevelPhotoOverlay(deco)) return undefined
   return {
     ['--calendar-deco-bg-rgb' as string]: '248, 245, 238',
     ['--calendar-deco-bg-gradient' as string]: 'none',

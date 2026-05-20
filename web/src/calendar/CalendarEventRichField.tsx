@@ -219,7 +219,7 @@ export function CalendarEventRichField({
     }
   }, [editor, memoDefaults.fontFamily, memoDefaults.fontSize])
 
-  const { decorated: calendarDecorated } = useCalendarDecoration()
+  const { photoPageScrim: calendarDecorated } = useCalendarDecoration()
   const stickyFooterClass = stickyTintDetailEventChrome(
     paperTint,
     'footer',

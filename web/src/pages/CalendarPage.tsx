@@ -311,25 +311,25 @@ function DayMemoPanel({
 
   const hol = holidayLabel(iso)
   const lunar = lunarCellInfo(iso, hol)
-  const { decorated } = useCalendarDecoration()
-  const detailHostClass = calendarDecoHostClass(decorated)
+  const { photoPageScrim } = useCalendarDecoration()
+  const detailHostClass = calendarDecoHostClass(photoPageScrim)
 
   return (
     <Card
       id="calendar-day-detail"
-      className={`calendar-detail-shell scroll-mt-24 !p-0 ${detailHostClass}${decorated ? ' !bg-transparent' : ''}`}
+      className={`calendar-detail-shell scroll-mt-24 !p-0 ${detailHostClass}${photoPageScrim ? ' !bg-transparent' : ''}`}
     >
-      {decorated ? (
+      {photoPageScrim ? (
         <CalendarDecoOverlay
           strength="card"
           className="rounded-[calc(var(--radius-card)-1px)]"
         />
       ) : null}
       <div
-        className={`calendar-detail-panel relative z-[1] flex min-w-0 flex-col overflow-hidden ${decorated ? 'rounded-[calc(var(--radius-card)-1px)]' : ''}`}
+        className={`calendar-detail-panel relative z-[1] flex min-w-0 flex-col overflow-hidden ${photoPageScrim ? 'rounded-[calc(var(--radius-card)-1px)]' : ''}`}
       >
         <div
-          className={`calendar-detail-body space-y-3 px-4 py-3 md:px-5${decorated ? ' rounded-[calc(var(--radius-card)-1px)]' : ''}`}
+          className={`calendar-detail-body space-y-3 px-4 py-3 md:px-5${photoPageScrim ? ' rounded-[calc(var(--radius-card)-1px)]' : ''}`}
         >
           <div className="space-y-3">
           {events.map((ev, i) => {
@@ -338,10 +338,10 @@ function DayMemoPanel({
             return (
               <div
                 key={ev.id}
-                className={`calendar-detail-event flex min-h-[18rem] flex-col overflow-hidden rounded-md border ${stickyTintCardChrome(paper)}${decorated ? ' bg-transparent' : ''}`}
+                className={`calendar-detail-event flex min-h-[18rem] flex-col overflow-hidden rounded-md border ${stickyTintCardChrome(paper)}${photoPageScrim ? ' bg-transparent' : ''}`}
               >
                 <CalendarDetailDecoBand
-                  className={`flex shrink-0 flex-col gap-1.5 px-1.5 py-1 ${stickyTintDetailEventChrome(paper, 'header', decorated)}`}
+                  className={`flex shrink-0 flex-col gap-1.5 px-1.5 py-1 ${stickyTintDetailEventChrome(paper, 'header', photoPageScrim)}`}
                 >
                   {i === 0 ? (
                     <div className="calendar-detail-date-row flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-black/[0.08] pb-2.5 dark:border-white/10">
@@ -375,7 +375,7 @@ function DayMemoPanel({
                           type="button"
                           className={[
                             'calendar-detail-add-btn inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[0.7rem] font-semibold tracking-tight transition-colors touch-manipulation',
-                            decorated
+                            photoPageScrim
                               ? 'border-green-accent/30 bg-surface-raised/78 text-starbucks-green hover:border-green-accent/45 hover:bg-green-light/40'
                               : 'border-green-accent/35 bg-green-light/45 text-starbucks-green hover:border-green-accent/50 hover:bg-green-light/55',
                           ].join(' ')}
@@ -426,7 +426,7 @@ function DayMemoPanel({
                     </label>
                     <div
                       className={`calendar-detail-time-field relative flex h-7 w-[7.25rem] max-w-[42vw] shrink-0 items-stretch overflow-hidden rounded border border-black/20 sm:max-w-none dark:border-white/15 ${
-                        decorated ? '' : 'bg-white/90 dark:bg-surface-raised'
+                        photoPageScrim ? '' : 'bg-white/90 dark:bg-surface-raised'
                       }`}
                       title={ev.time?.trim() ? undefined : '시간 미지정'}
                     >
@@ -511,7 +511,7 @@ function DayMemoPanel({
                   </div>
                 </CalendarDetailDecoBand>
                 <CalendarDetailDecoBand
-                  className={`calendar-detail-event-body flex min-h-0 flex-1 flex-col overflow-hidden ${stickyTintDetailEventChrome(paper, 'body', decorated)}`}
+                  className={`calendar-detail-event-body flex min-h-0 flex-1 flex-col overflow-hidden ${stickyTintDetailEventChrome(paper, 'body', photoPageScrim)}`}
                 >
                   <div
                     className={`flex min-h-0 flex-1 flex-col ${calendarEventInkTextClass(
