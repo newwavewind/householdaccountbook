@@ -6,7 +6,7 @@
   useRef,
   useState,
 } from 'react'
-import type { KeyboardEvent } from 'react'
+import type { KeyboardEvent, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
 const PANEL_GAP = 8
@@ -16,7 +16,11 @@ const PANEL_MAX_H = 288
 
 export type BulkListPickerRole = 'category' | 'card' | 'member'
 
-export type BulkListPickerRow = { value: string; label: string }
+export type BulkListPickerRow = {
+  value: string
+  label: string
+  icon?: ReactNode
+}
 
 type Props = {
   ariaLabel: string
@@ -187,11 +191,15 @@ export function BulkListPicker({
   }
 
   const emptyLabel = rowsList[0]?.label ?? ''
+  const selectedRow =
+    value.trim() === ''
+      ? rowsList[0]
+      : rowsList.find((r: BulkListPickerRow) => r.value === value)
   const shownOnTrigger =
     value.trim() === ''
       ? emptyLabel
-      : rowsList.find((r: BulkListPickerRow) => r.value === value)?.label ??
-        value
+      : selectedRow?.label ?? value
+  const shownIcon = value.trim() !== '' ? selectedRow?.icon : undefined
 
   const optPrefix =
     pickerRole === 'category' ? 'cat' : pickerRole === 'card' ? 'card' : 'member'
@@ -239,14 +247,15 @@ export function BulkListPicker({
               role="option"
               aria-selected={selected}
               tabIndex={-1}
-              className={`cursor-pointer rounded-[8px] px-3 py-2 text-sm outline-none transition-colors ${idx === highlight ? 'bg-green-light text-text-primary' : 'text-text-primary'} ${selected ? 'font-semibold' : ''}`}
+              className={`flex cursor-pointer items-center gap-2 rounded-[8px] px-2.5 py-1.5 text-sm outline-none transition-colors ${idx === highlight ? 'bg-green-light text-text-primary' : 'text-text-primary'} ${selected ? 'font-semibold' : ''}`}
               onMouseDown={(e) => {
                 e.preventDefault()
                 pickAt(idx)
               }}
               onMouseEnter={() => setHighlight(idx)}
             >
-              {row.label}
+              {row.icon ?? null}
+              <span className="min-w-0 truncate">{row.label}</span>
             </div>
           )
         })}
@@ -265,7 +274,7 @@ export function BulkListPicker({
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         disabled={disabled}
-        className={`${triggerClassName} ${disabled ? '' : value.trim() !== '' ? '' : 'text-text-soft'}`}
+        className={`${triggerClassName} inline-flex items-center justify-center gap-1.5 ${disabled ? '' : value.trim() !== '' ? '' : 'text-text-soft'}`}
         onClick={() => {
           if (disabled) return
           if (isOpen) onClose()
@@ -273,7 +282,8 @@ export function BulkListPicker({
         }}
         onKeyDown={onTriggerKeyDown}
       >
-        {shownOnTrigger}
+        {shownIcon ?? null}
+        <span className="min-w-0 truncate">{shownOnTrigger}</span>
       </button>
       {panel}
     </>

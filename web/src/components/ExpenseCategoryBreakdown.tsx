@@ -1,4 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
+import { CategoryLabel } from './CategoryLabel'
 import { EXPENSE_CATEGORIES } from '../constants/categories'
 import { cardBrandLabel } from '../constants/cardBrands'
 import type { Transaction } from '../types/transaction'
@@ -122,9 +123,11 @@ export function ExpenseCategoryBreakdown({
                   ].join(' ')}
                 >
                   <div className="flex items-baseline justify-between gap-2">
-                    <span className="min-w-0 shrink text-sm font-medium text-text-primary">
-                      {key}
-                    </span>
+                    <CategoryLabel
+                      name={key}
+                      className="min-w-0 shrink"
+                      textClassName="text-sm font-medium text-text-primary"
+                    />
                     <span className="shrink-0 text-sm font-semibold tabular-nums text-semantic-expense">
                       {fmtKrw.format(sum)}
                     </span>

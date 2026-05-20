@@ -21,9 +21,9 @@ export const BULK_CELL_TEXT =
 export const BULK_CELL_NUM =
   'mx-auto block max-w-full truncate text-center text-[0.8125rem] font-medium leading-9 tabular-nums text-text-primary'
 
-/** 금액 — 구분에 따라 색 */
+/** 금액 — 구분에 따라 색 (목록에서 강조) */
 export function bulkAmountClass(kind: 'income' | 'expense'): string {
-  return `${BULK_CELL_NUM} font-semibold ${
+  return `mx-auto block max-w-full truncate text-center text-sm font-bold leading-9 tabular-nums ${
     kind === 'income' ? 'text-semantic-income' : 'text-semantic-expense'
   }`
 }

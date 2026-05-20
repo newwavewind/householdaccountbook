@@ -1,5 +1,6 @@
 ﻿import { useMemo } from 'react'
 import type { KeyboardEvent } from 'react'
+import { CategoryIcon } from '../components/CategoryIcon'
 import { BulkListPicker, type BulkListPickerRow } from './BulkListPicker'
 
 /** '' = 미선택(선택 라벨) */
@@ -30,7 +31,14 @@ export function BulkCategoryPicker({
 }: Props) {
   const rows = useMemo((): BulkListPickerRow[] => {
     const head: BulkListPickerRow = { value: '', label: '선택' }
-    return [head, ...options.map((o) => ({ value: o, label: o }))]
+    return [
+      head,
+      ...options.map((o) => ({
+        value: o,
+        label: o,
+        icon: <CategoryIcon name={o} />,
+      })),
+    ]
   }, [options])
 
   return (

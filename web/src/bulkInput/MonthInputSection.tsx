@@ -4,6 +4,7 @@ import { Card } from '../components/ui/Card'
 import type { BulkDraftRow, BulkRowsUpdater } from './draftRow'
 import { BulkInputDraftRow } from './BulkInputDraftRow'
 import { BulkInputHistoryRow } from './BulkInputHistoryRow'
+import { BulkRowManageIcon } from './BulkRowManageIcon'
 import { BulkInputTableHead } from './BulkInputTableHead'
 import {
   BULK_TABLE_CLASS,
@@ -18,10 +19,7 @@ import {
   migrateLegacyMonthRowOrder,
   moveRowBelowTopAfterConfirm,
 } from './draftRowOrder'
-import { daysInMonth } from './monthUtils'
 import type { DraftLedgerComparison } from './compareMonthDraftLedger'
-import { draftMonthTotalsForDisplay } from './draftMonthTotals'
-
 type BulkListPageSize = 5 | 10 | 30 | 'all'
 
 const BULK_LIST_PAGE_SIZE_OPTIONS: { value: BulkListPageSize; label: string }[] = [
@@ -149,13 +147,6 @@ export function MonthInputSection({
   const [listPageSize, setListPageSize] = useState<BulkListPageSize>(10)
   const [listPage, setListPage] = useState(1)
   const confirmFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const maxDay = daysInMonth(year, monthIndex)
-
-  const draftMonthTotals = useMemo(
-    () => draftMonthTotalsForDisplay(year, monthIndex, rows),
-    [year, monthIndex, rows],
-  )
-
   const workingRow = rows[0] ?? emptyDraftRow()
   const historyRows = rows.length > 1 ? rows.slice(1) : []
 
@@ -374,7 +365,7 @@ export function MonthInputSection({
   }
 
   return (
-    <Card className="rounded-[var(--radius-card)] border border-border-subtle bg-surface-raised p-4 shadow-[var(--shadow-card)] md:p-6">
+    <Card className="rounded-[var(--radius-card)] border border-charcoal-border bg-surface-raised p-4 shadow-sm theme2:shadow-[var(--shadow-frap-base)] theme3:border-border-strong md:p-6">
       <div className={BULK_TABLE_SCROLL}>
         <div
           className={BULK_TABLE_INNER}
@@ -400,20 +391,8 @@ export function MonthInputSection({
           </section>
 
           <section aria-label="확인된 내역">
-            <div className="flex flex-col gap-2 border-b border-border-muted bg-neutral-cool/25 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-              <div className="flex min-w-0 flex-col gap-0.5 text-xs text-text-soft">
-                <p className="tabular-nums leading-relaxed">
-                  <span className="font-medium text-text-secondary">
-                    수입 {won(draftMonthTotals.income)}
-                  </span>
-                  <span className="mx-1.5 text-text-muted/60">·</span>
-                  <span className="font-medium text-text-secondary">
-                    지출 {won(draftMonthTotals.expense)}
-                  </span>
-                </p>
-              </div>
-              <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-                <label className="flex items-center gap-2 text-xs text-text-soft">
+            <div className="flex flex-col gap-1.5 border-b border-border-muted bg-neutral-cool/20 px-2.5 py-1.5 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
+                <label className="flex items-center gap-1.5 text-[0.6875rem] text-text-soft">
                   <span className="font-medium text-text-muted">목록 개수</span>
                   <select
                     aria-label="확인된 내역 목록 개수"
@@ -425,7 +404,7 @@ export function MonthInputSection({
                       setListPageSize(next)
                       setListPage(1)
                     }}
-                    className="h-8 rounded-lg border border-border-subtle bg-surface-raised px-2 text-xs font-semibold text-text-secondary outline-none focus:border-green-accent"
+                    className="h-7 rounded-md border border-border-subtle bg-surface-raised px-1.5 text-[0.6875rem] font-semibold text-text-secondary outline-none focus:border-green-accent"
                   >
                     {BULK_LIST_PAGE_SIZE_OPTIONS.map((opt) => (
                       <option key={String(opt.value)} value={opt.value}>
@@ -436,19 +415,19 @@ export function MonthInputSection({
                 </label>
                 {listPageSize !== 'all' && historyRows.length > 0 ? (
                   <nav
-                    className="flex items-center justify-center gap-2"
+                    className="flex items-center justify-center gap-1.5"
                     aria-label="확인된 내역 페이지"
                   >
                     <button
                       type="button"
                       disabled={listPage <= 1}
                       onClick={() => setListPage((p) => Math.max(1, p - 1))}
-                      className="flex h-8 min-w-8 items-center justify-center rounded-lg border border-border-subtle bg-surface-raised text-xs font-semibold text-text-secondary outline-none transition-colors hover:bg-green-light/30 disabled:opacity-40 focus:border-green-accent"
+                      className="flex h-7 min-w-7 items-center justify-center rounded-md border border-border-subtle bg-surface-raised text-[0.6875rem] font-semibold text-text-secondary outline-none transition-colors hover:bg-green-light/30 disabled:opacity-40 focus:border-green-accent"
                       aria-label="이전 페이지"
                     >
                       ◀
                     </button>
-                    <span className="min-w-[4.5rem] text-center text-xs font-semibold tabular-nums text-text-secondary">
+                    <span className="min-w-[3.25rem] text-center text-[0.6875rem] font-semibold tabular-nums text-text-secondary">
                       {listPage} / {listPageCount}
                     </span>
                     <button
@@ -457,14 +436,13 @@ export function MonthInputSection({
                       onClick={() =>
                         setListPage((p) => Math.min(listPageCount, p + 1))
                       }
-                      className="flex h-8 min-w-8 items-center justify-center rounded-lg border border-border-subtle bg-surface-raised text-xs font-semibold text-text-secondary outline-none transition-colors hover:bg-green-light/30 disabled:opacity-40 focus:border-green-accent"
+                      className="flex h-7 min-w-7 items-center justify-center rounded-md border border-border-subtle bg-surface-raised text-[0.6875rem] font-semibold text-text-secondary outline-none transition-colors hover:bg-green-light/30 disabled:opacity-40 focus:border-green-accent"
                       aria-label="다음 페이지"
                     >
                       ▶
                     </button>
                   </nav>
                 ) : null}
-              </div>
             </div>
             <table className={BULK_TABLE_CLASS}>
               <BulkInputTableHead
@@ -672,8 +650,6 @@ export function MonthInputSection({
           </div>
         ) : null}
         <p className="mt-3 text-xs text-text-soft">
-          일 칸에는 1부터 {maxDay}까지 숫자만 넣습니다. 금액은 숫자만 입력하면 되고, 다른 칸으로
-          넘어가면 천 단위 콤마로 보입니다.{' '}
           <kbd className="rounded border border-border-default bg-neutral-cool px-1 py-px text-[0.65rem]">
             Enter
           </kbd>
@@ -684,7 +660,15 @@ export function MonthInputSection({
           로 이전 칸으로 이동합니다.{' '}
           맨 위 <span className="font-medium text-starbucks-green">입력</span> 칸에서 새 내용을 넣고{' '}
           <span className="font-medium text-starbucks-green">확인</span>을 누르면 아래 목록으로 내려갑니다.
-          아래 목록의 <span className="font-medium">⋯</span>에서 수정·삭제할 수 있습니다. 해당 달 전체가 장부에 반영됩니다.
+          아래 목록의{' '}
+          <span
+            className="inline-flex align-middle text-text-muted"
+            aria-hidden
+          >
+            <BulkRowManageIcon className="size-3" />
+          </span>{' '}
+          <span className="font-medium text-text-secondary">관리</span>에서 수정·삭제할 수 있습니다. 해당 달
+          전체가 장부에 반영됩니다.
         </p>
       </Card>
   )

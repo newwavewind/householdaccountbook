@@ -8,6 +8,7 @@ import { LedgerCalendar } from './components/LedgerCalendar'
 import { NoSpendChallengeBanner } from './components/NoSpendChallengeBanner'
 import { CalendarHoverTooltip } from './components/CalendarHoverTooltip'
 import { TransactionFormModal } from './components/TransactionFormModal'
+import { CategoryLabel } from './components/CategoryLabel'
 import { DayDetailModal } from './components/DayDetailModal'
 import { ExpenseCategoryBreakdown } from './components/ExpenseCategoryBreakdown'
 import { useLedger } from './hooks/useLedger'
@@ -335,7 +336,10 @@ function TransactionLedgerRow({
         <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm text-text-soft">
           <span className="tabular-nums">{t.date}</span>
           {t.category ? (
-            <span className="text-text-primary/80">{t.category}</span>
+            <CategoryLabel
+              name={t.category}
+              textClassName="text-text-primary/80"
+            />
           ) : null}
         </span>
         {t.memo ? (

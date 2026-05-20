@@ -9,6 +9,7 @@ import {
   BULK_ACTION_BTN,
   BULK_ACTION_BTN_PRIMARY,
   BULK_INPUT_CONTROL_SM,
+  BULK_SELECT,
 } from './bulkInputControls'
 import { BulkCardPicker } from './BulkCardPicker'
 import { BulkCategoryPicker } from './BulkCategoryPicker'
@@ -108,7 +109,7 @@ export function BulkInputDraftRow({
       <td className={bulkTdClass()}>
         <select
           aria-label={`${monthIndex + 1}월 구분`}
-          className={BULK_INPUT_CONTROL_SM}
+          className={BULK_SELECT}
           value={r.kind}
           onChange={(e) => {
             const k = e.target.value === 'income' ? 'income' : 'expense'
@@ -123,8 +124,12 @@ export function BulkInputDraftRow({
           }}
           onKeyDown={onFieldKeyDown}
         >
-          <option value="expense">지출</option>
-          <option value="income">수입</option>
+          <option value="expense" className="text-center">
+            지출
+          </option>
+          <option value="income" className="text-center">
+            수입
+          </option>
         </select>
       </td>
       <td className={bulkTdClass()}>
@@ -177,7 +182,7 @@ export function BulkInputDraftRow({
         <select
           aria-label="결제 수단"
           disabled={r.kind !== 'expense'}
-          className={`${BULK_INPUT_CONTROL_SM} disabled:opacity-40`}
+          className={`${BULK_SELECT} disabled:opacity-40`}
           value={r.paymentMethod}
           onChange={(e) => {
             const v = e.target.value
@@ -191,9 +196,15 @@ export function BulkInputDraftRow({
           }}
           onKeyDown={onFieldKeyDown}
         >
-          <option value="card">카드</option>
-          <option value="ieum">이음카드</option>
-          <option value="cash">현금</option>
+          <option value="card" className="text-center">
+            카드
+          </option>
+          <option value="ieum" className="text-center">
+            이음카드
+          </option>
+          <option value="cash" className="text-center">
+            현금
+          </option>
         </select>
       </td>
       <td className={bulkTdClass()}>

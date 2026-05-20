@@ -1,5 +1,6 @@
 ﻿import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
+import { CategoryLabel } from './CategoryLabel'
 import { Button } from './ui/Button'
 import { cardBrandLabel } from '../constants/cardBrands'
 import type { Transaction } from '../types/transaction'
@@ -100,9 +101,10 @@ export function DayDetailModal({
                         {t.type === 'income' ? '수입' : '지출'}
                       </span>
                       {t.category ? (
-                        <span className="text-xs text-text-soft">
-                          {t.category}
-                        </span>
+                        <CategoryLabel
+                          name={t.category}
+                          textClassName="text-xs text-text-soft"
+                        />
                       ) : null}
                       {t.type === 'expense' ? (
                         <span className="rounded-full bg-neutral-cool px-2 py-0.5 text-xs font-medium text-text-primary">

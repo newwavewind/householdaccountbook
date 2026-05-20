@@ -9,6 +9,8 @@ import {
   saveBulkInputBundle,
 } from '../bulkInput/bulkInputStorage'
 import { compareDraftMultisetToLedgerMonth } from '../bulkInput/compareMonthDraftLedger'
+import { BulkMonthSummaryBadges } from '../bulkInput/BulkMonthSummaryBadges'
+import { BULK_PERIOD_SELECT } from '../bulkInput/bulkInputControls'
 import { draftMonthTotalsForDisplay } from '../bulkInput/draftMonthTotals'
 import { monthLabel } from '../bulkInput/monthUtils'
 import {
@@ -16,10 +18,6 @@ import {
   transactionToBulkDraftRow,
 } from '../bulkInput/ledgerToDraftProjection'
 import type { Transaction } from '../types/transaction'
-
-function won(n: number): string {
-  return `${Math.round(n).toLocaleString('ko-KR')}원`
-}
 
 function initialMonths(): BulkDraftRow[][] {
   return Array.from({ length: 12 }, () => [emptyDraftRow()])
@@ -116,6 +114,16 @@ export default function BulkInputPage() {
     [year, transactions, draftsMatrix],
   )
 
+  const activeMonthTotals = useMemo(
+    () =>
+      draftMonthTotalsForDisplay(
+        year,
+        activeMonthIndex,
+        draftsMatrix[activeMonthIndex] ?? [emptyDraftRow()],
+      ),
+    [year, activeMonthIndex, draftsMatrix],
+  )
+
   /** rows를 직접 받아 처리 — MonthInputSection이 rowsRef.current(최신)를 전달하므로 stale 없음 */
   const applyMonth = (latestRows: BulkDraftRow[], monthIndex: number, silent = false) => {
     const { ok, skippedCard, skippedDay } = draftsToTransactions(
@@ -167,91 +175,85 @@ export default function BulkInputPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-3 pb-20 pt-4 sm:px-4 md:px-6">
-      <div
-        className="mb-4 flex items-center gap-2 border-b border-border-muted pb-3"
-        role="group"
-        aria-label="연도 선택"
+      <section
+        aria-label="연·월 선택"
         id="bulk-year-control"
+        className="mb-4 w-fit max-w-full rounded-[var(--radius-card)] border border-charcoal-border bg-green-light/40 px-2.5 py-2 shadow-sm theme2:shadow-[var(--shadow-frap-base)] theme3:border-border-strong"
       >
-        <div className="flex min-w-0 items-center gap-2">
+        <div
+          className="flex flex-wrap items-center justify-start gap-2"
+          role="group"
+          aria-label={`${year}년 월별 입력`}
+        >
           <button
             type="button"
             disabled={!canGoOlder}
             aria-label={`한 해 이전(${year - 1}년)`}
             title="한 해 이전"
-            className="inline-flex h-10 w-9 shrink-0 items-center justify-center rounded-lg border border-input-border bg-surface-raised text-lg leading-none text-starbucks-green outline-none transition-colors hover:bg-neutral-cool/50 disabled:pointer-events-none disabled:opacity-35"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border-subtle bg-neutral-cool/35 text-lg leading-none text-starbucks-green outline-none transition-colors hover:bg-green-light/45 disabled:pointer-events-none disabled:opacity-35"
             onClick={() => applyYearChoice(year - 1)}
           >
             ‹
           </button>
-          <span className="min-w-[4.5rem] text-center text-lg font-semibold tabular-nums text-starbucks-green">
-            {year}년
-          </span>
+
+          <div className="inline-flex items-center gap-0 rounded-xl border border-border-subtle bg-neutral-cool/30 p-1 shadow-sm">
+            <span className="inline-flex h-9 items-center px-3 font-sans text-sm font-semibold tabular-nums text-starbucks-green">
+              {year}년
+            </span>
+            <span
+              className="mx-0.5 h-6 w-px shrink-0 bg-border-muted/80"
+              aria-hidden
+            />
+            <label htmlFor="bulk-month-select" className="sr-only">
+              월 선택
+            </label>
+            <select
+              id="bulk-month-select"
+              aria-label={`${year}년 월 선택`}
+              value={activeMonthIndex}
+              className={BULK_PERIOD_SELECT}
+              onChange={(e) => {
+                const next = Number(e.target.value)
+                setActiveMonthIndex(next)
+                requestAnimationFrame(() => {
+                  inputPanelRef.current?.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start',
+                  })
+                })
+              }}
+            >
+              {Array.from({ length: 12 }, (_, monthIndex) => {
+                const cmp = monthDraftLedgerCmp[monthIndex]
+                return (
+                  <option key={monthIndex} value={monthIndex}>
+                    {monthLabel(monthIndex)}
+                    {!cmp.multisetMatch ? ' · 차이' : ''}
+                  </option>
+                )
+              })}
+            </select>
+          </div>
+
+          <BulkMonthSummaryBadges
+            income={activeMonthTotals.income}
+            expense={activeMonthTotals.expense}
+          />
+
           <button
             type="button"
             disabled={!canGoNewer}
             aria-label={`한 해 다음(${year + 1}년)`}
             title="한 해 다음"
-            className="inline-flex h-10 w-9 shrink-0 items-center justify-center rounded-lg border border-input-border bg-surface-raised text-lg leading-none text-starbucks-green outline-none transition-colors hover:bg-neutral-cool/50 disabled:pointer-events-none disabled:opacity-35"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border-subtle bg-neutral-cool/35 text-lg leading-none text-starbucks-green outline-none transition-colors hover:bg-green-light/45 disabled:pointer-events-none disabled:opacity-35"
             onClick={() => applyYearChoice(year + 1)}
           >
             ›
           </button>
         </div>
-      </div>
+      </section>
 
       <section aria-label="월별 입력" className="flex flex-col gap-4">
-        <div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-            {Array.from({ length: 12 }, (_, monthIndex) => {
-              const rowsM = draftsMatrix[monthIndex] ?? [emptyDraftRow()]
-              const dTotals = draftMonthTotalsForDisplay(year, monthIndex, rowsM)
-              const cmp = monthDraftLedgerCmp[monthIndex]
-              const selected = activeMonthIndex === monthIndex
-              return (
-                <button
-                  key={monthIndex}
-                  type="button"
-                  aria-current={selected ? 'true' : undefined}
-                  aria-label={`${year}년 ${monthLabel(monthIndex)} 입력`}
-                  className={`rounded-[var(--radius-card)] border px-3 py-2.5 text-left transition-colors ${
-                    selected
-                      ? 'border-starbucks-green bg-green-light/50 ring-2 ring-starbucks-green/35'
-                      : 'border-border-subtle bg-surface-raised hover:border-border-strong hover:bg-neutral-cool/30'
-                  }`}
-                  onClick={() => {
-                    setActiveMonthIndex(monthIndex)
-                    requestAnimationFrame(() => {
-                      inputPanelRef.current?.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start',
-                      })
-                    })
-                  }}
-                >
-                  <div className="font-semibold tabular-nums text-starbucks-green">
-                    {monthLabel(monthIndex)}
-                  </div>
-                  <div className="mt-1 text-[0.65rem] leading-tight text-text-soft">
-                    <span className="tabular-nums text-text-secondary">
-                      {won(dTotals.income)}
-                    </span>
-                    <span className="mx-0.5 text-text-muted/80">/</span>
-                    <span className="tabular-nums text-text-secondary">
-                      {won(dTotals.expense)}
-                    </span>
-                  </div>
-                  {!cmp.multisetMatch ? (
-                    <div className="mt-1 text-[0.6rem] font-medium text-amber-800/90">
-                      장부와 차이
-                    </div>
-                  ) : null}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
         <div ref={inputPanelRef} id="bulk-input-active-month">
           <MonthInputSection
             year={year}

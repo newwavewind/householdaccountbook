@@ -1,3 +1,4 @@
+import { CategoryLabel } from '../components/CategoryLabel'
 import { cardBrandLabel } from '../constants/cardBrands'
 import type { BulkDraftRow } from './draftRow'
 import {
@@ -54,7 +55,15 @@ export function BulkInputHistoryRow({
         </span>
       </td>
       <td className={bulkTdClass()}>
-        <span className={BULK_CELL_TEXT}>{r.category.trim() || '—'}</span>
+        {r.category.trim() ? (
+          <CategoryLabel
+            name={r.category}
+            className={`${BULK_CELL_TEXT} max-w-full justify-center`}
+            textClassName="min-w-0 truncate"
+          />
+        ) : (
+          <span className={BULK_CELL_TEXT}>—</span>
+        )}
       </td>
       <td className={bulkTdClass()}>
         <span className={BULK_CELL_TEXT}>{r.memo.trim() || '—'}</span>
@@ -79,7 +88,7 @@ export function BulkInputHistoryRow({
           type="button"
           aria-label="항목 관리"
           title="수정·삭제"
-          className="mx-auto inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border-subtle bg-surface-raised text-text-muted shadow-sm transition-colors hover:border-green-accent/45 hover:bg-green-light/50 hover:text-green-accent"
+          className="mx-auto inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border-subtle bg-surface-raised text-text-muted/80 shadow-sm transition-colors hover:border-green-accent/45 hover:bg-green-light/50 hover:text-green-accent"
           onClick={() => onOpenMenu(r.localKey)}
         >
           <BulkRowManageIcon />
