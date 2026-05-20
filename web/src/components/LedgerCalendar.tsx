@@ -21,8 +21,76 @@ const LEDGER_DAY_CELL =
 
 const LEDGER_CELL_SURFACE = 'bg-surface-raised hover:bg-green-light/30'
 
+const LEDGER_CELL_BODY =
+  'relative z-[1] flex min-h-0 flex-1 flex-col gap-px pt-0.5'
+
+/** 수입·지출 한 줄 높이와 맞춘 하단 구분 영역 */
 const LEDGER_AMOUNT_FOOTER =
-  'mt-auto flex w-full min-w-0 shrink-0 flex-col gap-px border-t border-border-subtle pt-1'
+  'mt-auto flex w-full min-w-0 shrink-0 flex-col justify-center gap-px border-t border-border-subtle pt-1 min-h-[1.35rem] md:min-h-[1.4rem]'
+
+const LEDGER_AMOUNT_ROW_MIN = 'min-h-[1.05rem]'
+
+function LedgerAmountFooter({
+  iso,
+  amounts,
+  amountTextClass,
+}: {
+  iso: string
+  amounts: ReturnType<typeof ledgerAmountSummary>
+  amountTextClass: string
+}) {
+  const hasIncome = amounts != null && amounts.income > 0
+  const hasExpense = amounts != null && amounts.expense > 0
+  if (!hasIncome && !hasExpense) {
+    return (
+      <div className={LEDGER_AMOUNT_FOOTER} aria-hidden>
+        <span className={`block ${LEDGER_AMOUNT_ROW_MIN}`} />
+      </div>
+    )
+  }
+  return (
+    <div className={LEDGER_AMOUNT_FOOTER}>
+      {hasIncome ? (
+        <LedgerAmountLine
+          iso={iso}
+          kind="income"
+          text={formatLedgerIncome(amounts.income)}
+          colorClass="text-semantic-income"
+          amountTextClass={amountTextClass}
+        />
+      ) : null}
+      {hasExpense ? (
+        <LedgerAmountLine
+          iso={iso}
+          kind="expense"
+          text={formatLedgerExpense(amounts.expense)}
+          colorClass="text-semantic-expense"
+          amountTextClass={amountTextClass}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+function LedgerDayWatermark({
+  day,
+  watermarkClass,
+}: {
+  day: number
+  watermarkClass: string
+}) {
+  return (
+    <span
+      aria-hidden
+      className={[
+        'pointer-events-none absolute left-1/2 top-[42%] z-0 -translate-x-1/2 -translate-y-1/2 select-none text-[2.4rem] font-semibold leading-none tabular-nums md:top-[44%] md:text-[3rem]',
+        watermarkClass,
+      ].join(' ')}
+    >
+      {day}
+    </span>
+  )
+}
 
 function pad2(n: number) {
   return String(n).padStart(2, '0')
@@ -157,7 +225,16 @@ export const LedgerCalendar = memo(function LedgerCalendar({
                 className={[LEDGER_DAY_CELL, CELL_MIN_H, LEDGER_CELL_SURFACE].join(
                   ' ',
                 )}
-              />
+              >
+                <div className={LEDGER_CELL_BODY}>
+                  <div className="min-h-0 flex-1" aria-hidden />
+                  <LedgerAmountFooter
+                    iso={iso}
+                    amounts={null}
+                    amountTextClass={amountTextClass}
+                  />
+                </div>
+              </button>
             )
           }
 
@@ -168,7 +245,6 @@ export const LedgerCalendar = memo(function LedgerCalendar({
           const contentRows = ledgerContentRows(r)
           const amounts = ledgerAmountSummary(r)
           const hasContent = contentRows.length > 0
-          const hasFooter = amounts !== null
           const isToday = iso === todayIso
           const isSel = iso === selectedIso
           const isSunday = cellIdx % 7 === 0
@@ -207,44 +283,23 @@ export const LedgerCalendar = memo(function LedgerCalendar({
                   : undefined
               }
             >
-              <span
-                aria-hidden
-                className={[
-                  'pointer-events-none absolute left-1/2 top-[42%] z-0 -translate-x-1/2 -translate-y-1/2 select-none text-[2.4rem] font-semibold leading-none tabular-nums md:top-[44%] md:text-[3rem]',
-                  watermarkClass,
-                ].join(' ')}
-              >
-                {day}
-              </span>
+              <LedgerDayWatermark day={day} watermarkClass={watermarkClass} />
 
-              <div className="relative z-[1] flex min-h-0 flex-1 flex-col gap-px pt-0.5">
+              <div className={LEDGER_CELL_BODY}>
                 {hasContent ? (
                   <MarqueeTickerRows
                     rows={contentRows}
                     staggerKeyPrefix={iso}
                   />
-                ) : null}
+                ) : (
+                  <div className="min-h-0 flex-1" aria-hidden />
+                )}
 
-                <div className={LEDGER_AMOUNT_FOOTER}>
-                  {hasFooter && amounts && amounts.income > 0 ? (
-                    <LedgerAmountLine
-                      iso={iso}
-                      kind="income"
-                      text={formatLedgerIncome(amounts.income)}
-                      colorClass="text-semantic-income"
-                      amountTextClass={amountTextClass}
-                    />
-                  ) : null}
-                  {hasFooter && amounts && amounts.expense > 0 ? (
-                    <LedgerAmountLine
-                      iso={iso}
-                      kind="expense"
-                      text={formatLedgerExpense(amounts.expense)}
-                      colorClass="text-semantic-expense"
-                      amountTextClass={amountTextClass}
-                    />
-                  ) : null}
-                </div>
+                <LedgerAmountFooter
+                  iso={iso}
+                  amounts={amounts}
+                  amountTextClass={amountTextClass}
+                />
               </div>
               {isNoSpendCelebrate ? (
                 <>
