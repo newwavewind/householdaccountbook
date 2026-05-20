@@ -11,6 +11,7 @@ import type { CSSProperties } from 'react'
 import { useLedger } from '../hooks/useLedger'
 import {
   CALENDAR_DECO_CHANGED_EVENT,
+  hasCalendarPhoto,
   loadCalendarDecoration,
   saveCalendarDecoration,
   type CalendarDecoration,
@@ -19,8 +20,6 @@ import {
   CALENDAR_DECO_STRENGTH,
   calendarDecorationHostStyle,
   calendarDecorationLayerStyle,
-  hasCalendarBackground,
-  hasCalendarPattern,
   isCalendarDecorated,
   usePageLevelPhotoOverlay,
   type CalendarDecoStrength,
@@ -29,13 +28,9 @@ import {
 type CalendarDecorationContextValue = {
   decoration: CalendarDecoration
   setDecoration: (next: CalendarDecoration) => void
-  /** 패턴 또는 배경 적용 중 */
+  /** 배경 사진 적용 중 */
   decorated: boolean
-  /** 패턴 레이어만 */
-  patternActive: boolean
-  /** 배경색·칸 색만 */
-  backgroundActive: boolean
-  /** 사진 배경 — 페이지 main 단일 오버레이 */
+  /** @deprecated decorated 와 동일 — 하위 호환 */
   photoPageOverlay: boolean
   layerStyle: (strength: CalendarDecoStrength) => CSSProperties | undefined
   hostStyle: CSSProperties | undefined
@@ -72,20 +67,19 @@ export function CalendarDecorationProvider({ children }: { children: ReactNode }
     [householdId],
   )
 
-  const patternActive = hasCalendarPattern(decoration)
-  const backgroundActive = hasCalendarBackground(decoration)
+  const photoActive = hasCalendarPhoto(decoration)
   const decorated = isCalendarDecorated(decoration)
   const photoPageOverlay = usePageLevelPhotoOverlay(decoration)
 
   const layerStyle = useCallback(
     (strength: CalendarDecoStrength) => {
-      if (!patternActive) return undefined
+      if (!photoActive) return undefined
       return calendarDecorationLayerStyle(
         decoration,
         CALENDAR_DECO_STRENGTH[strength],
       )
     },
-    [decoration, patternActive],
+    [decoration, photoActive],
   )
 
   const hostStyle = useMemo(
@@ -98,22 +92,11 @@ export function CalendarDecorationProvider({ children }: { children: ReactNode }
       decoration,
       setDecoration,
       decorated,
-      patternActive,
-      backgroundActive,
       photoPageOverlay,
       layerStyle,
       hostStyle,
     }),
-    [
-      decoration,
-      setDecoration,
-      decorated,
-      patternActive,
-      backgroundActive,
-      photoPageOverlay,
-      layerStyle,
-      hostStyle,
-    ],
+    [decoration, setDecoration, decorated, photoPageOverlay, layerStyle, hostStyle],
   )
 
   return (

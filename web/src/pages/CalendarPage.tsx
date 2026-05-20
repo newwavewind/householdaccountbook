@@ -777,9 +777,7 @@ export default function CalendarPage() {
 
   const { transactions, userId, householdId } = useLedger()
   const {
-    decoration: calendarDecoration,
     decorated: calendarDecorated,
-    backgroundActive: calendarBackgroundActive,
     photoPageOverlay,
     layerStyle,
     hostStyle,
@@ -836,8 +834,7 @@ export default function CalendarPage() {
     })
   }, [])
 
-  const decorationLayerStyle = layerStyle('card')
-  const cellZoneDecoStyle = layerStyle('cells')
+  const photoLayerStyle = layerStyle('card')
 
   useEffect(() => {
     if (!peekIso) return
@@ -953,24 +950,17 @@ export default function CalendarPage() {
 
   const selectedMemo = memos[selectedIso]
 
-  const photoLayerStyle = photoPageOverlay ? decorationLayerStyle : undefined
-
   return (
     <main
       className={[
         'mx-auto w-full max-w-5xl px-4 py-6 md:px-6',
-        calendarBackgroundActive ? 'calendar-page-deco' : '',
-        calendarBackgroundActive &&
-        calendarDecoration.backgroundMode === 'gradient'
-          ? 'calendar-page-deco--gradient'
-          : '',
         photoPageOverlay ? 'calendar-page-photo-host relative' : '',
       ]
         .filter(Boolean)
         .join(' ')}
       style={hostStyle}
     >
-      {photoLayerStyle ? (
+      {photoPageOverlay && photoLayerStyle ? (
         <div
           className="pointer-events-none absolute inset-0 z-0"
           style={photoLayerStyle}
@@ -1029,13 +1019,6 @@ export default function CalendarPage() {
             .filter(Boolean)
             .join(' ')}
         >
-          {decorationLayerStyle && !photoPageOverlay ? (
-            <div
-              className="pointer-events-none absolute inset-0 z-0 rounded-[calc(var(--radius-card)-1px)]"
-              style={decorationLayerStyle}
-              aria-hidden
-            />
-          ) : null}
           <div className="relative z-[1] min-w-0">
           <div
             className={[
@@ -1145,13 +1128,6 @@ export default function CalendarPage() {
           </div>
 
           <div className="calendar-days-frame relative">
-            {cellZoneDecoStyle ? (
-              <div
-                className="pointer-events-none absolute inset-0 z-0 rounded-[calc(var(--radius-card)-2px)]"
-                style={cellZoneDecoStyle}
-                aria-hidden
-              />
-            ) : null}
             <div className="calendar-days-grid relative z-[1]">
             {cells.map(({ iso, day, inMonth }, cellIdx) => {
               const isSel = iso === selectedIso

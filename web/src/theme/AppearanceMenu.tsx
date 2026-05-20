@@ -122,7 +122,7 @@ export function AppearanceMenu() {
 
   const summaryParts = [
     themeLabels[preference],
-    showDiaryDecorate && decoActive ? '꾸미기' : null,
+    showDiaryDecorate && decoActive ? '사진' : null,
     liquidGlass === 'clear' ? 'Glass' : null,
     colorScheme === 'dark' ? 'Dark' : null,
   ].filter(Boolean)
@@ -178,7 +178,7 @@ export function AppearanceMenu() {
       window.removeEventListener('resize', reposition)
       window.removeEventListener('scroll', reposition, true)
     }
-  }, [open, showDiaryDecorate, decoration.kind, decoration.backgroundRgb])
+  }, [open, showDiaryDecorate, decoration.imageUrl])
 
   useEffect(() => {
     if (!open) return
@@ -249,7 +249,7 @@ export function AppearanceMenu() {
       {showDiaryDecorate ? (
         <div className="mt-3 border-t border-border-muted pt-3">
           <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wide text-text-soft">
-            다이어리 꾸미기
+            배경 사진
           </p>
           <CalendarDecoratePanel
             decoration={decoration}
