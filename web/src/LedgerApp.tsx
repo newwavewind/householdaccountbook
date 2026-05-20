@@ -6,6 +6,7 @@ import { Card } from './components/ui/Card'
 import { Fab } from './components/ui/Fab'
 import { LedgerCalendar } from './components/LedgerCalendar'
 import { NoSpendChallengeBanner } from './components/NoSpendChallengeBanner'
+import { burstNoSpendConfetti } from './lib/noSpendConfetti'
 import { CalendarHoverTooltip } from './components/CalendarHoverTooltip'
 import { TransactionFormModal } from './components/TransactionFormModal'
 import { BulkRowManageIcon } from './bulkInput/BulkRowManageIcon'
@@ -492,6 +493,18 @@ export default function LedgerApp() {
   const [newMemberName, setNewMemberName] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState<{ member: string; step: 1 | 2 } | null>(null)
   const [memberManageOpen, setMemberManageOpen] = useState(false)
+  const [noSpendCelebrate, setNoSpendCelebrate] = useState(false)
+
+  const toggleNoSpendCelebrate = useCallback(() => {
+    setNoSpendCelebrate((on) => {
+      if (!on) burstNoSpendConfetti()
+      return !on
+    })
+  }, [])
+
+  useEffect(() => {
+    setNoSpendCelebrate(false)
+  }, [cursor.y, cursor.m])
 
   const moveMember = useCallback(
     (index: number, dir: -1 | 1) => {
@@ -1324,6 +1337,8 @@ export default function LedgerApp() {
               count={noSpendStats.count}
               eligibleDayCount={noSpendStats.eligibleDayCount}
               monthLabel={formatMonthLabel(cursor.y, cursor.m)}
+              active={noSpendCelebrate}
+              onToggleCelebrate={toggleNoSpendCelebrate}
             />
 
             <LedgerCalendar
@@ -1333,6 +1348,7 @@ export default function LedgerApp() {
               selectedIso={selectedIso}
               rollups={rollups}
               noSpendDays={noSpendStats.noSpendDays}
+              celebrateNoSpend={noSpendCelebrate}
               onSelectDay={onSelectDay}
               onHover={onCalendarHover}
             />

@@ -521,6 +521,132 @@
   }
 }
 
+/* 무지출 축하 — 달력 칸 강조 */
+@keyframes ledger-no-spend-celebrate-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 10px rgba(255, 215, 0, 0.7),
+      0 0 22px rgba(0, 220, 150, 0.55),
+      0 0 8px rgba(255, 105, 180, 0.5),
+      0 0 4px rgba(123, 104, 238, 0.35),
+      inset 0 0 20px rgba(255, 235, 130, 0.35);
+    border-color: rgba(255, 200, 0, 0.9);
+    background-color: rgba(255, 252, 238, 0.94);
+  }
+  33% {
+    box-shadow:
+      0 0 14px rgba(255, 100, 150, 0.65),
+      0 0 28px rgba(0, 200, 255, 0.5),
+      0 0 12px rgba(255, 235, 59, 0.6),
+      inset 0 0 26px rgba(200, 255, 230, 0.4);
+    border-color: rgba(0, 200, 160, 0.95);
+  }
+  66% {
+    box-shadow:
+      0 0 20px rgba(255, 230, 80, 0.95),
+      0 0 40px rgba(0, 230, 160, 0.75),
+      0 0 16px rgba(255, 80, 120, 0.65),
+      0 0 6px rgba(255, 165, 0, 0.5),
+      inset 0 0 30px rgba(255, 248, 180, 0.45);
+    border-color: rgba(255, 180, 0, 1);
+    background-color: rgba(240, 255, 250, 0.96);
+  }
+}
+
+@keyframes ledger-no-spend-ring-burst {
+  0% {
+    opacity: 0.85;
+    transform: translate(-50%, -50%) scale(0.35);
+    box-shadow:
+      0 0 0 0 rgba(255, 215, 0, 0.8),
+      0 0 0 0 rgba(0, 200, 130, 0.5);
+  }
+  70% {
+    opacity: 0.4;
+    transform: translate(-50%, -50%) scale(1);
+    box-shadow:
+      0 0 12px 4px rgba(255, 215, 0, 0.35),
+      0 0 20px 8px rgba(0, 200, 130, 0.2);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.15);
+    box-shadow:
+      0 0 0 0 rgba(255, 215, 0, 0),
+      0 0 0 0 rgba(0, 200, 130, 0);
+  }
+}
+
+@keyframes ledger-no-spend-celebrate-badge {
+  0%,
+  100% {
+    transform: scale(1) rotate(-1deg);
+  }
+  50% {
+    transform: scale(1.08) rotate(1deg);
+  }
+}
+
+@keyframes ledger-no-spend-firework-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.1) translateY(10px) rotate(0deg);
+    filter: brightness(1.5);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1.35) translateY(-6px) rotate(15deg);
+    filter: brightness(1.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1) translateY(-10px) rotate(-8deg);
+  }
+  100% {
+    opacity: 0.5;
+    transform: scale(0.85) translateY(-18px) rotate(12deg);
+    filter: brightness(1.2);
+  }
+}
+
+.ledger-no-spend-celebrate {
+  animation: ledger-no-spend-celebrate-glow 1.6s ease-in-out infinite;
+  border-width: 2px;
+  border-style: solid;
+}
+
+.ledger-no-spend-celebrate-badge {
+  animation: ledger-no-spend-celebrate-badge 1.4s ease-in-out infinite;
+  text-shadow: 0 1px 2px rgba(0, 80, 50, 0.35);
+}
+
+.ledger-no-spend-ring-burst {
+  animation: ledger-no-spend-ring-burst 2s ease-out infinite;
+  border: 2px solid rgba(255, 215, 0, 0.55);
+  background: radial-gradient(
+    circle,
+    rgba(255, 240, 150, 0.25) 0%,
+    transparent 65%
+  );
+}
+
+.ledger-no-spend-firework-particle {
+  animation: ledger-no-spend-firework-pop 1.8s ease-out infinite;
+  text-shadow: 0 0 6px rgba(255, 215, 0, 0.8);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ledger-no-spend-celebrate {
+    animation: none;
+    box-shadow: 0 0 12px rgba(0, 180, 120, 0.45);
+  }
+  .ledger-no-spend-celebrate-badge,
+  .ledger-no-spend-firework-particle {
+    animation: none;
+  }
+}
+
 /* 스티커 메모 — 위로 펼쳐지는 팝오버 */
 @keyframes sticky-memo-popout-in {
   from {

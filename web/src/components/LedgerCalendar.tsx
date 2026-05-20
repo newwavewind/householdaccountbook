@@ -7,6 +7,7 @@ import {
 } from '../lib/calendarDayTicker'
 import type { DayRollup } from '../lib/dayTotals'
 import { noSpendAnimationDelaySec } from '../lib/noSpendChallenge'
+import { NoSpendCelebrateBurst } from './NoSpendCelebrateBurst'
 import { MarqueeTicker } from './MarqueeTicker'
 import { MarqueeTickerRows, type MarqueeTickerRow } from './MarqueeTickerRows'
 
@@ -87,7 +88,9 @@ export interface LedgerCalendarProps {
   todayIso: string
   selectedIso: string | null
   rollups: Map<string, DayRollup>
-  noSpendDays: Set<string>
+  noSpendDays?: Set<string>
+  /** true면 무지출 날만 달력 위에서 축하 강조 */
+  celebrateNoSpend?: boolean
   onSelectDay: (iso: string) => void
   onHover: (
     detail: null | { iso: string; clientX: number; clientY: number },
@@ -100,7 +103,8 @@ export const LedgerCalendar = memo(function LedgerCalendar({
   todayIso,
   selectedIso,
   rollups,
-  noSpendDays,
+  noSpendDays = new Set(),
+  celebrateNoSpend = false,
   onSelectDay,
   onHover,
 }: LedgerCalendarProps) {
@@ -148,13 +152,15 @@ export const LedgerCalendar = memo(function LedgerCalendar({
             )
           }
 
+          const isNoSpendCelebrate =
+            celebrateNoSpend && noSpendDays.has(iso)
+
           const r = rollups.get(iso)
           const hasTx = r && r.count > 0
           const contentRows = ledgerContentRows(r)
           const amounts = ledgerAmountSummary(r)
           const hasContent = contentRows.length > 0
           const hasFooter = amounts !== null
-          const isNoSpend = noSpendDays.has(iso)
           const isToday = iso === todayIso
           const isSel = iso === selectedIso
           const isSunday = cellIdx % 7 === 0
@@ -168,14 +174,16 @@ export const LedgerCalendar = memo(function LedgerCalendar({
               key={iso}
               type="button"
               aria-label={
-                isNoSpend ? `${iso} 가계부, 무지출 성공` : `${iso} 가계부`
+                isNoSpendCelebrate
+                  ? `${iso} 가계부, 무지출 축하`
+                  : `${iso} 가계부`
               }
               onClick={() => onSelectDay(iso)}
               {...hoverHandlers}
               className={[
                 'relative flex w-full flex-col overflow-hidden rounded-lg border border-border-subtle bg-surface-raised px-0.5 py-1.5 text-left md:py-2',
                 CELL_MIN_H,
-                isNoSpend ? 'ledger-no-spend-neon' : '',
+                isNoSpendCelebrate ? 'ledger-no-spend-celebrate z-[2]' : '',
                 hasTx ? 'shadow-[0_0_0_1px_rgba(0,117,74,0.25)]' : '',
                 isToday
                   ? 'outline outline-2 outline-offset-[-2px] outline-green-accent/70'
@@ -185,8 +193,10 @@ export const LedgerCalendar = memo(function LedgerCalendar({
                 .filter(Boolean)
                 .join(' ')}
               style={
-                isNoSpend
-                  ? { animationDelay: `${noSpendAnimationDelaySec(iso)}s` }
+                isNoSpendCelebrate
+                  ? {
+                      animationDelay: `${noSpendAnimationDelaySec(iso)}s`,
+                    }
                   : undefined
               }
             >
@@ -231,6 +241,19 @@ export const LedgerCalendar = memo(function LedgerCalendar({
                   </div>
                 ) : null}
               </div>
+              {isNoSpendCelebrate ? (
+                <>
+                  <NoSpendCelebrateBurst />
+                  <div
+                    className="pointer-events-none absolute inset-x-0 bottom-1 z-[4] flex justify-center px-0.5"
+                    aria-hidden
+                  >
+                    <span className="ledger-no-spend-celebrate-badge rounded-md bg-gradient-to-r from-amber-400 via-yellow-200 via-30% to-green-400 px-2 py-0.5 text-[0.7rem] font-extrabold leading-none tracking-tight text-white shadow-[0_0_12px_rgba(255,200,0,0.7)] ring-2 ring-white/90 md:text-xs">
+                      🎉 무지출 🎊
+                    </span>
+                  </div>
+                </>
+              ) : null}
             </button>
           )
         })}

@@ -4,44 +4,59 @@ type Props = {
   count: number
   eligibleDayCount: number
   monthLabel: string
+  active: boolean
+  onToggleCelebrate: () => void
 }
 
 export function NoSpendChallengeBanner({
   count,
   eligibleDayCount,
   monthLabel,
+  active,
+  onToggleCelebrate,
 }: Props) {
   const message = noSpendBannerMessage(count, eligibleDayCount)
 
   return (
-    <div
-      className="mb-3 flex min-w-0 items-center gap-3 rounded-xl border border-amber-200/80 bg-gradient-to-r from-amber-50/95 via-green-light/35 to-amber-50/90 px-3 py-2.5 shadow-[0_1px_0_rgba(0,117,74,0.08)] md:px-4"
-      role="status"
-      aria-live="polite"
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onToggleCelebrate}
+      className={[
+        'mb-2 inline-flex w-fit max-w-full cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left outline-none transition-all',
+        active
+          ? 'border-green-accent/60 bg-gradient-to-r from-amber-50/95 via-green-light/55 to-amber-50/95 shadow-md ring-2 ring-green-accent/30'
+          : 'border-amber-200/80 bg-gradient-to-r from-amber-50/95 via-green-light/35 to-amber-50/90 shadow-sm hover:border-amber-300/90 hover:shadow-md',
+        'focus-visible:ring-2 focus-visible:ring-green-accent/40',
+      ].join(' ')}
+      aria-label={
+        active
+          ? `${monthLabel} 무지출 축하 표시 끄기`
+          : `${monthLabel} 무지출 축하 표시 켜기`
+      }
     >
       <span
-        className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/80 text-xl shadow-sm ring-1 ring-amber-200/60"
+        className="flex size-7 shrink-0 items-center justify-center rounded-full bg-white/85 text-sm shadow-sm ring-1 ring-amber-200/60"
         aria-hidden
       >
         {count > 0 ? '🏆' : '🎯'}
       </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-amber-800/80 md:text-xs">
-          {monthLabel} 무지출 챌린지
+      <div className="min-w-0">
+        <p className="text-[0.6rem] font-semibold uppercase tracking-wide text-amber-800/80">
+          {monthLabel} 무지출
         </p>
-        <p className="text-sm font-bold leading-snug text-starbucks-green md:text-base">
+        <p className="text-xs font-bold leading-snug text-starbucks-green">
           {message}
         </p>
         {eligibleDayCount > 0 ? (
-          <p className="mt-0.5 text-[0.65rem] text-text-soft md:text-xs">
-            지출 없는 날{' '}
+          <p className="text-[0.6rem] text-text-soft">
             <span className="font-semibold tabular-nums text-amber-800">
               {count}
             </span>
-            일 / 오늘까지 {eligibleDayCount}일 중
+            일 / {eligibleDayCount}일
           </p>
         ) : null}
       </div>
-    </div>
+    </button>
   )
 }
