@@ -8,7 +8,7 @@ import {
 import type { DayRollup } from '../lib/dayTotals'
 import { noSpendAnimationDelaySec } from '../lib/noSpendChallenge'
 import { NoSpendCelebrateBurst } from './NoSpendCelebrateBurst'
-import { MarqueeTicker } from './MarqueeTicker'
+import { MarqueeTicker, type MarqueeSegment } from './MarqueeTicker'
 import { MarqueeTickerRows, type MarqueeTickerRow } from './MarqueeTickerRows'
 
 const WEEK = ['일', '월', '화', '수', '목', '금', '토'] as const
@@ -24,11 +24,12 @@ const LEDGER_CELL_SURFACE = 'bg-surface-raised hover:bg-green-light/30'
 const LEDGER_CELL_BODY =
   'relative z-[1] flex min-h-0 flex-1 flex-col gap-px pt-0.5'
 
-/** 수입·지출 한 줄 높이와 맞춘 하단 구분 영역 */
+/** 수입·지출 한 줄 — 모든 칸 동일 높이 (pt-1 + 1.05rem 본문) */
 const LEDGER_AMOUNT_FOOTER =
-  'mt-auto flex w-full min-w-0 shrink-0 flex-col justify-center gap-px border-t border-border-subtle pt-1 min-h-[1.35rem] md:min-h-[1.4rem]'
+  'mt-auto box-border flex h-[calc(0.25rem+1.05rem)] w-full min-w-0 shrink-0 items-center overflow-hidden border-t border-border-subtle pt-1 md:h-[calc(0.25rem+1.125rem)]'
 
-const LEDGER_AMOUNT_ROW_MIN = 'min-h-[1.05rem]'
+const LEDGER_AMOUNT_TICKER =
+  '!flex !h-[1.05rem] !min-h-0 !max-h-[1.05rem] !flex-none !items-center w-full overflow-hidden md:!h-[1.125rem] md:!max-h-[1.125rem]'
 
 function LedgerAmountFooter({
   iso,
@@ -39,35 +40,45 @@ function LedgerAmountFooter({
   amounts: ReturnType<typeof ledgerAmountSummary>
   amountTextClass: string
 }) {
-  const hasIncome = amounts != null && amounts.income > 0
-  const hasExpense = amounts != null && amounts.expense > 0
-  if (!hasIncome && !hasExpense) {
-    return (
-      <div className={LEDGER_AMOUNT_FOOTER} aria-hidden>
-        <span className={`block ${LEDGER_AMOUNT_ROW_MIN}`} />
-      </div>
-    )
+  const segments: MarqueeSegment[] = []
+  const ariaParts: string[] = []
+
+  if (amounts != null && amounts.income > 0) {
+    const text = formatLedgerIncome(amounts.income)
+    segments.push({
+      id: 'income',
+      node: (
+        <span className={`${amountTextClass} text-semantic-income`}>{text}</span>
+      ),
+    })
+    ariaParts.push(`수입 ${text}`)
   }
+  if (amounts != null && amounts.expense > 0) {
+    const text = formatLedgerExpense(amounts.expense)
+    segments.push({
+      id: 'expense',
+      node: (
+        <span className={`${amountTextClass} text-semantic-expense`}>{text}</span>
+      ),
+    })
+    ariaParts.push(`지출 ${text}`)
+  }
+
+  if (segments.length === 0) {
+    return <div className={LEDGER_AMOUNT_FOOTER} aria-hidden />
+  }
+
   return (
     <div className={LEDGER_AMOUNT_FOOTER}>
-      {hasIncome ? (
-        <LedgerAmountLine
-          iso={iso}
-          kind="income"
-          text={formatLedgerIncome(amounts.income)}
-          colorClass="text-semantic-income"
-          amountTextClass={amountTextClass}
-        />
-      ) : null}
-      {hasExpense ? (
-        <LedgerAmountLine
-          iso={iso}
-          kind="expense"
-          text={formatLedgerExpense(amounts.expense)}
-          colorClass="text-semantic-expense"
-          amountTextClass={amountTextClass}
-        />
-      ) : null}
+      <MarqueeTicker
+        variant="cell"
+        segments={segments}
+        ariaLabel={ariaParts.join(' ')}
+        staggerKey={`${iso}-amounts`}
+        pauseOnHover={false}
+        forceMarquee={segments.length > 1}
+        className={LEDGER_AMOUNT_TICKER}
+      />
     </div>
   )
 }
@@ -115,38 +126,6 @@ function buildGrid(year: number, monthIndex: number) {
     })
   }
   return cells
-}
-
-function LedgerAmountLine({
-  iso,
-  kind,
-  text,
-  colorClass,
-  amountTextClass,
-}: {
-  iso: string
-  kind: 'income' | 'expense'
-  text: string
-  colorClass: string
-  amountTextClass: string
-}) {
-  return (
-    <MarqueeTicker
-      variant="cell"
-      segments={[
-        {
-          id: kind,
-          node: (
-            <span className={`${amountTextClass} ${colorClass}`}>{text}</span>
-          ),
-        },
-      ]}
-      ariaLabel={kind === 'income' ? `수입 ${text}` : `지출 ${text}`}
-      staggerKey={`${iso}-${kind}`}
-      pauseOnHover={false}
-      className="!min-h-[1.05rem] !flex-none w-full"
-    />
-  )
 }
 
 function ledgerContentRows(rollup: DayRollup | undefined): MarqueeTickerRow[] {
