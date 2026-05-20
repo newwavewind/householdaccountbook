@@ -6,6 +6,7 @@ type Props = {
   monthLabel: string
   active: boolean
   onToggleCelebrate: () => void
+  className?: string
 }
 
 export function NoSpendChallengeBanner({
@@ -14,6 +15,7 @@ export function NoSpendChallengeBanner({
   monthLabel,
   active,
   onToggleCelebrate,
+  className = '',
 }: Props) {
   const message = noSpendBannerMessage(count, eligibleDayCount)
 
@@ -23,12 +25,15 @@ export function NoSpendChallengeBanner({
       aria-pressed={active}
       onClick={onToggleCelebrate}
       className={[
-        'mb-2 inline-flex w-fit max-w-full cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left outline-none transition-all',
+        'inline-flex w-fit max-w-full cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left outline-none transition-all',
         active
           ? 'border-green-accent/60 bg-gradient-to-r from-amber-50/95 via-green-light/55 to-amber-50/95 shadow-md ring-2 ring-green-accent/30'
           : 'border-amber-200/80 bg-gradient-to-r from-amber-50/95 via-green-light/35 to-amber-50/90 shadow-sm hover:border-amber-300/90 hover:shadow-md',
         'focus-visible:ring-2 focus-visible:ring-green-accent/40',
-      ].join(' ')}
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
       aria-label={
         active
           ? `${monthLabel} 무지출 축하 표시 끄기`

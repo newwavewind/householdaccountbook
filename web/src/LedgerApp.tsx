@@ -4,6 +4,7 @@ import { NavLink, useSearchParams } from 'react-router-dom'
 import { Button } from './components/ui/Button'
 import { Card } from './components/ui/Card'
 import { Fab } from './components/ui/Fab'
+import { CalendarMonthHeading } from './calendar/CalendarMonthHeading'
 import { LedgerCalendar } from './components/LedgerCalendar'
 import { NoSpendChallengeBanner } from './components/NoSpendChallengeBanner'
 import { burstNoSpendConfetti } from './lib/noSpendConfetti'
@@ -564,26 +565,40 @@ export default function LedgerApp() {
     [rollups, cursor.y, cursor.m, filteredTransactions],
   )
 
+  const yearFiltered = useMemo(
+    () => filteredTransactions.filter((t) => isInYear(t.date, cursor.y)),
+    [filteredTransactions, cursor.y],
+  )
+
   const yearIncomeTotal = useMemo(
     () =>
-      transactions
-        .filter((t) => isInYear(t.date, cursor.y) && t.type === 'income')
+      yearFiltered
+        .filter((t) => t.type === 'income')
         .reduce((s, t) => s + t.amount, 0),
-    [transactions, cursor.y],
+    [yearFiltered],
   )
 
   const yearExpenseTotal = useMemo(
     () =>
-      transactions
-        .filter((t) => isInYear(t.date, cursor.y) && t.type === 'expense')
+      yearFiltered
+        .filter((t) => t.type === 'expense')
         .reduce((s, t) => s + t.amount, 0),
-    [transactions, cursor.y],
+    [yearFiltered],
   )
 
-  const yearTxCount = useMemo(
-    () => transactions.filter((t) => isInYear(t.date, cursor.y)).length,
-    [transactions, cursor.y],
+  const yearTxCount = yearFiltered.length
+
+  const yearIncomeCount = useMemo(
+    () => yearFiltered.filter((t) => t.type === 'income').length,
+    [yearFiltered],
   )
+
+  const yearExpenseCount = useMemo(
+    () => yearFiltered.filter((t) => t.type === 'expense').length,
+    [yearFiltered],
+  )
+
+  const yearNetTotal = yearIncomeTotal - yearExpenseTotal
 
   const filtered = useMemo(
     () =>
@@ -1094,46 +1109,6 @@ export default function LedgerApp() {
               })}
             </div>
 
-            <div className="mt-4 rounded-2xl border border-gold/25 bg-gradient-to-br from-gold-lightest/80 to-transparent px-3 py-3 md:px-4 md:py-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-text-soft">
-                {cursor.y}년 누적 · 전체{' '}
-                <span className="font-semibold tabular-nums text-text-secondary">
-                  {yearTxCount}건
-                </span>
-              </p>
-              <div className="mt-3 grid grid-cols-3 gap-2 sm:gap-3">
-                <div className="min-w-0 rounded-lg border border-border-muted bg-surface-raised px-2 py-2 sm:px-3 sm:py-2.5">
-                  <p className="text-[0.65rem] font-medium text-text-soft sm:text-xs">
-                    연 수입
-                  </p>
-                  <p className="mt-1 truncate text-sm font-semibold tabular-nums text-semantic-income sm:text-base md:text-lg">
-                    {fmtKrw.format(yearIncomeTotal)}
-                  </p>
-                </div>
-                <div className="min-w-0 rounded-lg border border-border-muted bg-surface-raised px-2 py-2 sm:px-3 sm:py-2.5">
-                  <p className="text-[0.65rem] font-medium text-text-soft sm:text-xs">
-                    연 지출
-                  </p>
-                  <p className="mt-1 truncate text-sm font-semibold tabular-nums text-semantic-expense sm:text-base md:text-lg">
-                    {fmtKrw.format(yearExpenseTotal)}
-                  </p>
-                </div>
-                <div className="min-w-0 rounded-lg border border-border-muted bg-surface-raised px-2 py-2 sm:px-3 sm:py-2.5">
-                  <p className="text-[0.65rem] font-medium text-text-soft sm:text-xs">
-                    연 순액
-                  </p>
-                  <p
-                    className={`mt-1 truncate text-sm font-semibold tabular-nums sm:text-base md:text-lg ${
-                      yearIncomeTotal - yearExpenseTotal >= 0
-                        ? 'text-semantic-income'
-                        : 'text-semantic-expense'
-                    }`}
-                  >
-                    {fmtKrw.format(yearIncomeTotal - yearExpenseTotal)}
-                  </p>
-                </div>
-              </div>
-            </div>
           </Card>
         </section>
 
@@ -1271,24 +1246,33 @@ export default function LedgerApp() {
 
         <section aria-label="달력">
           <Card className="overflow-hidden">
-            <LedgerSectionTitle title="달력" />
-            <div className="mb-4 mt-4 flex flex-col gap-3 rounded-2xl border border-border-subtle/60 bg-gradient-to-r from-ceramic/70 via-surface-raised to-ceramic/40 p-2 shadow-[var(--shadow-frap-base)] md:flex-row md:items-center md:justify-between md:p-3">
-              <div className="flex flex-1 items-center justify-between gap-1 md:justify-start md:gap-2">
+            <div className="relative mb-4 flex min-h-[5rem] items-center gap-2 rounded-2xl border border-border-subtle/60 bg-gradient-to-r from-ceramic/70 via-surface-raised to-ceramic/40 p-2 shadow-[var(--shadow-frap-base)] md:min-h-[5.25rem] md:p-3">
+              <Button
+                variant="outlined"
+                className="relative z-[1] !min-h-11 !min-w-11 shrink-0 !rounded-xl !px-0"
+                aria-label="이전 달"
+                type="button"
+                onClick={goPrevMonth}
+              >
+                ‹
+              </Button>
+              <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+                <CalendarMonthHeading year={cursor.y} monthIndex={cursor.m} />
+              </div>
+              <div className="relative z-[1] ml-auto flex shrink-0 items-center gap-1.5 md:gap-2">
+                <NoSpendChallengeBanner
+                  count={noSpendStats.count}
+                  eligibleDayCount={noSpendStats.eligibleDayCount}
+                  monthLabel={formatMonthLabel(cursor.y, cursor.m)}
+                  active={noSpendCelebrate}
+                  onToggleCelebrate={() => {
+                    goThisMonth()
+                    toggleNoSpendCelebrate()
+                  }}
+                />
                 <Button
                   variant="outlined"
-                  className="!min-h-11 !min-w-11 !rounded-xl !px-0"
-                  aria-label="이전 달"
-                  type="button"
-                  onClick={goPrevMonth}
-                >
-                  ‹
-                </Button>
-                <p className="min-w-[10rem] flex-1 text-center font-calendar-month text-base font-bold tracking-tight text-starbucks-green md:text-lg">
-                  {formatMonthLabel(cursor.y, cursor.m)}
-                </p>
-                <Button
-                  variant="outlined"
-                  className="!min-h-11 !min-w-11 !rounded-xl !px-0"
+                  className="!min-h-11 !min-w-11 shrink-0 !rounded-xl !px-0"
                   aria-label="다음 달"
                   type="button"
                   onClick={goNextMonth}
@@ -1296,50 +1280,7 @@ export default function LedgerApp() {
                   ›
                 </Button>
               </div>
-              <Button
-                variant="outlined"
-                type="button"
-                className="w-full shrink-0 !rounded-xl md:w-auto"
-                onClick={goThisMonth}
-              >
-                이번 달
-              </Button>
             </div>
-
-            <div className="mb-4 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-[var(--radius-card)] border border-border-muted border-l-4 border-l-green-light bg-surface-raised px-3 py-3 md:px-4 md:py-4">
-                <p className="text-sm font-medium text-text-soft">수입</p>
-                <p className="mt-1 text-xl font-semibold tabular-nums text-semantic-income md:text-2xl">
-                  {fmtKrw.format(incomeTotal)}
-                </p>
-              </div>
-              <div className="rounded-[var(--radius-card)] border border-border-muted border-l-4 border-l-[rgba(200,32,20,0.35)] bg-surface-raised px-3 py-3 ring-1 ring-inset ring-[#c82014]/10 md:px-4 md:py-4">
-                <p className="text-sm font-medium text-text-soft">지출</p>
-                <p className="mt-1 text-xl font-semibold tabular-nums text-semantic-expense md:text-2xl">
-                  {fmtKrw.format(expenseTotal)}
-                </p>
-              </div>
-              <div className="rounded-[var(--radius-card)] border border-border-muted border-l-4 border-l-starbucks-green bg-surface-raised px-3 py-3 md:px-4 md:py-4">
-                <p className="text-sm font-medium text-text-soft">이달 순액</p>
-                <p
-                  className={`mt-1 text-xl font-semibold tabular-nums md:text-2xl ${
-                    incomeTotal - expenseTotal >= 0
-                      ? 'text-semantic-income'
-                      : 'text-semantic-expense'
-                  }`}
-                >
-                  {fmtKrw.format(incomeTotal - expenseTotal)}
-                </p>
-              </div>
-            </div>
-
-            <NoSpendChallengeBanner
-              count={noSpendStats.count}
-              eligibleDayCount={noSpendStats.eligibleDayCount}
-              monthLabel={formatMonthLabel(cursor.y, cursor.m)}
-              active={noSpendCelebrate}
-              onToggleCelebrate={toggleNoSpendCelebrate}
-            />
 
             <LedgerCalendar
               year={cursor.y}
@@ -1412,43 +1353,93 @@ export default function LedgerApp() {
 
             <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
               <div className="rounded-xl border border-emerald-200/50 bg-gradient-to-b from-emerald-50/80 to-transparent px-3 py-2.5">
-                <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-emerald-900/55">
-                  수입
+                <p className="flex flex-wrap items-baseline gap-x-1.5 text-base font-semibold tabular-nums text-semantic-income sm:text-lg">
+                  <span className="min-w-[3rem] shrink-0 text-[0.65rem] font-semibold uppercase tracking-wider text-emerald-900/55">
+                    수입
+                  </span>
+                  <span>+{fmtKrw.format(incomeTotal)}</span>
+                  <span className="text-xs font-normal text-text-soft">
+                    {monthIncomeTransactions.length}건
+                  </span>
                 </p>
-                <p className="mt-1 text-base font-semibold tabular-nums text-semantic-income sm:text-lg">
-                  +{fmtKrw.format(incomeTotal)}
-                </p>
-                <p className="mt-0.5 text-xs tabular-nums text-text-soft">
-                  {monthIncomeTransactions.length}건
+                <div
+                  className="my-1 border-t border-black/[0.05] dark:border-white/[0.06]"
+                  aria-hidden
+                />
+                <p className="flex flex-wrap items-baseline gap-x-1 text-[0.65rem] font-medium leading-tight tabular-nums text-semantic-income">
+                  <span className="min-w-[3rem] shrink-0 text-[0.55rem] leading-none text-text-soft">
+                    {cursor.y}년
+                  </span>
+                  <span className="truncate pl-1.5">+{fmtKrw.format(yearIncomeTotal)}</span>
+                  <span className="text-[0.55rem] font-normal text-text-soft">
+                    {yearIncomeCount}건
+                  </span>
                 </p>
               </div>
               <div className="rounded-xl border border-rose-200/50 bg-gradient-to-b from-rose-50/70 to-transparent px-3 py-2.5">
-                <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-rose-900/55">
-                  지출
+                <p className="flex flex-wrap items-baseline gap-x-1.5 text-base font-semibold tabular-nums text-semantic-expense sm:text-lg">
+                  <span className="min-w-[3rem] shrink-0 text-[0.65rem] font-semibold uppercase tracking-wider text-rose-900/55">
+                    지출
+                  </span>
+                  <span>−{fmtKrw.format(expenseTotal)}</span>
+                  <span className="text-xs font-normal text-text-soft">
+                    {monthExpenseTransactions.length}건
+                  </span>
                 </p>
-                <p className="mt-1 text-base font-semibold tabular-nums text-semantic-expense sm:text-lg">
-                  −{fmtKrw.format(expenseTotal)}
-                </p>
-                <p className="mt-0.5 text-xs tabular-nums text-text-soft">
-                  {monthExpenseTransactions.length}건
+                <div
+                  className="my-1 border-t border-black/[0.05] dark:border-white/[0.06]"
+                  aria-hidden
+                />
+                <p className="flex flex-wrap items-baseline gap-x-1 text-[0.65rem] font-medium leading-tight tabular-nums text-semantic-expense">
+                  <span className="min-w-[3rem] shrink-0 text-[0.55rem] leading-none text-text-soft">
+                    {cursor.y}년
+                  </span>
+                  <span className="truncate pl-1.5">−{fmtKrw.format(yearExpenseTotal)}</span>
+                  <span className="text-[0.55rem] font-normal text-text-soft">
+                    {yearExpenseCount}건
+                  </span>
                 </p>
               </div>
               <div className="rounded-xl border border-border-subtle bg-ceramic/40 px-3 py-2.5">
-                <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-text-soft">
-                  순액
-                </p>
                 <p
-                  className={`mt-1 text-base font-semibold tabular-nums sm:text-lg ${
+                  className={`flex flex-wrap items-baseline gap-x-1.5 text-base font-semibold tabular-nums sm:text-lg ${
                     monthNetTotal >= 0
                       ? 'text-semantic-income'
                       : 'text-semantic-expense'
                   }`}
                 >
-                  {monthNetTotal >= 0 ? '+' : '−'}
-                  {fmtKrw.format(Math.abs(monthNetTotal))}
+                  <span className="min-w-[3rem] shrink-0 text-[0.65rem] font-semibold uppercase tracking-wider text-text-soft">
+                    순액
+                  </span>
+                  <span>
+                    {monthNetTotal >= 0 ? '+' : '−'}
+                    {fmtKrw.format(Math.abs(monthNetTotal))}
+                  </span>
+                  <span className="text-xs font-normal text-text-soft">
+                    {filtered.length}건
+                  </span>
                 </p>
-                <p className="mt-0.5 text-xs tabular-nums text-text-soft">
-                  {filtered.length}건
+                <div
+                  className="my-1 border-t border-black/[0.05] dark:border-white/[0.06]"
+                  aria-hidden
+                />
+                <p
+                  className={`flex flex-wrap items-baseline gap-x-1 text-[0.65rem] font-medium leading-tight tabular-nums ${
+                    yearNetTotal >= 0
+                      ? 'text-semantic-income'
+                      : 'text-semantic-expense'
+                  }`}
+                >
+                  <span className="min-w-[3rem] shrink-0 text-[0.55rem] leading-none text-text-soft">
+                    {cursor.y}년
+                  </span>
+                  <span className="truncate pl-1.5">
+                    {yearNetTotal >= 0 ? '+' : '−'}
+                    {fmtKrw.format(Math.abs(yearNetTotal))}
+                  </span>
+                  <span className="text-[0.55rem] font-normal text-text-soft">
+                    {yearTxCount}건
+                  </span>
                 </p>
               </div>
             </div>

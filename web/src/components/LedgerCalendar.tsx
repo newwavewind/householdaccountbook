@@ -137,6 +137,10 @@ export const LedgerCalendar = memo(function LedgerCalendar({
           }
 
           if (!inMonth) {
+            const isSunday = cellIdx % 7 === 0
+            const watermarkClass = isSunday
+              ? 'text-red-500/[0.07]'
+              : 'text-text-primary/[0.05]'
             return (
               <button
                 key={iso}
@@ -145,10 +149,20 @@ export const LedgerCalendar = memo(function LedgerCalendar({
                 onClick={() => onSelectDay(iso)}
                 {...hoverHandlers}
                 className={[
+                  'relative flex w-full flex-col overflow-hidden rounded-lg border border-border-subtle bg-surface-raised px-0.5 py-1.5 text-left md:py-2',
                   CELL_MIN_H,
-                  'rounded-lg border border-border-muted/30 bg-transparent',
                 ].join(' ')}
-              />
+              >
+                <span
+                  aria-hidden
+                  className={[
+                    'pointer-events-none absolute left-1/2 top-[42%] z-0 -translate-x-1/2 -translate-y-1/2 select-none text-[2.4rem] font-semibold leading-none tabular-nums md:top-[44%] md:text-[3rem]',
+                    watermarkClass,
+                  ].join(' ')}
+                >
+                  {day}
+                </span>
+              </button>
             )
           }
 

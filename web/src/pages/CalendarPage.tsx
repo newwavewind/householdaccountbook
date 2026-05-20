@@ -26,6 +26,7 @@ import {
   loadCalendarLunarView,
   saveCalendarLunarView,
 } from '../calendar/calendarLunarViewStorage'
+import { CalendarMonthHeading } from '../calendar/CalendarMonthHeading'
 import CalendarStickyNotesBoard from '../calendar/CalendarStickyNotesBoard'
 import { useHouseholdCalendarMemos } from '../calendar/useHouseholdCalendarMemos'
 import { useHouseholdCalendarStickers } from '../calendar/useHouseholdCalendarStickers'
@@ -111,46 +112,6 @@ function buildGrid(year: number, monthIndex: number) {
     })
   }
   return cells
-}
-
-const MONTH_EN = [
-  'JAN',
-  'FEB',
-  'MAR',
-  'APR',
-  'MAY',
-  'JUN',
-  'JUL',
-  'AUG',
-  'SEP',
-  'OCT',
-  'NOV',
-  'DEC',
-] as const
-
-function CalendarMonthHeading({
-  year,
-  monthIndex,
-}: {
-  year: number
-  monthIndex: number
-}) {
-  return (
-    <div
-      className="flex min-w-[4.5rem] flex-col items-center gap-0.5 leading-none font-calendar-month"
-      aria-label={`${year}년 ${monthIndex + 1}월`}
-    >
-      <span className="text-xs font-medium tabular-nums tracking-wide text-text-soft md:text-sm">
-        {year}
-      </span>
-      <span className="text-2xl font-bold tabular-nums text-text-primary md:text-[1.75rem]">
-        {monthIndex + 1}
-      </span>
-      <span className="text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-starbucks-green md:text-xs">
-        {MONTH_EN[monthIndex]}
-      </span>
-    </div>
-  )
 }
 
 function formatSelectedHeading(iso: string) {
@@ -909,15 +870,6 @@ export default function CalendarPage() {
     deepLinkDayRef.current = null
   }, [selectedIso, cloudStatus, scrollDetailIntoView])
 
-  const goThisMonth = useCallback(() => {
-    setPeekIso(null)
-    const n = new Date()
-    setCursorY(n.getFullYear())
-    setCursorM(n.getMonth())
-    setSelectedIso(todayIso())
-    scrollDetailIntoView()
-  }, [scrollDetailIntoView])
-
   const onPickDay = useCallback((iso: string) => {
     setSelectedIso(iso)
     setPeekIso(iso)
@@ -1053,16 +1005,6 @@ export default function CalendarPage() {
                 onClick={goNextMonth}
               >
                 ›
-              </Button>
-            </div>
-            <div className="flex w-full shrink-0 flex-col gap-2 sm:flex-row sm:justify-end md:w-auto">
-              <Button
-                variant="outlined"
-                type="button"
-                className="calendar-toolbar-btn min-h-11 w-full sm:flex-1 md:w-auto"
-                onClick={goThisMonth}
-              >
-                오늘 / 이번 달
               </Button>
             </div>
           </div>
