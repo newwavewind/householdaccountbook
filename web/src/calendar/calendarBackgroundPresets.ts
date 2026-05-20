@@ -1,5 +1,17 @@
 import { CALENDAR_DECO_PATTERN_PRESETS } from './calendarDecorationStorage'
 
+/** RGB 문자열을 흰색/검정 쪽으로 혼합 (0~1, 높을수록 원색에 가까움) */
+function blendRgb(rgb: string, toward: 'white' | 'black', amount: number): string {
+  const parts = rgb.split(',').map((s) => Number(s.trim()))
+  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return rgb
+  const t = Math.max(0, Math.min(1, amount))
+  const mix = (c: number) =>
+    toward === 'white'
+      ? Math.round(c + (255 - c) * (1 - t))
+      : Math.round(c * t)
+  return `${mix(parts[0]!)}, ${mix(parts[1]!)}, ${mix(parts[2]!)}`
+}
+
 /** 선택 원색 + 농도(0~1) → 실제 배경 RGB (흰색과 혼합) */
 export function calendarDecorationMixedBgRgb(
   rgb: string,
@@ -51,8 +63,8 @@ function toneGradientPresets(): CalendarBackgroundPreset[] {
     id: `${p.id}-grad`,
     label: p.label,
     mode: 'gradient' as const,
-    rgb: p.rgb,
-    rgbEnd: p.rgb,
+    rgb: blendRgb(p.rgb, 'white', 0.38),
+    rgbEnd: blendRgb(p.rgb, 'black', 0.88),
     group: 'tone' as const,
   }))
 }
@@ -72,8 +84,8 @@ function rainbowGradientPresets(): CalendarBackgroundPreset[] {
     id: `${p.id}-grad`,
     label: p.label,
     mode: 'gradient' as const,
-    rgb: p.rgb,
-    rgbEnd: p.rgb,
+    rgb: blendRgb(p.rgb, 'white', 0.42),
+    rgbEnd: blendRgb(p.rgb, 'black', 0.82),
     group: 'rainbow' as const,
   }))
 }
@@ -96,6 +108,25 @@ export function getCalendarBackgroundPreset(
     return PRESET_BY_ID.get(id)!
   }
   return PRESET_BY_ID.get('sand')!
+}
+
+/** 단색 id + 그라데이션 모드일 때 대응하는 -grad 프리셋 */
+export function resolveCalendarBackgroundPreset(
+  id: string | undefined,
+  mode: CalendarBackgroundMode,
+): CalendarBackgroundPreset {
+  const preset = getCalendarBackgroundPreset(id)
+  if (mode === 'gradient' && preset.mode !== 'gradient') {
+    const grad = PRESET_BY_ID.get(`${preset.id}-grad`)
+    if (grad) return grad
+    return calendarBackgroundPresetFromRgb(preset.rgb, 'gradient')
+  }
+  if (mode === 'solid' && preset.mode === 'gradient') {
+    const baseId = preset.id.replace(/-grad$/, '')
+    const solid = PRESET_BY_ID.get(baseId)
+    if (solid) return solid
+  }
+  return preset
 }
 
 export function calendarBackgroundPresetFromRgb(

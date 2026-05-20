@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react'
 import {
   calendarBackgroundGradientCss,
   calendarDecorationMixedBgRgb,
-  getCalendarBackgroundPreset,
+  resolveCalendarBackgroundPreset,
 } from './calendarBackgroundPresets'
 import type { CalendarDecoration } from './calendarDecorationStorage'
 
@@ -19,6 +19,16 @@ export function isCalendarDecorated(deco: CalendarDecoration): boolean {
   return hasCalendarPattern(deco) || hasCalendarBackground(deco)
 }
 
+/** 사진 배경이 설정된 상태 */
+export function isCalendarPhotoDeco(deco: CalendarDecoration): boolean {
+  return deco.kind === 'photo' && !!deco.imageUrl
+}
+
+/** 사진은 달력 페이지 main에만 오버레이 — 하위 호스트는 스크림만 */
+export function usePageLevelPhotoOverlay(deco: CalendarDecoration): boolean {
+  return isCalendarPhotoDeco(deco)
+}
+
 export { calendarDecorationMixedBgRgb } from './calendarBackgroundPresets'
 
 /** 꾸미기 호스트 — 반투명 면·페이지 배경 */
@@ -26,9 +36,12 @@ export function calendarDecorationHostStyle(
   deco: CalendarDecoration,
 ): CSSProperties | undefined {
   if (!hasCalendarBackground(deco)) return undefined
-  const preset = getCalendarBackgroundPreset(deco.backgroundPresetId)
+  const preset = resolveCalendarBackgroundPreset(
+    deco.backgroundPresetId,
+    deco.backgroundMode,
+  )
   const mixedRgb = calendarDecorationMixedBgRgb(
-    preset.rgb,
+    preset.rgbEnd ?? preset.rgb,
     deco.backgroundDensity,
   )
   const gradient =

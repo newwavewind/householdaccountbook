@@ -720,6 +720,16 @@
   background-repeat: no-repeat;
 }
 
+/* 그라데이션 모드 — 단색 배경을 덮지 않도록 */
+.calendar-page-deco.calendar-page-deco--gradient {
+  background-color: transparent;
+}
+
+/* 사진 배경 — main 단일 레이어가 스크롤 영역 전체를 덮음 */
+.calendar-page-photo-host {
+  isolation: isolate;
+}
+
 /* 달력 꾸미기 — 카드·헤더·칸은 반투명, 격자 선은 유지 */
 .calendar-card--decorated {
   background-color: transparent !important;

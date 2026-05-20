@@ -14,9 +14,9 @@ export function CalendarDecoOverlay({
   strength = 'card',
   className = '',
 }: Props) {
-  const { decorated, layerStyle } = useCalendarDecoration()
+  const { decorated, photoPageOverlay, layerStyle } = useCalendarDecoration()
   const style = layerStyle(strength)
-  if (!decorated || !style) return null
+  if (!decorated || !style || photoPageOverlay) return null
 
   return (
     <div
@@ -33,7 +33,7 @@ export function calendarDecoHostClass(decorated: boolean): string {
     : ''
 }
 
-/** 일정 상세 헤더·본문·툴바 — 패턴 레이어 + 반투명 면 (달력 날짜 칸과 동일) */
+/** 일정 상세 헤더·본문·툴바 — 부모/페이지 패턴 위 반투명 스크림만 */
 export function CalendarDetailDecoBand({
   className = '',
   children,
@@ -44,9 +44,14 @@ export function CalendarDetailDecoBand({
   const { decorated } = useCalendarDecoration()
   return (
     <div
-      className={`calendar-detail-deco-band relative overflow-hidden ${className}`.trim()}
+      className={[
+        'calendar-detail-deco-band relative overflow-hidden',
+        decorated ? 'calendar-deco-scrim' : '',
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
     >
-      {decorated ? <CalendarDecoOverlay strength="card" /> : null}
       <div className="relative z-[1] flex min-h-0 min-w-0 flex-1 flex-col">
         {children}
       </div>

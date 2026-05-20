@@ -8,7 +8,7 @@ import {
   CALENDAR_BACKGROUND_PRESETS,
   calendarBackgroundPickerSwatchStyle,
   calendarBackgroundSwatchStyle,
-  getCalendarBackgroundPreset,
+  resolveCalendarBackgroundPreset,
   type CalendarBackgroundPreset,
 } from './calendarBackgroundPresets'
 import {
@@ -108,7 +108,10 @@ export function CalendarDecoratePanel({
     (p) => p.group === 'rainbow',
   )
 
-  const selectedBg = getCalendarBackgroundPreset(decoration.backgroundPresetId)
+  const selectedBg = resolveCalendarBackgroundPreset(
+    decoration.backgroundPresetId,
+    decoration.backgroundMode,
+  )
   const previewBg = calendarBackgroundSwatchStyle(
     selectedBg,
     decoration.backgroundDensity,
@@ -133,13 +136,7 @@ export function CalendarDecoratePanel({
         aria-hidden
       >
         {decoration.useBackground ? (
-          <div
-            className="absolute inset-0"
-            style={{
-              background: previewBg,
-              opacity: decoration.backgroundPageAlpha,
-            }}
-          />
+          <div className="absolute inset-0" style={{ background: previewBg }} />
         ) : null}
         {patternActive && previewPatternStyle ? (
           <div className="absolute inset-0" style={previewPatternStyle} />
@@ -237,21 +234,6 @@ export function CalendarDecoratePanel({
                   0.01,
                   Number(e.target.value) / 100,
                 ),
-              })
-            }
-            className="mt-1 w-full accent-green-accent"
-          />
-        </label>
-        <label className="block text-[11px] font-semibold text-text-soft">
-          배경 투명도 ({Math.round(decoration.backgroundPageAlpha * 100)}%)
-          <input
-            type="range"
-            min={20}
-            max={100}
-            value={Math.round(decoration.backgroundPageAlpha * 100)}
-            onChange={(e) =>
-              patch({
-                backgroundPageAlpha: Number(e.target.value) / 100,
               })
             }
             className="mt-1 w-full accent-green-accent"

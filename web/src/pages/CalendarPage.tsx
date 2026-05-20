@@ -766,8 +766,10 @@ export default function CalendarPage() {
 
   const { transactions, userId, householdId } = useLedger()
   const {
+    decoration: calendarDecoration,
     decorated: calendarDecorated,
     backgroundActive: calendarBackgroundActive,
+    photoPageOverlay,
     layerStyle,
     hostStyle,
   } = useCalendarDecoration()
@@ -940,16 +942,31 @@ export default function CalendarPage() {
 
   const selectedMemo = memos[selectedIso]
 
+  const photoLayerStyle = photoPageOverlay ? decorationLayerStyle : undefined
+
   return (
     <main
       className={[
         'mx-auto w-full max-w-5xl px-4 py-6 md:px-6',
         calendarBackgroundActive ? 'calendar-page-deco' : '',
+        calendarBackgroundActive &&
+        calendarDecoration.backgroundMode === 'gradient'
+          ? 'calendar-page-deco--gradient'
+          : '',
+        photoPageOverlay ? 'calendar-page-photo-host relative' : '',
       ]
         .filter(Boolean)
         .join(' ')}
       style={hostStyle}
     >
+      {photoLayerStyle ? (
+        <div
+          className="pointer-events-none absolute inset-0 z-0"
+          style={photoLayerStyle}
+          aria-hidden
+        />
+      ) : null}
+      <div className={photoPageOverlay ? 'relative z-[1]' : undefined}>
       <div className="mb-6 w-full min-w-0">
         <DdaySummaryTicker lines={ddaySummaryLines} />
         {backend === 'supabase' && cloudConfigured ? (
@@ -1001,7 +1018,7 @@ export default function CalendarPage() {
             .filter(Boolean)
             .join(' ')}
         >
-          {decorationLayerStyle ? (
+          {decorationLayerStyle && !photoPageOverlay ? (
             <div
               className="pointer-events-none absolute inset-0 z-0 rounded-[calc(var(--radius-card)-1px)]"
               style={decorationLayerStyle}
@@ -1399,6 +1416,7 @@ export default function CalendarPage() {
             document.body,
           )
         : null}
+      </div>
     </main>
   )
 }

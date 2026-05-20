@@ -22,6 +22,7 @@ import {
   hasCalendarBackground,
   hasCalendarPattern,
   isCalendarDecorated,
+  usePageLevelPhotoOverlay,
   type CalendarDecoStrength,
 } from './calendarDecorationStyles'
 
@@ -34,6 +35,8 @@ type CalendarDecorationContextValue = {
   patternActive: boolean
   /** 배경색·칸 색만 */
   backgroundActive: boolean
+  /** 사진 배경 — 페이지 main 단일 오버레이 */
+  photoPageOverlay: boolean
   layerStyle: (strength: CalendarDecoStrength) => CSSProperties | undefined
   hostStyle: CSSProperties | undefined
 }
@@ -72,6 +75,7 @@ export function CalendarDecorationProvider({ children }: { children: ReactNode }
   const patternActive = hasCalendarPattern(decoration)
   const backgroundActive = hasCalendarBackground(decoration)
   const decorated = isCalendarDecorated(decoration)
+  const photoPageOverlay = usePageLevelPhotoOverlay(decoration)
 
   const layerStyle = useCallback(
     (strength: CalendarDecoStrength) => {
@@ -96,6 +100,7 @@ export function CalendarDecorationProvider({ children }: { children: ReactNode }
       decorated,
       patternActive,
       backgroundActive,
+      photoPageOverlay,
       layerStyle,
       hostStyle,
     }),
@@ -105,6 +110,7 @@ export function CalendarDecorationProvider({ children }: { children: ReactNode }
       decorated,
       patternActive,
       backgroundActive,
+      photoPageOverlay,
       layerStyle,
       hostStyle,
     ],
