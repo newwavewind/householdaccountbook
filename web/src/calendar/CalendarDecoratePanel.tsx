@@ -140,7 +140,7 @@ export function CalendarDecoratePanel({
             <input
               type="range"
               min={12}
-              max={90}
+              max={100}
               value={Math.round(decoration.opacity * 100)}
               onChange={(e) =>
                 patch({ opacity: Number(e.target.value) / 100 })

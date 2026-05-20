@@ -6,7 +6,7 @@ export type CalendarPhotoFit = 'full' | 'contain'
 
 export type CalendarDecoration = {
   imageUrl?: string
-  /** 배경 사진 농도 (12% ~ 90%) */
+  /** 배경 사진 농도 (12% ~ 100%) */
   opacity: number
   photoScope: CalendarPhotoScope
   photoFit: CalendarPhotoFit
@@ -23,7 +23,7 @@ export const DEFAULT_CALENDAR_DECORATION: CalendarDecoration = {
 }
 
 const OPACITY_MIN = 0.12
-const OPACITY_MAX = 0.9
+const OPACITY_MAX = 1
 
 function storageKey(householdId: string | null | undefined): string {
   return householdId ? `${KEY}:${householdId}` : KEY

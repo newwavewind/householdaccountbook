@@ -49,7 +49,7 @@ export function calendarDecorationLayerStyle(
   strength = 1,
 ): CSSProperties | undefined {
   if (!deco.imageUrl) return undefined
-  const opacity = Math.min(0.9, deco.opacity * strength)
+  const opacity = Math.min(1, deco.opacity * strength)
   const contain = deco.photoFit === 'contain'
   return {
     backgroundImage: `url(${deco.imageUrl})`,
