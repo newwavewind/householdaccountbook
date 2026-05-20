@@ -765,8 +765,12 @@ export default function CalendarPage() {
   const [lunarView, setLunarView] = useState(() => loadCalendarLunarView())
 
   const { transactions, userId, householdId } = useLedger()
-  const { decorated: calendarDecorated, layerStyle, hostStyle } =
-    useCalendarDecoration()
+  const {
+    decorated: calendarDecorated,
+    backgroundActive: calendarBackgroundActive,
+    layerStyle,
+    hostStyle,
+  } = useCalendarDecoration()
   const { memos, patchMemos, cloudStatus, cloudMessage } =
     useHouseholdCalendarMemos()
 
@@ -940,7 +944,7 @@ export default function CalendarPage() {
     <main
       className={[
         'mx-auto w-full max-w-5xl px-4 py-6 md:px-6',
-        calendarDecorated ? 'calendar-page-deco' : '',
+        calendarBackgroundActive ? 'calendar-page-deco' : '',
       ]
         .filter(Boolean)
         .join(' ')}

@@ -1,4 +1,12 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react'
+import { createPortal } from 'react-dom'
 import { useLocation } from 'react-router-dom'
 import {
   CalendarDecoratePanel,
@@ -19,8 +27,29 @@ const themeLabels: Record<ThemePreference, string> = {
   theme3: '테마3',
 }
 
-const panelBaseClass =
-  'absolute right-0 top-full z-50 mt-1 rounded-md border border-charcoal-border bg-surface-raised p-2.5 shadow-[var(--shadow-frap-stack)] theme2:shadow-[var(--shadow-frap-base)] theme3:border-border-strong dark:border-border-strong'
+const PANEL_Z = 10000
+const VIEWPORT_PAD = 8
+const PANEL_WIDTH = 288
+
+const panelSurfaceClass =
+  'rounded-md border border-charcoal-border bg-surface-raised p-2.5 shadow-[var(--shadow-frap-stack)] theme2:shadow-[var(--shadow-frap-base)] theme3:border-border-strong dark:border-border-strong'
+
+function clampPanelDesktop(anchor: DOMRect, panelW: number, panelH: number) {
+  let left = anchor.right - panelW
+  left = Math.max(
+    VIEWPORT_PAD,
+    Math.min(left, window.innerWidth - panelW - VIEWPORT_PAD),
+  )
+  let top = anchor.bottom + VIEWPORT_PAD
+  if (top + panelH > window.innerHeight - VIEWPORT_PAD) {
+    top = anchor.top - panelH - VIEWPORT_PAD
+  }
+  top = Math.max(
+    VIEWPORT_PAD,
+    Math.min(top, window.innerHeight - panelH - VIEWPORT_PAD),
+  )
+  return { top, left }
+}
 
 function ToggleRow({
   id,
@@ -82,7 +111,10 @@ export function AppearanceMenu() {
   } = useThemePreference()
   const [open, setOpen] = useState(false)
   const [decoErr, setDecoErr] = useState<string | null>(null)
-  const wrapRef = useRef<HTMLDivElement>(null)
+  const [panelStyle, setPanelStyle] = useState<CSSProperties | null>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const panelId = useId()
   const glassId = useId()
   const darkId = useId()
 
@@ -95,10 +127,65 @@ export function AppearanceMenu() {
     colorScheme === 'dark' ? 'Dark' : null,
   ].filter(Boolean)
 
+  const reposition = () => {
+    const panel = panelRef.current
+    const btn = btnRef.current
+    const isDesktop = window.matchMedia('(min-width: 768px)').matches
+
+    if (!isDesktop) {
+      setPanelStyle({
+        position: 'fixed',
+        left: '50%',
+        top: '50%',
+        transform: 'translate(-50%, -50%)',
+        width: `min(100vw - ${VIEWPORT_PAD * 2}px, ${PANEL_WIDTH}px)`,
+        maxHeight: `min(80vh, calc(100dvh - ${VIEWPORT_PAD * 2}px))`,
+        zIndex: PANEL_Z + 1,
+        visibility: 'visible',
+      })
+      return
+    }
+
+    if (!btn || !panel) return
+    const anchor = btn.getBoundingClientRect()
+    const { top, left } = clampPanelDesktop(
+      anchor,
+      panel.offsetWidth || PANEL_WIDTH,
+      panel.offsetHeight,
+    )
+    setPanelStyle({
+      position: 'fixed',
+      top,
+      left,
+      width: PANEL_WIDTH,
+      maxHeight: `min(80vh, calc(100dvh - ${VIEWPORT_PAD * 2}px))`,
+      zIndex: PANEL_Z + 1,
+      visibility: 'visible',
+    })
+  }
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setPanelStyle(null)
+      return
+    }
+    reposition()
+    const raf = requestAnimationFrame(reposition)
+    window.addEventListener('resize', reposition)
+    window.addEventListener('scroll', reposition, true)
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('resize', reposition)
+      window.removeEventListener('scroll', reposition, true)
+    }
+  }, [open, showDiaryDecorate, decoration.kind, decoration.backgroundRgb])
+
   useEffect(() => {
     if (!open) return
     const onDoc = (e: MouseEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false)
+      const t = e.target as Node
+      if (btnRef.current?.contains(t) || panelRef.current?.contains(t)) return
+      setOpen(false)
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false)
@@ -122,97 +209,127 @@ export function AppearanceMenu() {
     setDecoErr(null)
   }
 
-  return (
-    <div ref={wrapRef} className="relative shrink-0">
-      <button
-        type="button"
-        className={`inline-flex max-w-[9rem] items-center gap-1 rounded-md border py-0.5 pl-2 pr-1.5 text-[10px] font-semibold shadow-sm outline-none hover:bg-well focus-visible:ring-2 focus-visible:ring-green-accent/40 md:max-w-none md:py-1 md:pl-2.5 md:pr-2 md:text-xs theme2:shadow-[var(--shadow-frap-base)] theme3:border-border-strong ${
-          showDiaryDecorate && decoActive
-            ? 'border-green-accent bg-green-light/50 text-starbucks-green'
-            : 'border-charcoal-border bg-surface-raised text-text-primary'
-        }`}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        aria-label="화면·꾸미기 설정"
-        title="화면·꾸미기 설정"
-        onClick={() => setOpen((v) => !v)}
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="size-3.5 shrink-0 md:size-4"
-          aria-hidden
-        >
-          <circle cx="12" cy="12" r="3" />
-          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-        </svg>
-        <span className="truncate">{summaryParts.join(' · ')}</span>
-      </button>
+  const panelContent = (
+    <>
+      <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wide text-text-soft">
+        화면 스타일
+      </p>
 
-      {open ? (
-        <div
-          role="dialog"
-          aria-label="화면·꾸미기 설정"
-          className={`${panelBaseClass} max-h-[min(80vh,32rem)] w-[min(100vw-2rem,18rem)] overflow-y-auto`}
+      <label className="mb-1 flex flex-col gap-0.5 px-1">
+        <span className="text-[10px] font-medium text-text-soft">테마</span>
+        <select
+          value={preference}
+          aria-label="테마 선택"
+          className="w-full cursor-pointer rounded-md border border-charcoal-border bg-surface-raised py-1 pl-2 pr-6 text-[11px] font-semibold text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-green-accent/40 md:text-xs"
+          onChange={(e) => setPreference(e.target.value as ThemePreference)}
         >
+          {(Object.keys(themeLabels) as ThemePreference[]).map((k) => (
+            <option key={k} value={k}>
+              {themeLabels[k]}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <div className="mt-1 space-y-0.5 border-t border-border-muted pt-2">
+        <ToggleRow
+          id={glassId}
+          label="Liquid Glass"
+          checked={liquidGlass === 'clear'}
+          onChange={(on) => setLiquidGlass(on ? 'clear' : 'off')}
+        />
+        <ToggleRow
+          id={darkId}
+          label="다크 모드"
+          checked={colorScheme === 'dark'}
+          onChange={(on) => setColorScheme(on ? 'dark' : 'light')}
+        />
+      </div>
+
+      {showDiaryDecorate ? (
+        <div className="mt-3 border-t border-border-muted pt-3">
           <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wide text-text-soft">
-            화면 스타일
+            다이어리 꾸미기
           </p>
-
-          <label className="mb-1 flex flex-col gap-0.5 px-1">
-            <span className="text-[10px] font-medium text-text-soft">테마</span>
-            <select
-              value={preference}
-              aria-label="테마 선택"
-              className="w-full cursor-pointer rounded-md border border-charcoal-border bg-surface-raised py-1 pl-2 pr-6 text-[11px] font-semibold text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-green-accent/40 md:text-xs"
-              onChange={(e) =>
-                setPreference(e.target.value as ThemePreference)
-              }
-            >
-              {(Object.keys(themeLabels) as ThemePreference[]).map((k) => (
-                <option key={k} value={k}>
-                  {themeLabels[k]}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <div className="mt-1 space-y-0.5 border-t border-border-muted pt-2">
-            <ToggleRow
-              id={glassId}
-              label="Liquid Glass"
-              checked={liquidGlass === 'clear'}
-              onChange={(on) => setLiquidGlass(on ? 'clear' : 'off')}
-            />
-            <ToggleRow
-              id={darkId}
-              label="다크 모드"
-              checked={colorScheme === 'dark'}
-              onChange={(on) => setColorScheme(on ? 'dark' : 'light')}
-            />
-          </div>
-
-          {showDiaryDecorate ? (
-            <div className="mt-3 border-t border-border-muted pt-3">
-              <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wide text-text-soft">
-                다이어리 꾸미기
-              </p>
-              <CalendarDecoratePanel
-                decoration={decoration}
-                onChange={onDecoChange}
-                onReset={onDecoReset}
-                err={decoErr}
-                setErr={setDecoErr}
-              />
-            </div>
-          ) : null}
+          <CalendarDecoratePanel
+            decoration={decoration}
+            onChange={onDecoChange}
+            onReset={onDecoReset}
+            err={decoErr}
+            setErr={setDecoErr}
+          />
         </div>
       ) : null}
-    </div>
+    </>
+  )
+
+  const panelPortal =
+    open && typeof document !== 'undefined' ? (
+      <>
+        <div
+          className="fixed inset-0 z-[10000] bg-black/40 md:pointer-events-none md:bg-transparent"
+          aria-hidden
+          onClick={() => setOpen(false)}
+        />
+        <div
+          ref={panelRef}
+          id={panelId}
+          role="dialog"
+          aria-label="화면·꾸미기 설정"
+          className={`${panelSurfaceClass} overflow-y-auto overscroll-contain`}
+          style={
+            panelStyle ?? {
+              position: 'fixed',
+              top: -9999,
+              left: VIEWPORT_PAD,
+              width: `min(100vw - ${VIEWPORT_PAD * 2}px, ${PANEL_WIDTH}px)`,
+              visibility: 'hidden',
+              zIndex: PANEL_Z + 1,
+            }
+          }
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          {panelContent}
+        </div>
+      </>
+    ) : null
+
+  return (
+    <>
+      <span className="relative inline-flex shrink-0">
+        <button
+          ref={btnRef}
+          type="button"
+          className={`inline-flex max-w-[9rem] items-center gap-1 rounded-md border py-0.5 pl-2 pr-1.5 text-[10px] font-semibold shadow-sm outline-none hover:bg-well focus-visible:ring-2 focus-visible:ring-green-accent/40 md:max-w-none md:py-1 md:pl-2.5 md:pr-2 md:text-xs theme2:shadow-[var(--shadow-frap-base)] theme3:border-border-strong ${
+            showDiaryDecorate && decoActive
+              ? 'border-green-accent bg-green-light/50 text-starbucks-green'
+              : 'border-charcoal-border bg-surface-raised text-text-primary'
+          }`}
+          aria-expanded={open}
+          aria-haspopup="dialog"
+          aria-controls={open ? panelId : undefined}
+          aria-label="화면·꾸미기 설정"
+          title="화면·꾸미기 설정"
+          onClick={() => setOpen((v) => !v)}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="size-3.5 shrink-0 md:size-4"
+            aria-hidden
+          >
+            <circle cx="12" cy="12" r="3" />
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+          </svg>
+          <span className="truncate">{summaryParts.join(' · ')}</span>
+        </button>
+      </span>
+      {panelPortal ? createPortal(panelPortal, document.body) : null}
+    </>
   )
 }

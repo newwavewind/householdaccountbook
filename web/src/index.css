@@ -711,10 +711,13 @@
 
 /* 달력 페이지 — 꾸미기 배경색 전체(main) */
 .calendar-page-deco {
+  background-image: var(--calendar-deco-bg-gradient, none);
   background-color: rgba(
     var(--calendar-deco-bg-rgb, 120, 110, 95),
     var(--calendar-deco-page-alpha, 0.92)
   );
+  background-size: cover;
+  background-repeat: no-repeat;
 }
 
 /* 달력 꾸미기 — 카드·헤더·칸은 반투명, 격자 선은 유지 */

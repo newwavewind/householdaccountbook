@@ -1,32 +1,43 @@
 import type { CSSProperties } from 'react'
+import {
+  calendarBackgroundGradientCss,
+  calendarDecorationMixedBgRgb,
+  getCalendarBackgroundPreset,
+} from './calendarBackgroundPresets'
 import type { CalendarDecoration } from './calendarDecorationStorage'
 
-export function isCalendarDecorated(deco: CalendarDecoration): boolean {
+export function hasCalendarPattern(deco: CalendarDecoration): boolean {
   return deco.kind !== 'none' && (deco.kind !== 'photo' || !!deco.imageUrl)
 }
 
-/** 선택 원색 + 농도(0~1) → 실제 배경 RGB (흰색과 혼합) */
-export function calendarDecorationMixedBgRgb(
-  rgb: string,
-  density: number,
-): string {
-  const parts = rgb.split(',').map((s) => Number(s.trim()))
-  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return rgb
-  const t = Math.max(0, Math.min(1, density))
-  const mix = (c: number) => Math.round(c * t + 255 * (1 - t))
-  return `${mix(parts[0]!)}, ${mix(parts[1]!)}, ${mix(parts[2]!)}`
+export function hasCalendarBackground(deco: CalendarDecoration): boolean {
+  return deco.useBackground !== false
 }
 
-/** 꾸미기 호스트 — 반투명 면용 배경 RGB (localStorage `backgroundRgb`) */
+/** 패턴 또는 배경 꾸미기가 켜진 상태 */
+export function isCalendarDecorated(deco: CalendarDecoration): boolean {
+  return hasCalendarPattern(deco) || hasCalendarBackground(deco)
+}
+
+export { calendarDecorationMixedBgRgb } from './calendarBackgroundPresets'
+
+/** 꾸미기 호스트 — 반투명 면·페이지 배경 */
 export function calendarDecorationHostStyle(
   deco: CalendarDecoration,
 ): CSSProperties | undefined {
-  if (!isCalendarDecorated(deco)) return undefined
+  if (!hasCalendarBackground(deco)) return undefined
+  const preset = getCalendarBackgroundPreset(deco.backgroundPresetId)
+  const mixedRgb = calendarDecorationMixedBgRgb(
+    preset.rgb,
+    deco.backgroundDensity,
+  )
+  const gradient =
+    deco.backgroundMode === 'gradient'
+      ? calendarBackgroundGradientCss(preset, deco.backgroundDensity)
+      : 'none'
   return {
-    ['--calendar-deco-bg-rgb' as string]: calendarDecorationMixedBgRgb(
-      deco.backgroundRgb,
-      deco.backgroundDensity,
-    ),
+    ['--calendar-deco-bg-rgb' as string]: mixedRgb,
+    ['--calendar-deco-bg-gradient' as string]: gradient,
     ['--calendar-deco-bg-fill' as string]: String(deco.backgroundFill),
     ['--calendar-deco-page-alpha' as string]: String(deco.backgroundPageAlpha),
   }

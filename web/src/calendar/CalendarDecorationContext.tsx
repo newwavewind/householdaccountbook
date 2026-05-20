@@ -19,6 +19,8 @@ import {
   CALENDAR_DECO_STRENGTH,
   calendarDecorationHostStyle,
   calendarDecorationLayerStyle,
+  hasCalendarBackground,
+  hasCalendarPattern,
   isCalendarDecorated,
   type CalendarDecoStrength,
 } from './calendarDecorationStyles'
@@ -26,7 +28,12 @@ import {
 type CalendarDecorationContextValue = {
   decoration: CalendarDecoration
   setDecoration: (next: CalendarDecoration) => void
+  /** 패턴 또는 배경 적용 중 */
   decorated: boolean
+  /** 패턴 레이어만 */
+  patternActive: boolean
+  /** 배경색·칸 색만 */
+  backgroundActive: boolean
   layerStyle: (strength: CalendarDecoStrength) => CSSProperties | undefined
   hostStyle: CSSProperties | undefined
 }
@@ -62,17 +69,19 @@ export function CalendarDecorationProvider({ children }: { children: ReactNode }
     [householdId],
   )
 
+  const patternActive = hasCalendarPattern(decoration)
+  const backgroundActive = hasCalendarBackground(decoration)
   const decorated = isCalendarDecorated(decoration)
 
   const layerStyle = useCallback(
     (strength: CalendarDecoStrength) => {
-      if (!decorated) return undefined
+      if (!patternActive) return undefined
       return calendarDecorationLayerStyle(
         decoration,
         CALENDAR_DECO_STRENGTH[strength],
       )
     },
-    [decoration, decorated],
+    [decoration, patternActive],
   )
 
   const hostStyle = useMemo(
@@ -81,8 +90,24 @@ export function CalendarDecorationProvider({ children }: { children: ReactNode }
   )
 
   const value = useMemo(
-    () => ({ decoration, setDecoration, decorated, layerStyle, hostStyle }),
-    [decoration, setDecoration, decorated, layerStyle, hostStyle],
+    () => ({
+      decoration,
+      setDecoration,
+      decorated,
+      patternActive,
+      backgroundActive,
+      layerStyle,
+      hostStyle,
+    }),
+    [
+      decoration,
+      setDecoration,
+      decorated,
+      patternActive,
+      backgroundActive,
+      layerStyle,
+      hostStyle,
+    ],
   )
 
   return (

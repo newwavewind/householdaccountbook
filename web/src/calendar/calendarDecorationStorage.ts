@@ -11,11 +11,19 @@ export type CalendarDecoKind =
   | 'checker'
   | 'photo'
 
+export type CalendarBackgroundMode = 'solid' | 'gradient'
+
 export type CalendarDecoration = {
   kind: CalendarDecoKind
   /** rgba용 "r, g, b" (패턴 색) */
   patternRgb: string
-  /** rgba용 "r, g, b" (배경·반투명 면) */
+  /** 배경 사용(패턴 없이도 가능) */
+  useBackground: boolean
+  /** 단색 | 그라데이션 */
+  backgroundMode: CalendarBackgroundMode
+  /** calendarBackgroundPresets id */
+  backgroundPresetId: string
+  /** rgba용 "r, g, b" (칸·반투명 면 기준색) */
   backgroundRgb: string
   /** 날짜 칸 배경 불투명도 (0~1, 패턴 비침) */
   backgroundFill: number
@@ -35,6 +43,9 @@ export const CALENDAR_DECO_CHANGED_EVENT = 'gaegyeobu-calendar-decoration-change
 export const DEFAULT_CALENDAR_DECORATION: CalendarDecoration = {
   kind: 'none',
   patternRgb: '0, 117, 74',
+  useBackground: true,
+  backgroundMode: 'solid',
+  backgroundPresetId: 'sand',
   backgroundRgb: '120, 110, 95',
   backgroundFill: 0.78,
   backgroundPageAlpha: 0.92,
@@ -60,16 +71,8 @@ export const CALENDAR_DECO_PATTERN_PRESETS = [
   { id: 'lilac', label: '라일락', rgb: '175, 150, 210' },
 ] as const
 
-/** 배경색 14종 — 패턴 색과 동일 원색 */
-export const CALENDAR_DECO_BACKGROUND_PRESETS = CALENDAR_DECO_PATTERN_PRESETS
-
-const BACKGROUND_RGB_VALUES = CALENDAR_DECO_PATTERN_PRESETS.map((p) => p.rgb)
-
-function parseBackgroundRgb(raw: unknown): string {
-  const parsed = parseRgb(raw, DEFAULT_CALENDAR_DECORATION.backgroundRgb)
-  return (BACKGROUND_RGB_VALUES as readonly string[]).includes(parsed)
-    ? parsed
-    : DEFAULT_CALENDAR_DECORATION.backgroundRgb
+function parseBackgroundMode(raw: unknown): CalendarBackgroundMode {
+  return raw === 'gradient' ? 'gradient' : 'solid'
 }
 
 function parseRgb(
@@ -142,19 +145,40 @@ export function loadCalendarDecoration(
       p.backgroundPageAlpha <= 1
         ? p.backgroundPageAlpha
         : DEFAULT_CALENDAR_DECORATION.backgroundPageAlpha
-    const backgroundDensity =
+    let backgroundDensity =
       typeof p.backgroundDensity === 'number' &&
       p.backgroundDensity >= 0 &&
       p.backgroundDensity <= 1
         ? p.backgroundDensity
         : DEFAULT_CALENDAR_DECORATION.backgroundDensity
+    if (backgroundDensity < 0.01) {
+      backgroundDensity = 0.01
+    }
+    const useBackground =
+      typeof p.useBackground === 'boolean'
+        ? p.useBackground
+        : DEFAULT_CALENDAR_DECORATION.useBackground
+    const backgroundMode = parseBackgroundMode(p.backgroundMode)
+    const backgroundRgb = parseRgb(
+      p.backgroundRgb,
+      DEFAULT_CALENDAR_DECORATION.backgroundRgb,
+    )
+    const backgroundPresetId =
+      typeof p.backgroundPresetId === 'string' && p.backgroundPresetId
+        ? p.backgroundPresetId
+        : backgroundMode === 'gradient'
+          ? 'sand-grad'
+          : 'sand'
     return {
       kind: parseKind(p.kind),
       patternRgb: parseRgb(
         p.patternRgb,
         DEFAULT_CALENDAR_DECORATION.patternRgb,
       ),
-      backgroundRgb: parseBackgroundRgb(p.backgroundRgb),
+      useBackground,
+      backgroundMode,
+      backgroundPresetId,
+      backgroundRgb,
       backgroundFill,
       backgroundPageAlpha,
       backgroundDensity,
@@ -177,6 +201,9 @@ export function saveCalendarDecoration(
     const payload: CalendarDecoration = {
       kind: deco.kind,
       patternRgb: deco.patternRgb,
+      useBackground: deco.useBackground,
+      backgroundMode: deco.backgroundMode,
+      backgroundPresetId: deco.backgroundPresetId,
       backgroundRgb: deco.backgroundRgb,
       backgroundFill: deco.backgroundFill,
       backgroundPageAlpha: deco.backgroundPageAlpha,
