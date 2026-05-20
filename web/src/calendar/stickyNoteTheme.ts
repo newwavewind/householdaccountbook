@@ -118,11 +118,82 @@ export const STICKY_THEMES: Record<StickyTint, StickyTheme> = {
   },
 }
 
+/** 꾸미기 ON — 모든 날짜 칸 동일 배경(이번 달·이전달·메모 동일) */
+export function calendarDecoDayCellBgClass(): string {
+  return 'calendar-day-cell--deco'
+}
+
 /**
  * 달력 날짜 칸 배경 — 저장된 일정의 memoTint와 맞춤(본문 톤 기준).
  * 목탄은 칸 안 가독성을 위해 옅게만 칠함.
  */
+/** 일정 상세 패널 — 달력 날짜 칸(bg-surface-raised/78)과 동일 투명도 */
+function stickyTintDetailPanelCellBg(tint: StickyTint): string {
+  if (tint === 'white') {
+    return 'bg-surface-raised/78 dark:bg-[#2c2c2e]/78'
+  }
+  if (tint === 'charcoal') {
+    return 'bg-[#3d3d3d]/28 dark:bg-[#323232]/35'
+  }
+  const base = stickyTintCalendarCellBg(tint, true, true)
+  return base.replace(/\/80\b/g, '/78').replace(/\/68\b/g, '/66')
+}
+
 /** 일정 카드·스티커 외곽 테두리 */
+/** 일정 상세 패널 — 꾸미기 시 헤더·본문·툴바 반투명 */
+export function stickyTintDetailEventChrome(
+  tint: StickyTint,
+  part: 'header' | 'body' | 'footer',
+  decorated: boolean,
+): string {
+  const t = STICKY_THEMES[tint]
+  if (!decorated) {
+    if (part === 'header') return t.headerClass
+    if (part === 'body') return t.bodyClass
+    return t.footerClass
+  }
+
+  const cellBg = stickyTintDetailPanelCellBg(tint)
+  const borders: Record<StickyTint, { h: string; f: string }> = {
+    white: {
+      h: 'border-b border-black/[0.07] dark:border-white/10',
+      f: 'border-t border-black/[0.07] dark:border-white/10',
+    },
+    yellow: {
+      h: 'border-b border-[#c9b86a]/90 dark:border-[#6b6040]/80',
+      f: 'border-t border-[#c9b86a]/90 dark:border-[#6b6040]/80',
+    },
+    green: {
+      h: 'border-b border-[#6fa378]/95 dark:border-[#4a6354]/80',
+      f: 'border-t border-[#6fa378]/95 dark:border-[#4a6354]/80',
+    },
+    pink: {
+      h: 'border-b border-[#d0809a]/90 dark:border-[#6a5058]/80',
+      f: 'border-t border-[#d0809a]/90 dark:border-[#6a5058]/80',
+    },
+    purple: {
+      h: 'border-b border-[#9a82b8]/90 dark:border-[#5c5068]/80',
+      f: 'border-t border-[#9a82b8]/90 dark:border-[#5c5068]/80',
+    },
+    blue: {
+      h: 'border-b border-[#7098c8]/90 dark:border-[#4a5a6a]/80',
+      f: 'border-t border-[#7098c8]/90 dark:border-[#4a5a6a]/80',
+    },
+    gray: {
+      h: 'border-b border-[#9e9e9e]/95 dark:border-[#555]/80',
+      f: 'border-t border-[#9e9e9e]/95 dark:border-[#555]/80',
+    },
+    charcoal: {
+      h: 'border-b border-black/40 dark:border-white/12',
+      f: 'border-t border-black/40 dark:border-white/12',
+    },
+  }
+  const edge = borders[tint]
+  if (part === 'header') return `${cellBg} ${edge.h}`
+  if (part === 'body') return cellBg
+  return `${cellBg} ${edge.f}`
+}
+
 export function stickyTintCardChrome(tint: StickyTint): string {
   if (tint === 'white') {
     return 'border-black/[0.09] shadow-[3px_5px_16px_rgba(0,0,0,0.06)] dark:border-white/12 dark:shadow-[3px_5px_16px_rgba(0,0,0,0.35)]'
@@ -136,7 +207,12 @@ export function stickyTintCardChrome(tint: StickyTint): string {
 export function stickyTintCalendarCellBg(
   tint: StickyTint,
   inMonth: boolean,
+  decorated = false,
 ): string {
+  if (decorated) {
+    return calendarDecoDayCellBgClass()
+  }
+
   if (tint === 'charcoal') {
     return inMonth ? 'bg-[#3d3d3d]/25 dark:bg-[#323232]/35' : 'bg-[#3d3d3d]/18 dark:bg-[#323232]/25'
   }

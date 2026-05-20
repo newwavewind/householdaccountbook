@@ -1,5 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import {
+  CalendarDecoOverlay,
+  calendarDecoHostClass,
+} from '../calendar/CalendarDecoOverlay'
+import { useCalendarDecoration } from '../calendar/CalendarDecorationContext'
 import { MarqueeTicker, type MarqueeSegment } from '../components/MarqueeTicker'
 import type { DdaySummaryLine } from './ddayCompute'
 
@@ -16,17 +21,26 @@ function linesToSegments(lines: DdaySummaryLine[]): MarqueeSegment[] {
 
 export function DdaySummaryTicker({ lines }: Props) {
   const [expanded, setExpanded] = useState(false)
+  const { decorated } = useCalendarDecoration()
+  const hostClass = calendarDecoHostClass(decorated)
 
-  const actionBtnClass =
-    'inline-flex min-h-[2.75rem] min-w-[4.5rem] shrink-0 items-center justify-center border-l border-border-subtle bg-surface-raised/80 px-2.5 text-xs font-semibold text-starbucks-green transition-colors hover:bg-green-light/35 md:min-h-11 md:px-3'
+  const actionBtnClass = [
+    'inline-flex min-h-[2.75rem] min-w-[4.5rem] shrink-0 items-center justify-center border-l border-border-subtle px-2.5 text-xs font-semibold text-starbucks-green transition-colors hover:bg-green-light/35 md:min-h-11 md:px-3',
+    decorated ? '' : 'bg-surface-raised/80',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   const ariaLabel = lines.map((l) => l.text).join(' · ')
 
   if (lines.length === 0) {
     return (
       <div className="w-full min-w-0">
-        <div className="overflow-hidden rounded-xl border border-border-subtle bg-gradient-to-r from-ceramic/95 via-well/50 to-ceramic/95 shadow-sm">
-          <div className="flex min-h-[2.75rem] items-stretch">
+        <div
+          className={`dday-ticker-shell overflow-hidden rounded-xl border border-border-subtle bg-gradient-to-r from-ceramic/95 via-well/50 to-ceramic/95 shadow-sm ${hostClass}`}
+        >
+          <CalendarDecoOverlay strength="card" />
+          <div className="relative z-[1] flex min-h-[2.75rem] items-stretch">
             <Link
               to="/calendar/dday"
               title="디데이 설정"
@@ -50,8 +64,11 @@ export function DdaySummaryTicker({ lines }: Props) {
 
   return (
     <div className="w-full min-w-0">
-      <div className="overflow-hidden rounded-xl border border-border-subtle bg-gradient-to-r from-ceramic/95 via-well/50 to-ceramic/95 shadow-sm">
-        <div className="flex min-h-[2.75rem] items-stretch">
+      <div
+        className={`dday-ticker-shell overflow-hidden rounded-xl border border-border-subtle bg-gradient-to-r from-ceramic/95 via-well/50 to-ceramic/95 shadow-sm ${hostClass}`}
+      >
+        <CalendarDecoOverlay strength="panel" />
+        <div className="relative z-[1] flex min-h-[2.75rem] items-stretch">
           <Link
             to="/calendar/dday"
             title="디데이 설정"

@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -146,9 +146,14 @@ export default function CommunityPostDetailPage() {
 
   const handleAddComment = async () => {
     if (!commentBody.trim() || !post) return
+    if (auth.user && auth.needsNicknameSetup) {
+      nav('/settings/account')
+      return
+    }
     const name = displayName
-    if (!name) {
-      alert('닉네임을 입력하세요.')
+    if (!name || (auth.user && name === '익명')) {
+      alert(auth.user ? '닉네임을 먼저 설정해 주세요.' : '닉네임을 입력하세요.')
+      if (auth.user) nav('/settings/account')
       return
     }
     if (!auth.user) setGuestNickname(name)

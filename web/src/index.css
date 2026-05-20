@@ -7,6 +7,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Gamja+Flower&display=swap');
 /* «오이체»·«가지체»: 한컴 미설치 시 웹폰트 폴백 */
 @import url('https://fonts.googleapis.com/css2?family=Hi+Melody&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap');
 
 @font-face {
   font-family: 'EF_cucumbersalad';
@@ -36,6 +37,9 @@
   --font-serif-display:
     'Pretendard Variable', 'Pretendard', ui-sans-serif, system-ui, -apple-system,
     'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  /* 달력·장부 월 표시 전용 */
+  --font-calendar-month:
+    'Gowun Batang', 'Nanum Myeongjo', Georgia, 'Apple SD Gothic Neo', serif;
 
   --color-starbucks-green: #006241;
   --color-green-accent: #00754a;
@@ -91,6 +95,7 @@
   --color-alert-surface: rgb(255 251 235 / 0.92);
 
   --color-well: rgb(0 0 0 / 0.02);
+  --color-calendar-grid: rgb(0 0 0 / 0.1);
   --color-inset-highlight: rgb(255 255 255 / 0.85);
 
   --radius-card: 12px;
@@ -145,6 +150,7 @@
   --color-alert-surface: #fef3c8;
 
   --color-well: rgba(23, 23, 23, 0.04);
+  --color-calendar-grid: rgba(23, 23, 23, 0.12);
   --color-inset-highlight: rgba(255, 255, 255, 0.88);
 
   --color-semantic-income: #65a30d;
@@ -239,6 +245,7 @@
   --color-alert-surface: #fef3c7;
 
   --color-well: rgba(55, 65, 81, 0.05);
+  --color-calendar-grid: rgba(55, 65, 81, 0.14);
   --color-inset-highlight: rgba(255, 255, 255, 0.92);
 
   --color-semantic-income: #3d7d2c;
@@ -677,6 +684,167 @@
 
 .sticky-memo-popout-panel--exit {
   animation: sticky-memo-popout-out 0.22s ease-in forwards;
+}
+
+/* 달력 날짜 격자 — 바깥·칸 사이 동일 선, 요일 행 제외 */
+.calendar-days-frame {
+  overflow: hidden;
+  border-radius: calc(var(--radius-card) - 2px);
+  border: 1px solid var(--color-calendar-grid);
+  background-color: var(--color-calendar-grid);
+}
+
+.calendar-days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 1px;
+  background-color: var(--color-calendar-grid);
+}
+
+.calendar-day-cell--selected {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-green-accent) 45%, transparent);
+}
+
+.calendar-day-cell--today {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-green-accent) 55%, transparent);
+}
+
+/* 달력 페이지 — 꾸미기 배경색 전체(main) */
+.calendar-page-deco {
+  background-color: rgba(
+    var(--calendar-deco-bg-rgb, 120, 110, 95),
+    var(--calendar-deco-page-alpha, 0.92)
+  );
+}
+
+/* 달력 꾸미기 — 카드·헤더·칸은 반투명, 격자 선은 유지 */
+.calendar-card--decorated {
+  background-color: transparent !important;
+}
+
+.calendar-card--decorated .calendar-month-toolbar {
+  background-color: rgba(
+    var(--calendar-deco-bg-rgb, 120, 110, 95),
+    calc(var(--calendar-deco-page-alpha, 0.92) * 0.35)
+  );
+  backdrop-filter: blur(3px);
+}
+
+.calendar-card--decorated .calendar-month-toolbar .calendar-toolbar-chip,
+.calendar-card--decorated .calendar-month-toolbar .calendar-toolbar-btn {
+  background-color: rgba(
+    var(--calendar-deco-bg-rgb, 120, 110, 95),
+    calc(var(--calendar-deco-page-alpha, 0.92) * 0.56)
+  ) !important;
+}
+
+/* 칸 사이·바깥 테두리 — gap 배경은 반드시 불투명(투명하면 선이 사라짐) */
+.calendar-card--decorated .calendar-days-frame {
+  border-color: var(--color-calendar-grid);
+  border-top: none;
+  background-color: var(--color-calendar-grid);
+}
+
+.calendar-card--decorated .calendar-days-grid {
+  background-color: var(--color-calendar-grid);
+}
+
+/* 요일 행 — 배경·격자·구분선 없음, 영문 라벨만 */
+.calendar-card--decorated .calendar-weekday-row {
+  border-bottom: none;
+  background: transparent;
+}
+
+.calendar-card--decorated .calendar-weekday-grid {
+  gap: 0;
+  background-color: transparent;
+}
+
+.calendar-card--decorated .calendar-weekday-cell {
+  min-height: 1.75rem;
+  background: transparent !important;
+}
+
+.calendar-card--decorated .calendar-weekday-label {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+/* 날짜 칸 — 칸 배경 진하기(패턴 은은히 비침) */
+.calendar-card--decorated .calendar-day-cell--deco {
+  background-color: rgba(
+    var(--calendar-deco-bg-rgb, 120, 110, 95),
+    var(--calendar-deco-bg-fill, 0.78)
+  ) !important;
+}
+
+/* 다이어리 꾸미기 — 달력 카드와 동일 스크림(월 헤더·툴바 칩 기준) */
+.calendar-deco-host--active.dday-ticker-shell {
+  background: rgba(var(--calendar-deco-bg-rgb, 248, 245, 238), 0.32) !important;
+  backdrop-filter: blur(3px);
+}
+
+.calendar-deco-host--active.dday-ticker-shell a[href='/calendar/dday'].border-r {
+  background-color: color-mix(in srgb, var(--color-green-accent) 12%, transparent) !important;
+}
+
+.calendar-deco-host--active.dday-ticker-shell button.border-l,
+.calendar-deco-host--active.dday-ticker-shell a.border-l[href='/calendar/dday'] {
+  background-color: rgba(var(--calendar-deco-bg-rgb, 248, 245, 238), 0.52) !important;
+}
+
+.calendar-deco-host--active.calendar-sticky-shell {
+  background: rgba(var(--calendar-deco-bg-rgb, 248, 245, 238), 0.52) !important;
+  backdrop-filter: blur(3px);
+}
+
+.calendar-deco-host--active.calendar-detail-shell {
+  background-color: transparent !important;
+}
+
+.calendar-deco-host--active.calendar-detail-shell.bg-surface-raised {
+  background-color: transparent !important;
+}
+
+.calendar-deco-host--active.calendar-deco-scrim,
+.calendar-deco-host--active .calendar-deco-scrim {
+  background-color: rgba(var(--calendar-deco-bg-rgb, 248, 245, 238), 0.52) !important;
+  backdrop-filter: blur(3px);
+}
+
+.calendar-deco-host--active.calendar-detail-shell .calendar-detail-time-field {
+  background-color: rgba(var(--calendar-deco-bg-rgb, 248, 245, 238), 0.52) !important;
+}
+
+.calendar-deco-host--active.calendar-detail-shell .calendar-detail-time-field button.border-l {
+  background-color: rgba(var(--calendar-deco-bg-rgb, 248, 245, 238), 0.52) !important;
+}
+
+/* 일정 상세 — 달력 날짜 칸(surface-raised/78)과 동일, 본문 바탕은 투명 */
+.calendar-deco-host--active .calendar-detail-body {
+  background: transparent !important;
+}
+
+.calendar-deco-host--active.calendar-detail-shell .calendar-detail-deco-band {
+  isolation: isolate;
+}
+
+.calendar-deco-host--active.calendar-detail-shell .calendar-detail-deco-band.bg-surface-raised\/78 {
+  background-color: rgba(var(--calendar-deco-bg-rgb, 248, 245, 238), 0.78) !important;
+}
+
+.calendar-deco-host--active.calendar-detail-shell .calendar-detail-editor-pane,
+.calendar-deco-host--active.calendar-detail-shell .calendar-detail-editor-pane .tiptap,
+.calendar-deco-host--active.calendar-detail-shell .calendar-detail-editor-pane .ProseMirror {
+  background: transparent !important;
+}
+
+.calendar-deco-host--active .calendar-detail-save-btn {
+  background-color: color-mix(in srgb, var(--color-green-accent) 82%, transparent) !important;
+  backdrop-filter: blur(3px);
 }
 
 @media (prefers-reduced-motion: reduce) {

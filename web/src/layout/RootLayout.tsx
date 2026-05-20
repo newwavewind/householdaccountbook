@@ -1,5 +1,5 @@
 import { Fragment, useMemo, type ReactNode } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import {
   useCommunityAuth,
@@ -22,8 +22,8 @@ function SettingsGearButton({ onClick }: { onClick: () => void }) {
       type="button"
       variant="outlined"
       className="!min-h-0 !px-2 !py-0.5 !text-[10px] md:!px-2.5 md:!py-1"
-      aria-label="환경 설정"
-      title="환경 설정"
+      aria-label="설정"
+      title="설정"
       onClick={onClick}
     >
       <svg
@@ -155,9 +155,13 @@ export default function RootLayout() {
         <>
           {auth.user ? (
             <>
-              <span className="max-w-[5.5rem] truncate text-[10px] leading-tight text-text-soft md:max-w-[12rem] md:text-xs">
-                {auth.user.displayName}
-              </span>
+              <Link
+                to="/settings/account"
+                title={auth.needsNicknameSetup ? '닉네임을 정해 주세요' : '회원 정보'}
+                className="max-w-[5.5rem] truncate text-[10px] leading-tight text-text-soft underline-offset-2 hover:text-text-primary hover:underline md:max-w-[12rem] md:text-xs"
+              >
+                {auth.needsNicknameSetup ? '닉네임 설정' : auth.user.displayName}
+              </Link>
               <Button
                 type="button"
                 variant="outlined"
@@ -180,9 +184,13 @@ export default function RootLayout() {
         </>
       ) : auth.user ? (
         <>
-          <span className="max-w-[5.5rem] truncate text-[10px] leading-tight text-text-soft md:max-w-[12rem] md:text-xs">
-            {auth.user.displayName}
-          </span>
+          <Link
+            to="/settings/account"
+            title={auth.needsNicknameSetup ? '닉네임을 정해 주세요' : '닉네임 변경'}
+            className="max-w-[5.5rem] truncate text-[10px] leading-tight text-text-soft underline-offset-2 hover:text-text-primary hover:underline md:max-w-[12rem] md:text-xs"
+          >
+            {auth.needsNicknameSetup ? '닉네임 설정' : auth.user.displayName}
+          </Link>
           <Button
             type="button"
             variant="outlined"

@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -88,9 +88,9 @@ function SupabaseLoginScreen() {
           로그인 · 가입
         </h1>
         <p className="mx-auto mt-3 max-w-md text-center text-sm leading-relaxed text-text-soft">
-          Google 계정으로 <strong className="font-medium text-text-faint">로그인</strong>과{' '}
-          <strong className="font-medium text-text-faint">첫 방문 시 자동 가입</strong>이 한 번에
-          처리됩니다. 별도 회원가입 양식은 없습니다.
+          Google로 <strong className="font-medium text-text-faint">익명 로그인</strong>만 합니다.
+          실명은 공개되지 않고, 가입 직후 <strong className="font-medium text-text-faint">닉네임</strong>을
+          정해 커뮤니티에 활동합니다.
         </p>
 
 
@@ -168,25 +168,35 @@ function SupabaseLoginScreen() {
         ) : auth.user ? (
           <Card className="mt-10 border border-border-muted bg-surface-raised p-8 shadow-[var(--shadow-card)]">
             <p className="text-center text-xs font-medium uppercase tracking-wide text-text-soft">
-              로그인됨
+              로그인됨 · 익명
             </p>
             <div className="mt-4 flex flex-col items-center gap-1 text-center">
+              <p className="text-xs text-text-soft">닉네임</p>
               <p className="text-lg font-semibold text-text-primary">
-                {auth.user.displayName}
+                {auth.needsNicknameSetup ? '미설정' : auth.user.displayName}
               </p>
-              {auth.user.email ? (
-                <p className="text-sm text-text-soft">{auth.user.email}</p>
-              ) : null}
             </div>
             <div className="mt-8 flex flex-col gap-2 sm:flex-row sm:justify-center">
               <Button
                 type="button"
                 variant="primary"
                 className="w-full sm:w-auto sm:min-w-[9rem]"
-                onClick={() => nav('/community')}
+                onClick={() =>
+                  nav(auth.needsNicknameSetup ? '/settings/account' : '/community')
+                }
               >
-                커뮤니티로
+                {auth.needsNicknameSetup ? '닉네임 정하기' : '커뮤니티로'}
               </Button>
+              {!auth.needsNicknameSetup ? (
+                <Button
+                  type="button"
+                  variant="outlined"
+                  className="w-full sm:w-auto sm:min-w-[9rem]"
+                  onClick={() => nav('/settings')}
+                >
+                  설정
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 variant="outlined"

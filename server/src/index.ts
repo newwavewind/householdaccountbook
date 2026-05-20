@@ -222,18 +222,28 @@ app.put('/api/ledgers/:id', async (req, res) => {
 })
 
 // ── Dev auth (로컬 전용 — 이후 Supabase Auth 로 교체)
+function profilePublicName(profile: {
+  nickname: string | null
+  displayName: string | null
+}): string {
+  return profile.nickname?.trim() || profile.displayName?.trim() || ''
+}
+
 app.post('/api/auth/dev', async (req, res) => {
   const emailRaw = req.body?.email
   const displayNameRaw = req.body?.displayName
+  const nicknameRaw = req.body?.nickname
   const roleRaw = req.body?.role === 'admin' ? 'admin' : 'user'
   const email =
     typeof emailRaw === 'string' && emailRaw.trim().length > 0
       ? emailRaw.trim()
       : `user-${randomUUID()}@local.dev`
-  const displayName =
-    typeof displayNameRaw === 'string' && displayNameRaw.trim().length > 0
-      ? displayNameRaw.trim()
-      : '로컬 사용자'
+  const nickname =
+    typeof nicknameRaw === 'string' && nicknameRaw.trim().length > 0
+      ? nicknameRaw.trim()
+      : typeof displayNameRaw === 'string' && displayNameRaw.trim().length > 0
+        ? displayNameRaw.trim()
+        : '맑은고양이42'
 
   let profile = await prisma.profile.findUnique({ where: { email } })
   if (!profile) {
@@ -241,24 +251,27 @@ app.post('/api/auth/dev', async (req, res) => {
       data: {
         id: randomUUID(),
         email,
-        displayName,
+        displayName: null,
+        nickname,
         role: roleRaw,
       },
     })
   } else {
     profile = await prisma.profile.update({
       where: { id: profile.id },
-      data: { displayName, role: roleRaw },
+      data: { nickname, role: roleRaw },
     })
   }
 
   const token = signToken(profile.id, profile.role)
+  const publicName = profilePublicName(profile)
   res.json({
     token,
     user: {
       id: profile.id,
       email: profile.email,
-      displayName: profile.displayName ?? '',
+      displayName: publicName,
+      nickname: profile.nickname ?? '',
       avatarUrl: profile.avatarUrl ?? undefined,
       role: profile.role,
     },
@@ -272,10 +285,37 @@ app.get('/api/me', async (req, res) => {
     where: { id: auth.userId },
   })
   if (!profile) return res.status(401).json({ error: '프로필이 없습니다.' })
+  const publicName = profilePublicName(profile)
   res.json({
     id: profile.id,
     email: profile.email,
-    displayName: profile.displayName ?? '',
+    displayName: publicName,
+    nickname: profile.nickname ?? '',
+    avatarUrl: profile.avatarUrl ?? undefined,
+    role: profile.role,
+  })
+})
+
+app.patch('/api/me/nickname', async (req, res) => {
+  const auth = authRequired(req, res)
+  if (!auth) return
+  const raw = req.body?.nickname
+  if (typeof raw !== 'string' || raw.trim().length < 2 || raw.trim().length > 24) {
+    return res.status(400).json({ error: '닉네임은 2~24자여야 합니다.' })
+  }
+  const nickname = raw.trim().replace(/\s+/g, ' ')
+  if (nickname.includes('@')) {
+    return res.status(400).json({ error: '이메일 형식은 닉네임으로 쓸 수 없습니다.' })
+  }
+  const profile = await prisma.profile.update({
+    where: { id: auth.userId },
+    data: { nickname },
+  })
+  res.json({
+    id: profile.id,
+    email: profile.email,
+    displayName: profilePublicName(profile),
+    nickname: profile.nickname ?? '',
     avatarUrl: profile.avatarUrl ?? undefined,
     role: profile.role,
   })
@@ -362,10 +402,7 @@ app.post('/api/posts', async (req, res) => {
   const profile = await prisma.profile.findUnique({ where: { id: auth.userId } })
   if (!profile) return res.status(401).json({ error: '프로필이 없습니다.' })
 
-  const display =
-    profile.displayName?.trim() ||
-    profile.email?.split('@')[0] ||
-    '작성자'
+  const display = profilePublicName(profile) || '익명'
 
   const row = await prisma.post.create({
     data: {

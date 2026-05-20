@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react'
-import { Link } from 'react-router-dom'
-import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
+import { Card } from '../components/ui/Card'
+import { SettingsSectionHeader } from '../components/settings/SettingsSectionHeader'
 import { useMemoDefaults } from '../memo/MemoDefaultsContext'
 import {
   CALENDAR_FONT_SIZES,
@@ -9,7 +9,7 @@ import {
 } from '../calendar/calendarRichTextFonts'
 import { DEFAULT_MEMO_DEFAULTS } from '../memo/memoDefaultsStorage'
 
-export default function SettingsPage() {
+export default function AppearanceSettingsPage() {
   const { defaults, patchDefaults, setDefaults } = useMemoDefaults()
 
   const previewStyle: CSSProperties = {
@@ -19,22 +19,10 @@ export default function SettingsPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-6 md:px-6">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-starbucks-green md:text-2xl">
-            환경 설정
-          </h1>
-          <p className="mt-1 text-sm text-text-soft">
-            메모·일정 입력 시 기본으로 쓰일 글꼴과 글자 크기입니다.
-          </p>
-        </div>
-        <Link
-          to="/calendar"
-          className="text-sm font-semibold text-starbucks-green underline-offset-2 hover:underline"
-        >
-          ← 돌아가기
-        </Link>
-      </div>
+      <SettingsSectionHeader
+        title="환경 설정"
+        description="메모·일정 입력 시 기본으로 쓰일 글꼴과 글자 크기입니다."
+      />
 
       <Card className="space-y-6 p-4 md:p-6">
         <section aria-labelledby="memo-font-heading">

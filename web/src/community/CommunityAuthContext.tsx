@@ -12,8 +12,14 @@ import { communityBackendMode } from '../lib/communityBackend'
 import { getCommunitySupabase } from '../lib/communitySupabaseClient'
 import { probeGoogleOAuth, supabaseAuthV1CallbackUrl } from '../lib/supabaseOAuthProbe'
 import { oauthCallbackFullUrl } from '../lib/appUrls'
+import {
+  isValidNickname,
+  nicknameValidationMessage,
+  normalizeNickname,
+} from '../lib/nickname'
 import { setPrismaApiToken, getPrismaApiToken } from '../lib/prismaApi'
 import { canWriteNotice } from './communityGrades'
+import { saveProfileNickname } from './profileNickname'
 import type { CommunityUser, ProfileRole } from './types'
 import {
   readMockSession,
@@ -27,6 +33,8 @@ type CommunityAuthState = {
   role: ProfileRole
   communityGrade: number
   canWriteNotice: boolean
+  needsNicknameSetup: boolean
+  setNickname: (raw: string) => Promise<void>
   demoSignIn: (asAdmin: boolean) => void
   signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>
@@ -37,14 +45,14 @@ const CommunityAuthContext = createContext<CommunityAuthState | null>(null)
 const DEMO_USER: MockSession = {
   userId: 'demo-user',
   email: 'demo.user@example.com',
-  displayName: '데모 사용자',
+  displayName: '맑은고양이42',
   role: 'user',
 }
 
 const DEMO_ADMIN: MockSession = {
   userId: 'demo-admin',
   email: 'demo.admin@example.com',
-  displayName: '데모 관리자',
+  displayName: '든든한별빛77',
   role: 'admin',
   communityGrade: 3,
 }
@@ -68,6 +76,10 @@ function initialMockRole(): ProfileRole {
   return readMockSession()?.role === 'admin' ? 'admin' : 'user'
 }
 
+function hasNicknameValue(name: string | null | undefined): boolean {
+  return Boolean(name && normalizeNickname(name).length >= 2)
+}
+
 export function CommunityAuthProvider({ children }: { children: ReactNode }) {
   const mode = communityBackendMode()
   const [loading, setLoading] = useState(
@@ -80,12 +92,14 @@ export function CommunityAuthProvider({ children }: { children: ReactNode }) {
     mode === 'mock' ? initialMockRole() : 'user',
   )
   const [communityGrade, setCommunityGrade] = useState(0)
+  const [needsNicknameSetup, setNeedsNicknameSetup] = useState(false)
 
   const syncMockFromStorage = useCallback(() => {
     const s = readMockSession()
     setUser(s ? mockSessionToUser(s) : null)
     setRole(s?.role === 'admin' ? 'admin' : 'user')
     setCommunityGrade(s?.communityGrade ?? 0)
+    setNeedsNicknameSetup(false)
     setLoading(false)
   }, [])
 
@@ -96,6 +110,7 @@ export function CommunityAuthProvider({ children }: { children: ReactNode }) {
       queueMicrotask(() => {
         setUser(null)
         setRole('user')
+        setNeedsNicknameSetup(false)
         setLoading(false)
       })
       return
@@ -111,22 +126,26 @@ export function CommunityAuthProvider({ children }: { children: ReactNode }) {
           setPrismaApiToken(null)
           setUser(null)
           setRole('user')
+          setNeedsNicknameSetup(false)
           return
         }
         const u = (await r.json()) as {
           id: string
           email: string
           displayName: string
+          nickname?: string | null
           avatarUrl?: string
           role: string
         }
+        const nick = u.nickname?.trim() || u.displayName?.trim() || ''
         setUser({
           id: u.id,
           email: u.email,
-          displayName: u.displayName,
+          displayName: nick || '익명',
           avatarUrl: u.avatarUrl,
         })
         setRole(u.role === 'admin' ? 'admin' : 'user')
+        setNeedsNicknameSetup(!hasNicknameValue(nick))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -144,6 +163,7 @@ export function CommunityAuthProvider({ children }: { children: ReactNode }) {
         setLoading(false)
         setUser(null)
         setRole('user')
+        setNeedsNicknameSetup(false)
       })
       return
     }
@@ -151,18 +171,22 @@ export function CommunityAuthProvider({ children }: { children: ReactNode }) {
     const loadProfile = async (uid: string) => {
       const { data, error } = await client
         .from('profiles')
-        .select('role, community_grade')
+        .select('role, community_grade, nickname')
         .eq('id', uid)
         .maybeSingle()
       if (error) {
         setRole('user')
         setCommunityGrade(0)
-        return
+        return { grade: 0, nickname: null as string | null }
       }
       const grade = data?.community_grade ?? 0
       setRole(data?.role === 'admin' ? 'admin' : 'user')
       setCommunityGrade(grade)
-      return grade
+      const nick =
+        typeof data?.nickname === 'string' && data.nickname.trim()
+          ? normalizeNickname(data.nickname)
+          : null
+      return { grade, nickname: nick }
     }
 
     const applySession = async () => {
@@ -171,20 +195,20 @@ export function CommunityAuthProvider({ children }: { children: ReactNode }) {
         setUser(null)
         setRole('user')
         setCommunityGrade(0)
+        setNeedsNicknameSetup(false)
         setLoading(false)
         return
       }
       const u = session.user
-      const grade = (await loadProfile(u.id)) ?? 0
+      const prof = await loadProfile(u.id)
+      const nick = prof?.nickname ?? null
+      setNeedsNicknameSetup(!nick)
       setUser({
         id: u.id,
         email: u.email ?? '',
-        displayName:
-          (u.user_metadata?.full_name as string | undefined) ??
-          (u.user_metadata?.name as string | undefined) ??
-          (u.email?.split('@')[0] ?? '사용자'),
+        displayName: nick ?? '익명',
         avatarUrl: u.user_metadata?.avatar_url as string | undefined,
-        communityGrade: grade,
+        communityGrade: prof?.grade ?? 0,
       })
       setLoading(false)
     }
@@ -197,26 +221,85 @@ export function CommunityAuthProvider({ children }: { children: ReactNode }) {
           setUser(null)
           setRole('user')
           setCommunityGrade(0)
+          setNeedsNicknameSetup(false)
           setLoading(false)
           return
         }
         const u = session.user
-        const grade = (await loadProfile(u.id)) ?? 0
+        const prof = await loadProfile(u.id)
+        const nick = prof?.nickname ?? null
+        setNeedsNicknameSetup(!nick)
         setUser({
           id: u.id,
           email: u.email ?? '',
-          displayName:
-            (u.user_metadata?.full_name as string | undefined) ??
-            (u.user_metadata?.name as string | undefined) ??
-            (u.email?.split('@')[0] ?? '사용자'),
+          displayName: nick ?? '익명',
           avatarUrl: u.user_metadata?.avatar_url as string | undefined,
-          communityGrade: grade,
+          communityGrade: prof?.grade ?? 0,
         })
         setLoading(false)
       })()
     })
     return () => sub.subscription.unsubscribe()
   }, [mode])
+
+  const setNickname = useCallback(
+    async (raw: string) => {
+      const nickname = normalizeNickname(raw)
+      const msg = nicknameValidationMessage(nickname)
+      if (!isValidNickname(nickname) || msg) {
+        throw new Error(msg ?? '닉네임을 확인해 주세요.')
+      }
+
+      if (mode === 'mock') {
+        const s = readMockSession()
+        if (!s) throw new Error('로그인이 필요합니다.')
+        writeMockSession({ ...s, displayName: nickname })
+        syncMockFromStorage()
+        return
+      }
+
+      if (mode === 'prisma') {
+        const token = getPrismaApiToken()
+        if (!token) throw new Error('로그인이 필요합니다.')
+        const r = await fetch('/api/me/nickname', {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ nickname }),
+        })
+        if (!r.ok) {
+          const j = (await r.json().catch(() => null)) as { error?: string } | null
+          throw new Error(j?.error ?? '닉네임을 저장하지 못했습니다.')
+        }
+        const u = (await r.json()) as {
+          id: string
+          email: string
+          displayName: string
+          nickname?: string
+          avatarUrl?: string
+          role: string
+        }
+        setUser((prev) =>
+          prev
+            ? {
+                ...prev,
+                displayName: u.displayName || nickname,
+              }
+            : null,
+        )
+        setNeedsNicknameSetup(false)
+        return
+      }
+
+      if (!user) throw new Error('로그인이 필요합니다.')
+      await saveProfileNickname(user.id, nickname)
+      setUser((prev) => (prev ? { ...prev, displayName: nickname } : null))
+      setNeedsNicknameSetup(false)
+    },
+    [mode, syncMockFromStorage, user],
+  )
 
   const demoSignIn = useCallback(
     (asAdmin: boolean) => {
@@ -234,6 +317,7 @@ export function CommunityAuthProvider({ children }: { children: ReactNode }) {
             body: JSON.stringify({
               email: src.email,
               displayName: src.displayName,
+              nickname: src.displayName,
               role: src.role,
             }),
           })
@@ -247,18 +331,22 @@ export function CommunityAuthProvider({ children }: { children: ReactNode }) {
               id: string
               email: string
               displayName: string
+              nickname?: string
               avatarUrl?: string
               role: string
             }
           }
           setPrismaApiToken(data.token)
+          const nick =
+            data.user.nickname?.trim() || data.user.displayName?.trim() || ''
           setUser({
             id: data.user.id,
             email: data.user.email,
-            displayName: data.user.displayName,
+            displayName: nick || '익명',
             avatarUrl: data.user.avatarUrl,
           })
           setRole(data.user.role === 'admin' ? 'admin' : 'user')
+          setNeedsNicknameSetup(!hasNicknameValue(nick))
           setLoading(false)
         })()
       }
@@ -336,11 +424,23 @@ export function CommunityAuthProvider({ children }: { children: ReactNode }) {
       role,
       communityGrade,
       canWriteNotice: canWriteNotice(role, communityGrade),
+      needsNicknameSetup,
+      setNickname,
       demoSignIn,
       signInWithGoogle,
       signOut,
     }),
-    [communityGrade, demoSignIn, loading, role, signInWithGoogle, signOut, user],
+    [
+      communityGrade,
+      demoSignIn,
+      loading,
+      needsNicknameSetup,
+      role,
+      setNickname,
+      signInWithGoogle,
+      signOut,
+      user,
+    ],
   )
 
   return (

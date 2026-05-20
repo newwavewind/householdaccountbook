@@ -1,4 +1,15 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
+import {
+  CalendarDecoratePanel,
+  isCalendarDecorateActive,
+} from '../calendar/CalendarDecoratePanel'
+import { useCalendarDecoration } from '../calendar/CalendarDecorationContext'
+import {
+  DEFAULT_CALENDAR_DECORATION,
+  saveCalendarDecoration,
+} from '../calendar/calendarDecorationStorage'
+import { useLedger } from '../hooks/useLedger'
 import { useThemePreference } from './ThemeContext'
 import type { ThemePreference } from './themePreference'
 
@@ -8,8 +19,8 @@ const themeLabels: Record<ThemePreference, string> = {
   theme3: '테마3',
 }
 
-const panelClass =
-  'absolute right-0 top-full z-50 mt-1 w-[min(100vw-2rem,14rem)] rounded-md border border-charcoal-border bg-surface-raised p-2.5 shadow-[var(--shadow-frap-stack)] theme2:shadow-[var(--shadow-frap-base)] theme3:border-border-strong dark:border-border-strong'
+const panelBaseClass =
+  'absolute right-0 top-full z-50 mt-1 rounded-md border border-charcoal-border bg-surface-raised p-2.5 shadow-[var(--shadow-frap-stack)] theme2:shadow-[var(--shadow-frap-base)] theme3:border-border-strong dark:border-border-strong'
 
 function ToggleRow({
   id,
@@ -49,7 +60,18 @@ function ToggleRow({
   )
 }
 
+function isDiaryDecorateRoute(pathname: string): boolean {
+  return (
+    pathname === '/calendar' ||
+    (pathname.startsWith('/calendar/') && pathname !== '/calendar/recovery')
+  )
+}
+
 export function AppearanceMenu() {
+  const location = useLocation()
+  const showDiaryDecorate = isDiaryDecorateRoute(location.pathname)
+  const { householdId } = useLedger()
+  const { decoration, setDecoration } = useCalendarDecoration()
   const {
     preference,
     setPreference,
@@ -59,12 +81,16 @@ export function AppearanceMenu() {
     setColorScheme,
   } = useThemePreference()
   const [open, setOpen] = useState(false)
+  const [decoErr, setDecoErr] = useState<string | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const glassId = useId()
   const darkId = useId()
 
+  const decoActive = isCalendarDecorateActive(decoration)
+
   const summaryParts = [
     themeLabels[preference],
+    showDiaryDecorate && decoActive ? '꾸미기' : null,
     liquidGlass === 'clear' ? 'Glass' : null,
     colorScheme === 'dark' ? 'Dark' : null,
   ].filter(Boolean)
@@ -85,15 +111,30 @@ export function AppearanceMenu() {
     }
   }, [open])
 
+  const onDecoChange = (next: typeof decoration) => {
+    setDecoration(next)
+    saveCalendarDecoration(next, householdId)
+  }
+
+  const onDecoReset = () => {
+    const reset = { ...DEFAULT_CALENDAR_DECORATION }
+    onDecoChange(reset)
+    setDecoErr(null)
+  }
+
   return (
     <div ref={wrapRef} className="relative shrink-0">
       <button
         type="button"
-        className="inline-flex max-w-[7.5rem] items-center gap-1 rounded-md border border-charcoal-border bg-surface-raised py-0.5 pl-2 pr-1.5 text-[10px] font-semibold text-text-primary shadow-sm outline-none hover:bg-well focus-visible:ring-2 focus-visible:ring-green-accent/40 md:max-w-none md:py-1 md:pl-2.5 md:pr-2 md:text-xs theme2:shadow-[var(--shadow-frap-base)] theme3:border-border-strong"
+        className={`inline-flex max-w-[9rem] items-center gap-1 rounded-md border py-0.5 pl-2 pr-1.5 text-[10px] font-semibold shadow-sm outline-none hover:bg-well focus-visible:ring-2 focus-visible:ring-green-accent/40 md:max-w-none md:py-1 md:pl-2.5 md:pr-2 md:text-xs theme2:shadow-[var(--shadow-frap-base)] theme3:border-border-strong ${
+          showDiaryDecorate && decoActive
+            ? 'border-green-accent bg-green-light/50 text-starbucks-green'
+            : 'border-charcoal-border bg-surface-raised text-text-primary'
+        }`}
         aria-expanded={open}
         aria-haspopup="dialog"
-        aria-label="화면 표시 설정"
-        title="화면 표시 설정"
+        aria-label="화면·꾸미기 설정"
+        title="화면·꾸미기 설정"
         onClick={() => setOpen((v) => !v)}
       >
         <svg
@@ -116,8 +157,8 @@ export function AppearanceMenu() {
       {open ? (
         <div
           role="dialog"
-          aria-label="화면 표시 설정"
-          className={panelClass}
+          aria-label="화면·꾸미기 설정"
+          className={`${panelBaseClass} max-h-[min(80vh,32rem)] w-[min(100vw-2rem,18rem)] overflow-y-auto`}
         >
           <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wide text-text-soft">
             화면 스타일
@@ -155,6 +196,21 @@ export function AppearanceMenu() {
               onChange={(on) => setColorScheme(on ? 'dark' : 'light')}
             />
           </div>
+
+          {showDiaryDecorate ? (
+            <div className="mt-3 border-t border-border-muted pt-3">
+              <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wide text-text-soft">
+                다이어리 꾸미기
+              </p>
+              <CalendarDecoratePanel
+                decoration={decoration}
+                onChange={onDecoChange}
+                onReset={onDecoReset}
+                err={decoErr}
+                setErr={setDecoErr}
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

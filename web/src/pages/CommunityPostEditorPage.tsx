@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -74,9 +74,15 @@ export default function CommunityPostEditorPage({
       setErr('\ub0b4\uc6a9\uc744 \uc785\ub825\ud558\uc138\uc694.')
       return
     }
+    if (auth.needsNicknameSetup) {
+      setErr('닉네임을 먼저 설정해 주세요.')
+      nav('/settings/account')
+      return
+    }
     const displayName = (auth.user?.displayName || nickname).trim()
-    if (!displayName) {
-      setErr('\ub2c9\ub124\uc784\uc744 \uc785\ub825\ud558\uc138\uc694.')
+    if (!displayName || displayName === '익명') {
+      setErr(isGuest ? '닉네임을 입력하세요.' : '닉네임을 먼저 설정해 주세요.')
+      if (!isGuest) nav('/settings/account')
       return
     }
     if (isGuest) setGuestNickname(displayName)
@@ -139,7 +145,19 @@ export default function CommunityPostEditorPage({
         <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
           {isGuest ? (
             <CommunityNicknameField value={nickname} onChange={setNickname} disabled={saving} />
-          ) : null}
+          ) : (
+            <p className="text-xs text-text-soft">
+              작성자: <span className="font-medium text-text-primary">{auth.user?.displayName}</span>
+              {' · '}
+              <button
+                type="button"
+                className="font-medium text-green-accent underline-offset-2 hover:underline"
+                onClick={() => nav('/settings/account')}
+              >
+                닉네임 변경
+              </button>
+            </p>
+          )}
           <div>
             <label htmlFor="pt" className="block text-xs font-semibold text-text-soft">
               제목

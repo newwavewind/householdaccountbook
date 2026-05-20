@@ -1,5 +1,6 @@
-﻿import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { fetchProfileNickname } from '../community/profileNickname'
 import { communityBackendMode } from '../lib/communityBackend'
 import { getCommunitySupabase } from '../lib/communitySupabaseClient'
 import { supabaseAuthV1CallbackUrl } from '../lib/supabaseOAuthProbe'
@@ -217,9 +218,15 @@ export default function AuthCallbackPage() {
         } catch {
           /* ignore */
         }
+        const nickname = await fetchProfileNickname(session.user.id)
+        const next = nickname ? '/community' : '/settings/account'
         setStatus('ok')
-        setMsg('로그인에 성공했습니다. 잠시 후 이동합니다.')
-        scheduleRedirect(600, '/community')
+        setMsg(
+          nickname
+            ? '로그인에 성공했습니다. 잠시 후 이동합니다.'
+            : '닉네임을 정하면 커뮤니티를 이용할 수 있어요.',
+        )
+        scheduleRedirect(600, next)
       } catch (e) {
         if (cancelled) return
         setStatus('error')

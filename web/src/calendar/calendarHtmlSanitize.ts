@@ -81,3 +81,47 @@ export function extractFirstImageSrc(html: string | undefined): string | null {
 export function htmlWithoutImages(html: string): string {
   return html.replace(/<img\b[^>]*>/gi, '').trim()
 }
+
+export type HtmlPreviewTypography = {
+  fontFamily?: string
+  fontSize?: string
+}
+
+function parseInlineTypography(style: string): HtmlPreviewTypography {
+  const fontFamily = /font-family:\s*([^;]+)/i
+    .exec(style)?.[1]
+    ?.trim()
+    .replace(/^["']|["']$/g, '')
+  const fontSize = /font-size:\s*([^;]+)/i.exec(style)?.[1]?.trim()
+  const out: HtmlPreviewTypography = {}
+  if (fontFamily) out.fontFamily = fontFamily
+  if (fontSize) out.fontSize = fontSize
+  return out
+}
+
+/** 일정 HTML에서 첫 글꼴·글자 크기 (달력 칸 미리보기용) */
+export function extractHtmlPreviewTypography(
+  html: string | undefined,
+): HtmlPreviewTypography {
+  const raw = html?.trim()
+  if (!raw) return {}
+
+  const safe = sanitizeCalendarEventHtml(raw)
+
+  if (typeof document !== 'undefined') {
+    const root = document.createElement('div')
+    root.innerHTML = safe
+    const styled = root.querySelectorAll('[style]')
+    for (const el of styled) {
+      const attr = el.getAttribute('style')
+      if (!attr) continue
+      const parsed = parseInlineTypography(attr)
+      if (parsed.fontFamily || parsed.fontSize) return parsed
+    }
+  }
+
+  const fromAttr = parseInlineTypography(safe)
+  if (fromAttr.fontFamily || fromAttr.fontSize) return fromAttr
+
+  return {}
+}

@@ -1,4 +1,6 @@
 ﻿import { useEffect, useMemo, useRef, useState } from 'react'
+import { CalendarDecoOverlay, calendarDecoHostClass } from './CalendarDecoOverlay'
+import { useCalendarDecoration } from './CalendarDecorationContext'
 import { CalendarStickyMemoCard } from './CalendarStickyMemoCard'
 import { StickyNoteDraggable } from './StickyNoteDraggable'
 import {
@@ -19,6 +21,8 @@ type Props = {
 }
 
 export default function CalendarStickyNotesBoard({ notes, patchNotes }: Props) {
+  const { decorated } = useCalendarDecoration()
+  const hostClass = calendarDecoHostClass(decorated)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set())
   const noteCountRef = useRef(0)
   const canvasRef = useRef<HTMLDivElement>(null)
@@ -127,10 +131,12 @@ export default function CalendarStickyNotesBoard({ notes, patchNotes }: Props) {
   return (
     <section
       aria-label="스티커 메모"
-      className={`overflow-hidden rounded-[var(--radius-card)] border border-border-subtle bg-gradient-to-b from-ceramic/60 to-surface-raised px-3 md:px-5 ${
+      className={`calendar-sticky-shell overflow-hidden rounded-[var(--radius-card)] border border-border-subtle bg-gradient-to-b from-ceramic/60 to-surface-raised px-3 md:px-5 ${hostClass} ${
         hasNotes ? 'py-2 md:py-2.5' : 'py-3 md:py-4'
       }`}
     >
+      <CalendarDecoOverlay strength="card" />
+      <div className="relative z-[1] min-w-0">
       {!hasNotes ? (
         <p className="text-center text-[11px] leading-snug text-text-soft sm:text-sm">
           <button
@@ -178,6 +184,7 @@ export default function CalendarStickyNotesBoard({ notes, patchNotes }: Props) {
           })}
         </div>
       ) : null}
+      </div>
     </section>
   )
 }

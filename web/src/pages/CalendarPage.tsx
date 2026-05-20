@@ -5,7 +5,6 @@ import { KakaoTalkShareIconButton } from '../components/KakaoTalkShareIconButton
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import {
-  deleteCalendarMemo,
   getDayEvents,
   setCalendarDayEvents,
   type CalendarDayEvent,
@@ -16,6 +15,12 @@ import {
   lunarCenterDayText,
   lunarMonthRangeLabel,
 } from '../calendar/lunarDisplay'
+import {
+  CalendarDecoOverlay,
+  CalendarDetailDecoBand,
+  calendarDecoHostClass,
+} from '../calendar/CalendarDecoOverlay'
+import { useCalendarDecoration } from '../calendar/CalendarDecorationContext'
 import {
   loadCalendarLunarView,
   saveCalendarLunarView,
@@ -48,18 +53,24 @@ import { CalendarEventRichField } from '../calendar/CalendarEventRichField'
 import type { StickyTint } from '../calendar/calendarStickyNotesStorage'
 import {
   STICKY_THEMES,
+  calendarDecoDayCellBgClass,
   stickyTintCalendarCellBg,
   stickyTintCardChrome,
+  stickyTintDetailEventChrome,
 } from '../calendar/stickyNoteTheme'
 import {
   extractFirstImageSrc,
+  extractHtmlPreviewTypography,
   htmlToPlain,
   htmlWithoutImages,
   sanitizeCalendarEventHtml,
 } from '../calendar/calendarHtmlSanitize'
 import type { DdayEvent } from '../dday/ddayTypes'
 
-const WEEK = ['일', '월', '화', '수', '목', '금', '토'] as const
+const WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
+
+const CALENDAR_DAY_CELL =
+  'calendar-day-cell relative flex min-h-[5rem] w-full cursor-pointer flex-col overflow-hidden rounded-none border-0 px-1 py-1.5 text-left transition-colors active:scale-[0.98] md:min-h-[6.25rem] md:px-1.5 md:py-2'
 
 function pad2(n: number) {
   return String(n).padStart(2, '0')
@@ -91,11 +102,44 @@ function buildGrid(year: number, monthIndex: number) {
   return cells
 }
 
-function formatMonthLabel(year: number, monthIndex: number) {
-  return new Intl.DateTimeFormat('ko-KR', {
-    year: 'numeric',
-    month: 'long',
-  }).format(new Date(year, monthIndex))
+const MONTH_EN = [
+  'JAN',
+  'FEB',
+  'MAR',
+  'APR',
+  'MAY',
+  'JUN',
+  'JUL',
+  'AUG',
+  'SEP',
+  'OCT',
+  'NOV',
+  'DEC',
+] as const
+
+function CalendarMonthHeading({
+  year,
+  monthIndex,
+}: {
+  year: number
+  monthIndex: number
+}) {
+  return (
+    <div
+      className="flex min-w-[4.5rem] flex-col items-center gap-0.5 leading-none font-calendar-month"
+      aria-label={`${year}년 ${monthIndex + 1}월`}
+    >
+      <span className="text-xs font-medium tabular-nums tracking-wide text-text-soft md:text-sm">
+        {year}
+      </span>
+      <span className="text-2xl font-bold tabular-nums text-text-primary md:text-[1.75rem]">
+        {monthIndex + 1}
+      </span>
+      <span className="text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-starbucks-green md:text-xs">
+        {MONTH_EN[monthIndex]}
+      </span>
+    </div>
+  )
 }
 
 function formatSelectedHeading(iso: string) {
@@ -192,32 +236,41 @@ function calendarCellBackgroundImage(
   return null
 }
 
-function calendarCellPreviewContent(
-  e: CalendarDayEvent,
-):
-  | { kind: 'plain'; text: string; ink: CalendarEventInkId | undefined }
-  | null {
+type CalendarCellPreview = {
+  text: string
+  ink: CalendarEventInkId | undefined
+  fontFamily?: string
+  fontSize?: string
+}
+
+function calendarCellPreviewContent(e: CalendarDayEvent): CalendarCellPreview | null {
   const ink = resolveCalendarEventMemoInk(e)
   const noteSan =
     e.noteHtml?.trim() ? sanitizeCalendarEventHtml(e.noteHtml) : ''
   if (noteSan) {
     const plain = htmlToPlain(htmlWithoutImages(noteSan))
-    if (plain) return { kind: 'plain', text: plain, ink }
+    if (plain) {
+      const typo = extractHtmlPreviewTypography(noteSan)
+      return { text: plain, ink, ...typo }
+    }
   }
   const nt = e.note?.trim()
-  if (nt) return { kind: 'plain', text: nt, ink }
+  if (nt) return { text: nt, ink }
 
   const labelSan =
     e.labelHtml?.trim() ? sanitizeCalendarEventHtml(e.labelHtml) : ''
   if (labelSan) {
     const plain = htmlToPlain(htmlWithoutImages(labelSan))
-    if (plain) return { kind: 'plain', text: plain, ink }
+    if (plain) {
+      const typo = extractHtmlPreviewTypography(labelSan)
+      return { text: plain, ink, ...typo }
+    }
   }
   const lt = e.label.trim()
-  if (lt) return { kind: 'plain', text: lt, ink }
+  if (lt) return { text: lt, ink }
 
   const t = e.time?.trim()
-  if (t) return { kind: 'plain', text: formatTimeKo(t), ink }
+  if (t) return { text: formatTimeKo(t), ink }
 
   return null
 }
@@ -226,7 +279,6 @@ type DayMemoPanelProps = {
   iso: string
   initial: CalendarDayMemo | undefined
   onPersist: (events: CalendarDayEvent[]) => void
-  onDelete: () => void
 }
 
 function emptyEventRow(): CalendarDayEvent {
@@ -237,7 +289,6 @@ function DayMemoPanel({
   iso,
   initial,
   onPersist,
-  onDelete,
 }: DayMemoPanelProps) {
   const [events, setEvents] = useState<CalendarDayEvent[]>([emptyEventRow()])
 
@@ -249,62 +300,100 @@ function DayMemoPanel({
 
   const hol = holidayLabel(iso)
   const lunar = lunarCellInfo(iso, hol)
+  const { decorated } = useCalendarDecoration()
+  const detailHostClass = calendarDecoHostClass(decorated)
 
   return (
     <Card
       id="calendar-day-detail"
-      className="scroll-mt-24 p-0"
+      className={`calendar-detail-shell scroll-mt-24 !p-0 ${detailHostClass}${decorated ? ' !bg-transparent' : ''}`}
     >
-      <div className="border-b border-border-muted px-4 py-3 md:px-5 md:py-4">
-        <div className="min-w-0">
-          <p className="text-base font-semibold text-starbucks-green">
-            {formatSelectedHeading(iso)}
-          </p>
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-soft">
-            <CalendarDayLabelsInline iso={iso} variant="detail" />
-            {lunar ? (
-              <span
-                className={
-                  lunar.emphasize ? 'font-semibold text-starbucks-green' : ''
-                }
-              >
-                음력 {lunar.label}
-              </span>
-            ) : null}
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-3 px-4 py-3 md:px-5">
-        <div className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-semibold text-text-primary">
-              일정 · 메모
-            </p>
-            <Button
-              type="button"
-              variant="outlined"
-              className="!min-h-11 min-w-[5.5rem] shrink-0 touch-manipulation !px-3 !py-2 !text-xs"
-              onClick={() =>
-                setEvents((prev) => [...prev, emptyEventRow()])
-              }
-            >
-              일정 추가
-            </Button>
-          </div>
-
+      {decorated ? (
+        <CalendarDecoOverlay
+          strength="card"
+          className="rounded-[calc(var(--radius-card)-1px)]"
+        />
+      ) : null}
+      <div
+        className={`calendar-detail-panel relative z-[1] flex min-w-0 flex-col overflow-hidden ${decorated ? 'rounded-[calc(var(--radius-card)-1px)]' : ''}`}
+      >
+        <div
+          className={`calendar-detail-body space-y-3 px-4 py-3 md:px-5${decorated ? ' rounded-[calc(var(--radius-card)-1px)]' : ''}`}
+        >
+          <div className="space-y-3">
           {events.map((ev, i) => {
             const paper: StickyTint = ev.memoTint ?? 'white'
             const stickyTheme = STICKY_THEMES[paper]
             return (
               <div
                 key={ev.id}
-                className={`flex min-h-[18rem] flex-col overflow-visible rounded-md border ${stickyTintCardChrome(paper)}`}
+                className={`calendar-detail-event flex min-h-[18rem] flex-col overflow-hidden rounded-md border ${stickyTintCardChrome(paper)}${decorated ? ' bg-transparent' : ''}`}
               >
-                <header
-                  className={`relative z-10 flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1.5 overflow-visible px-1.5 py-1 ${stickyTheme.headerClass}`}
+                <CalendarDetailDecoBand
+                  className={`flex shrink-0 flex-col gap-1.5 px-1.5 py-1 ${stickyTintDetailEventChrome(paper, 'header', decorated)}`}
                 >
-                  <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 md:gap-x-3">
+                  {i === 0 ? (
+                    <div className="calendar-detail-date-row flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-black/[0.08] pb-2.5 dark:border-white/10">
+                      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+                        <p className="text-sm font-semibold tracking-tight text-starbucks-green md:text-[0.95rem]">
+                          {formatSelectedHeading(iso)}
+                        </p>
+                        {lunar ? (
+                          <>
+                            <span
+                              className="hidden text-text-soft/60 sm:inline"
+                              aria-hidden
+                            >
+                              ·
+                            </span>
+                            <span
+                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[0.65rem] font-medium tabular-nums ${
+                                lunar.emphasize
+                                  ? 'bg-green-light/55 text-starbucks-green dark:bg-green-accent/20'
+                                  : 'bg-black/[0.04] text-text-soft dark:bg-white/8'
+                              }`}
+                            >
+                              음력 {lunar.label}
+                            </span>
+                          </>
+                        ) : null}
+                        <CalendarDayLabelsInline iso={iso} variant="detail" />
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <button
+                          type="button"
+                          className={[
+                            'calendar-detail-add-btn inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[0.7rem] font-semibold tracking-tight transition-colors touch-manipulation',
+                            decorated
+                              ? 'border-green-accent/30 bg-surface-raised/78 text-starbucks-green hover:border-green-accent/45 hover:bg-green-light/40'
+                              : 'border-green-accent/35 bg-green-light/45 text-starbucks-green hover:border-green-accent/50 hover:bg-green-light/55',
+                          ].join(' ')}
+                          aria-label="일정 추가"
+                          onClick={() =>
+                            setEvents((prev) => [...prev, emptyEventRow()])
+                          }
+                        >
+                          <span
+                            className="flex size-4 shrink-0 items-center justify-center rounded-full bg-green-accent text-[0.8rem] font-light leading-none text-on-accent"
+                            aria-hidden
+                          >
+                            +
+                          </span>
+                          추가
+                        </button>
+                        <Button
+                          type="button"
+                          variant="primary"
+                          className="calendar-detail-save-btn !min-h-0 shrink-0 !px-3.5 !py-1 !text-xs"
+                          onClick={() => onPersist(events)}
+                        >
+                          저장
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+                  <div className="flex w-full flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
+                  <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 md:gap-x-3">
                     <span className="text-[0.72rem] font-semibold tabular-nums text-text-secondary">
                       일정 {i + 1}
                     </span>
@@ -325,7 +414,9 @@ function DayMemoPanel({
                       중요
                     </label>
                     <div
-                      className="relative flex h-7 w-[7.25rem] max-w-[42vw] shrink-0 items-stretch overflow-hidden rounded border border-black/20 bg-white/90 sm:max-w-none dark:border-white/15 dark:bg-surface-raised"
+                      className={`calendar-detail-time-field relative flex h-7 w-[7.25rem] max-w-[42vw] shrink-0 items-stretch overflow-hidden rounded border border-black/20 sm:max-w-none dark:border-white/15 ${
+                        decorated ? '' : 'bg-white/90 dark:bg-surface-raised'
+                      }`}
                       title={ev.time?.trim() ? undefined : '시간 미지정'}
                     >
                       <input
@@ -395,7 +486,7 @@ function DayMemoPanel({
                     <button
                       type="button"
                       className={stickyTheme.headerBtnClass}
-                      aria-label="이 일정 삭제"
+                      aria-label={`일정 ${i + 1} 삭제`}
                       onClick={() => {
                         setEvents((prev) => {
                           const next = prev.filter((_, j) => j !== i)
@@ -406,9 +497,10 @@ function DayMemoPanel({
                       <span className="px-1 text-sm leading-none">×</span>
                     </button>
                   </div>
-                </header>
-                <div
-                  className={`flex min-h-0 flex-1 flex-col overflow-hidden ${stickyTheme.bodyClass}`}
+                  </div>
+                </CalendarDetailDecoBand>
+                <CalendarDetailDecoBand
+                  className={`calendar-detail-event-body flex min-h-0 flex-1 flex-col overflow-hidden ${stickyTintDetailEventChrome(paper, 'body', decorated)}`}
                 >
                   <div
                     className={`flex min-h-0 flex-1 flex-col ${calendarEventInkTextClass(
@@ -449,32 +541,12 @@ function DayMemoPanel({
                       }}
                     />
                   </div>
-                </div>
+                </CalendarDetailDecoBand>
               </div>
             )
           })}
+          </div>
         </div>
-      </div>
-
-      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border-muted px-4 py-2.5 md:px-5">
-        <Button
-          type="button"
-          variant="darkOutlined"
-          className="!min-h-0 shrink-0 !px-3 !py-1.5 !text-xs !border-danger !text-danger"
-          onClick={() => {
-            if (confirm('이 날짜의 모든 일정을 지울까요?')) onDelete()
-          }}
-        >
-          이 날 전체 삭제
-        </Button>
-        <Button
-          type="button"
-          variant="primary"
-          className="!min-h-0 shrink-0 !px-4 !py-1.5 !text-xs"
-          onClick={() => onPersist(events)}
-        >
-          저장
-        </Button>
       </div>
     </Card>
   )
@@ -693,6 +765,8 @@ export default function CalendarPage() {
   const [lunarView, setLunarView] = useState(() => loadCalendarLunarView())
 
   const { transactions, userId, householdId } = useLedger()
+  const { decorated: calendarDecorated, layerStyle, hostStyle } =
+    useCalendarDecoration()
   const { memos, patchMemos, cloudStatus, cloudMessage } =
     useHouseholdCalendarMemos()
 
@@ -744,6 +818,9 @@ export default function CalendarPage() {
       return next
     })
   }, [])
+
+  const decorationLayerStyle = layerStyle('card')
+  const cellZoneDecoStyle = layerStyle('cells')
 
   useEffect(() => {
     if (!peekIso) return
@@ -857,15 +934,19 @@ export default function CalendarPage() {
     [patchMemos, selectedIso],
   )
 
-  const removeMemo = useCallback(() => {
-    patchMemos((prev) => deleteCalendarMemo(prev, selectedIso))
-  }, [patchMemos, selectedIso])
-
   const selectedMemo = memos[selectedIso]
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-4 py-6 md:px-6">
-      <div className="mb-6">
+    <main
+      className={[
+        'mx-auto w-full max-w-5xl px-4 py-6 md:px-6',
+        calendarDecorated ? 'calendar-page-deco' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      style={hostStyle}
+    >
+      <div className="mb-6 w-full min-w-0">
         <DdaySummaryTicker lines={ddaySummaryLines} />
         {backend === 'supabase' && cloudConfigured ? (
           <div className="mt-4 space-y-2">
@@ -908,12 +989,34 @@ export default function CalendarPage() {
       <div className="flex flex-col gap-6">
         <CalendarStickyNotesBoard notes={stickyNotes} patchNotes={patchStickyNotes} />
 
-        <Card className="min-w-0 p-1.5 md:p-2">
-          <div className="mb-2 flex flex-col gap-2 rounded-[var(--radius-card)] bg-ceramic/80 p-2 md:flex-row md:items-center md:justify-between md:p-3">
+        <Card
+          className={[
+            'relative min-w-0 overflow-hidden p-1.5 md:p-2',
+            calendarDecorated ? 'calendar-card--decorated' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          {decorationLayerStyle ? (
+            <div
+              className="pointer-events-none absolute inset-0 z-0 rounded-[calc(var(--radius-card)-1px)]"
+              style={decorationLayerStyle}
+              aria-hidden
+            />
+          ) : null}
+          <div className="relative z-[1] min-w-0">
+          <div
+            className={[
+              'calendar-month-toolbar mb-2 flex flex-col gap-2 rounded-[var(--radius-card)] p-2 md:flex-row md:items-center md:justify-between md:p-3',
+              calendarDecorated ? '' : 'bg-ceramic/80',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
             <div className="flex flex-1 flex-wrap items-center justify-between gap-x-2 gap-y-2 md:justify-start">
               <Button
                 variant="outlined"
-                className="!min-h-11 min-w-11 !px-3"
+                className="calendar-toolbar-btn !min-h-11 min-w-11 !px-3"
                 aria-label="이전 달"
                 type="button"
                 onClick={goPrevMonth}
@@ -921,16 +1024,14 @@ export default function CalendarPage() {
                 ‹
               </Button>
               <div className="flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1">
-                <p className="w-full text-center text-base font-semibold text-text-primary md:text-lg">
-                  {formatMonthLabel(cursorY, cursorM)}
-                </p>
+                <CalendarMonthHeading year={cursorY} monthIndex={cursorM} />
                 {lunarMonthSubtitle ? (
                   <p className="text-center text-xs font-medium text-starbucks-green">
                     {lunarMonthSubtitle}
                   </p>
                 ) : null}
               </div>
-              <label className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-border-subtle bg-surface-raised px-2.5 py-1.5 text-xs font-semibold text-text-secondary transition-colors hover:border-green-accent/40 hover:bg-green-light/30 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-green-accent/50">
+              <label className="calendar-toolbar-chip flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-border-subtle bg-surface-raised px-2.5 py-1.5 text-xs font-semibold text-text-secondary transition-colors hover:border-green-accent/40 hover:bg-green-light/30 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-green-accent/50">
                 <input
                   type="checkbox"
                   checked={lunarView}
@@ -941,7 +1042,7 @@ export default function CalendarPage() {
               </label>
               <Button
                 variant="outlined"
-                className="!min-h-11 min-w-11 !px-3"
+                className="calendar-toolbar-btn !min-h-11 min-w-11 !px-3"
                 aria-label="다음 달"
                 type="button"
                 onClick={goNextMonth}
@@ -949,30 +1050,77 @@ export default function CalendarPage() {
                 ›
               </Button>
             </div>
-            <Button
-              variant="outlined"
-              type="button"
-              className="min-h-11 w-full shrink-0 md:w-auto"
-              onClick={goThisMonth}
-            >
-              오늘 / 이번 달
-            </Button>
-          </div>
-
-          <div className="mb-1 grid grid-cols-7 gap-0.5 text-center text-sm font-medium text-text-soft md:gap-1 md:text-base">
-            {WEEK.map((d, i) => (
-              <div
-                key={d}
-                className={
-                  i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : ''
-                }
+            <div className="flex w-full shrink-0 flex-col gap-2 sm:flex-row sm:justify-end md:w-auto">
+              <Button
+                variant="outlined"
+                type="button"
+                className="calendar-toolbar-btn min-h-11 w-full sm:flex-1 md:w-auto"
+                onClick={goThisMonth}
               >
-                {d}
-              </div>
-            ))}
+                오늘 / 이번 달
+              </Button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-7 gap-0.5 md:gap-1">
+          <div
+            className={[
+              'calendar-weekday-row relative mb-1.5',
+              calendarDecorated ? 'overflow-hidden rounded-t-[calc(var(--radius-card)-2px)]' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
+            <div
+              className={[
+                'relative z-[1] grid grid-cols-7 text-center text-sm font-medium md:text-base',
+                calendarDecorated ? 'calendar-weekday-grid' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
+              {WEEK.map((d, i) => {
+                const labelClass =
+                  i === 0
+                    ? 'text-red-500'
+                    : i === 6
+                      ? 'text-blue-500'
+                      : 'text-text-soft'
+                return (
+                  <div
+                    key={d}
+                    className={[
+                      'flex items-center justify-center',
+                      calendarDecorated
+                        ? 'calendar-weekday-cell py-0.5'
+                        : 'py-0.5',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                  >
+                    <span
+                      className={
+                        calendarDecorated
+                          ? `calendar-weekday-label ${labelClass}`
+                          : labelClass
+                      }
+                    >
+                      {d}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="calendar-days-frame relative">
+            {cellZoneDecoStyle ? (
+              <div
+                className="pointer-events-none absolute inset-0 z-0 rounded-[calc(var(--radius-card)-2px)]"
+                style={cellZoneDecoStyle}
+                aria-hidden
+              />
+            ) : null}
+            <div className="calendar-days-grid relative z-[1]">
             {cells.map(({ iso, day, inMonth }, cellIdx) => {
               const isSel = iso === selectedIso
 
@@ -985,8 +1133,11 @@ export default function CalendarPage() {
                     aria-pressed={isSel}
                     aria-label={iso}
                     className={[
-                      'relative flex min-h-[5rem] w-full cursor-pointer flex-col overflow-hidden rounded-lg border border-border-muted/30 bg-transparent transition-colors active:scale-[0.98] md:min-h-[6.25rem]',
-                      isSel ? 'ring-1 ring-inset ring-green-accent/35' : '',
+                      CALENDAR_DAY_CELL,
+                      calendarDecorated
+                        ? `${calendarDecoDayCellBgClass()} hover:bg-green-light/30`
+                        : 'bg-surface-raised hover:bg-green-light/25',
+                      isSel ? 'calendar-day-cell--selected' : '',
                     ]
                       .filter(Boolean)
                       .join(' ')}
@@ -1006,6 +1157,7 @@ export default function CalendarPage() {
               const hasLedger = txCount > 0
               const isToday = iso === today
               const isSunday = cellIdx % 7 === 0
+              const isSaturday = inMonth && cellIdx % 7 === 6
               const isRedDay =
                 inMonth &&
                 (isSunday || isRedCalendarDay(dayLabels?.primaryKind))
@@ -1040,7 +1192,17 @@ export default function CalendarPage() {
                     ariaLabel: preview.text,
                     node: (
                       <span
-                        className={`text-[0.65rem] leading-snug md:text-[0.7rem] ${cellTextShadow} ${calendarEventInkTextClass(preview.ink)}`}
+                        className={[
+                          preview.fontSize
+                            ? 'leading-snug'
+                            : 'text-[0.65rem] leading-snug md:text-[0.7rem]',
+                          cellTextShadow,
+                          calendarEventInkTextClass(preview.ink),
+                        ].join(' ')}
+                        style={{
+                          fontFamily: preview.fontFamily,
+                          fontSize: preview.fontSize,
+                        }}
                       >
                         {preview.text}
                       </span>
@@ -1067,19 +1229,29 @@ export default function CalendarPage() {
 
               const inMonthBase = hasMemo
                 ? cellBgImage
-                  ? 'border-border-subtle bg-surface-raised/30 hover:border-green-accent/45'
-                  : `border-border-subtle ${stickyTintCalendarCellBg(
+                  ? calendarDecorated
+                    ? 'bg-surface-raised/26 hover:bg-green-light/25'
+                    : 'bg-surface-raised/30 hover:bg-green-light/20'
+                  : `${stickyTintCalendarCellBg(
                       firstEventPaperTint(memo),
                       true,
-                    )} hover:border-green-accent/45 hover:bg-green-light/30`
-                : 'border-border-subtle bg-surface-raised hover:border-green-accent/45 hover:bg-green-light/35'
+                      calendarDecorated,
+                    )} hover:bg-green-light/30`
+                : calendarDecorated
+                  ? `${calendarDecoDayCellBgClass()} hover:bg-green-light/35`
+                  : 'bg-surface-raised hover:bg-green-light/35'
 
-              const selectedCellClass =
-                isSel && hasMemo
-                  ? 'ring-2 ring-inset ring-green-accent/60'
-                  : isSel
-                    ? 'bg-green-light/50'
-                    : ''
+              const accentBorderClass = isSel
+                ? 'calendar-day-cell--selected'
+                : isToday
+                  ? 'calendar-day-cell--today'
+                  : ''
+              const selectedFillClass =
+                isSel && !hasMemo
+                  ? calendarDecorated
+                    ? 'bg-green-light/45'
+                    : 'bg-green-light/50'
+                  : ''
 
               const centerDayText =
                 lunarView && lunar
@@ -1092,7 +1264,9 @@ export default function CalendarPage() {
                     : 'text-text-primary/[0.14] md:text-[2.8rem]'
                   : isRedDay
                     ? 'text-red-500/[0.11]'
-                    : 'text-text-primary/[0.08]'
+                    : isSaturday
+                      ? 'text-blue-500/[0.11]'
+                      : 'text-text-primary/[0.08]'
 
               return (
                 <button
@@ -1110,21 +1284,10 @@ export default function CalendarPage() {
                         : `${iso} 메모·일정`
                   }
                   className={[
-                    'relative flex min-h-[5rem] w-full cursor-pointer flex-col overflow-hidden rounded-lg border px-1 py-1.5 text-left transition-colors active:scale-[0.98] md:min-h-[6.25rem] md:px-1.5 md:py-2',
+                    CALENDAR_DAY_CELL,
                     inMonthBase,
-                    isRedCalendarDay(dayLabels?.primaryKind)
-                      ? 'ring-1 ring-inset ring-red-300/60'
-                      : '',
-                    hasLedger
-                      ? 'shadow-[0_0_0_1px_rgba(0,117,74,0.2)]'
-                      : '',
-                    isToday
-                      ? 'outline outline-2 outline-offset-[-2px] outline-green-accent/70'
-                      : '',
-                    lunarView && lunar?.emphasize
-                      ? 'ring-1 ring-inset ring-starbucks-green/35'
-                      : '',
-                    selectedCellClass,
+                    accentBorderClass,
+                    selectedFillClass,
                   ]
                     .filter(Boolean)
                     .join(' ')}
@@ -1133,14 +1296,14 @@ export default function CalendarPage() {
                     <>
                       <span
                         aria-hidden
-                        className="pointer-events-none absolute inset-0 z-0 rounded-[inherit] bg-cover bg-center"
+                        className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center"
                         style={{
                           backgroundImage: `url(${JSON.stringify(cellBgImage)})`,
                         }}
                       />
                       <span
                         aria-hidden
-                        className="pointer-events-none absolute inset-0 z-0 rounded-[inherit] bg-gradient-to-b from-white/50 via-white/15 to-black/30"
+                        className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-b from-white/50 via-white/15 to-black/30"
                       />
                     </>
                   ) : null}
@@ -1189,6 +1352,8 @@ export default function CalendarPage() {
                 </button>
               )
             })}
+            </div>
+          </div>
           </div>
         </Card>
 
@@ -1197,7 +1362,6 @@ export default function CalendarPage() {
             iso={selectedIso}
             initial={selectedMemo}
             onPersist={persistMemo}
-            onDelete={removeMemo}
           />
         </div>
       </div>

@@ -36,6 +36,7 @@ html.dark {
   --color-input-border: rgba(255, 255, 255, 0.22);
 
   --color-well: rgb(255 255 255 / 0.05);
+  --color-calendar-grid: rgb(255 255 255 / 0.1);
   --color-inset-highlight: rgb(255 255 255 / 0.06);
 
   --color-gold-lightest: rgb(40 36 28 / 0.85);
@@ -78,6 +79,7 @@ html.dark.theme3 {
   --color-input-border: rgba(255, 255, 255, 0.22);
 
   --color-well: rgb(255 255 255 / 0.05);
+  --color-calendar-grid: rgb(255 255 255 / 0.1);
   --color-inset-highlight: rgb(255 255 255 / 0.06);
   --color-auth-gradient-from: #1a1a1a;
   --color-auth-gradient-via: #141414;

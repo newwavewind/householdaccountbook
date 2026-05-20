@@ -20,6 +20,7 @@ model Profile {
   id          String   @id
   email       String   @unique
   displayName String?  @map("display_name")
+  nickname    String?  @map("nickname")
   avatarUrl   String?  @map("avatar_url")
   role        String   @default("user")
   updatedAt   DateTime @updatedAt @map("updated_at")

@@ -27,7 +27,9 @@ import {
 } from './calendarHtmlSanitize'
 import type { CalendarEventInkId } from './calendarEventInk'
 import type { StickyTint } from './calendarStickyNotesStorage'
-import { STICKY_THEMES } from './stickyNoteTheme'
+import { useCalendarDecoration } from './CalendarDecorationContext'
+import { CalendarDetailDecoBand } from './CalendarDecoOverlay'
+import { STICKY_THEMES, stickyTintDetailEventChrome } from './stickyNoteTheme'
 import { uploadCalendarImage } from './uploadCalendarImage'
 import { useMemoDefaults } from '../memo/MemoDefaultsContext'
 import {
@@ -216,6 +218,13 @@ export function CalendarEventRichField({
       applyMemoTypingDefaults(editor, memoDefaults)
     }
   }, [editor, memoDefaults.fontFamily, memoDefaults.fontSize])
+
+  const { decorated: calendarDecorated } = useCalendarDecoration()
+  const stickyFooterClass = stickyTintDetailEventChrome(
+    paperTint,
+    'footer',
+    calendarDecorated,
+  )
 
   if (!editor) return null
 
@@ -533,20 +542,24 @@ export function CalendarEventRichField({
       <div className="calendar-sticky-rich-editor flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-transparent">
         {hiddenFileInput}
         <div
-          className={`min-h-0 flex-1 overflow-y-auto ${st.placeholderClass} [&_.ProseMirror]:px-3 [&_.ProseMirror]:py-2`}
+          className={`calendar-detail-editor-pane min-h-0 flex-1 overflow-y-auto ${calendarDecorated ? 'bg-transparent' : ''} ${st.placeholderClass} [&_.ProseMirror]:bg-transparent [&_.ProseMirror]:px-3 [&_.ProseMirror]:py-2`}
         >
           <EditorContent
             editor={editor}
             className="min-h-[inherit] [&_.ProseMirror]:min-h-[11rem]"
           />
         </div>
-        <div
-          className={`flex shrink-0 flex-wrap items-center gap-0.5 px-1.5 py-1 ${st.footerClass}`}
-          role="toolbar"
-          aria-label={`${ariaLabel} 서식`}
+        <CalendarDetailDecoBand
+          className={`calendar-detail-event-toolbar flex shrink-0 flex-wrap items-center gap-0.5 px-1.5 py-1 ${stickyFooterClass}`}
         >
-          {toolbar}
-        </div>
+          <div
+            className="flex w-full flex-wrap items-center gap-0.5"
+            role="toolbar"
+            aria-label={`${ariaLabel} 서식`}
+          >
+            {toolbar}
+          </div>
+        </CalendarDetailDecoBand>
       </div>
     )
   }

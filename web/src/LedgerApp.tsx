@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useSearchParams } from 'react-router-dom'
 import { Button } from './components/ui/Button'
@@ -1283,7 +1283,7 @@ export default function LedgerApp() {
                 >
                   ‹
                 </Button>
-                <p className="min-w-[10rem] flex-1 text-center text-base font-bold tracking-tight text-starbucks-green md:text-lg">
+                <p className="min-w-[10rem] flex-1 text-center font-calendar-month text-base font-bold tracking-tight text-starbucks-green md:text-lg">
                   {formatMonthLabel(cursor.y, cursor.m)}
                 </p>
                 <Button
