@@ -11,21 +11,13 @@ import {
   type CalendarDayEvent,
   type CalendarDayMemo,
 } from '../calendar/calendarMemoStorage'
-import {
-  lunarCellInfo,
-  lunarCenterDayText,
-  lunarMonthRangeLabel,
-} from '../calendar/lunarDisplay'
+import { lunarCellInfo } from '../calendar/lunarDisplay'
 import {
   CalendarDecoOverlay,
   CalendarDetailDecoBand,
   calendarDecoHostClass,
 } from '../calendar/CalendarDecoOverlay'
 import { useCalendarDecoration } from '../calendar/CalendarDecorationContext'
-import {
-  loadCalendarLunarView,
-  saveCalendarLunarView,
-} from '../calendar/calendarLunarViewStorage'
 import { CalendarMonthHeading } from '../calendar/CalendarMonthHeading'
 import CalendarStickyNotesBoard from '../calendar/CalendarStickyNotesBoard'
 import { useHouseholdCalendarMemos } from '../calendar/useHouseholdCalendarMemos'
@@ -736,8 +728,6 @@ export default function CalendarPage() {
   const [cursorM, setCursorM] = useState(now.getMonth())
   const [selectedIso, setSelectedIso] = useState<string>(() => todayIso())
   const [peekIso, setPeekIso] = useState<string | null>(null)
-  const [lunarView, setLunarView] = useState(() => loadCalendarLunarView())
-
   const { transactions, userId, householdId } = useLedger()
   const { zonePhotoActive, hostStyle } = useCalendarDecoration()
   const calendarPhoto = zonePhotoActive('calendar')
@@ -778,20 +768,7 @@ export default function CalendarPage() {
     [cursorY, cursorM],
   )
 
-  const lunarMonthSubtitle = useMemo(
-    () => (lunarView ? lunarMonthRangeLabel(cursorY, cursorM) : ''),
-    [lunarView, cursorY, cursorM],
-  )
-
   const today = todayIso()
-
-  const toggleLunarView = useCallback(() => {
-    setLunarView((prev) => {
-      const next = !prev
-      saveCalendarLunarView(next)
-      return next
-    })
-  }, [])
 
   useEffect(() => {
     if (!peekIso) return
@@ -982,21 +959,7 @@ export default function CalendarPage() {
               </Button>
               <div className="flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1">
                 <CalendarMonthHeading year={cursorY} monthIndex={cursorM} />
-                {lunarMonthSubtitle ? (
-                  <p className="text-center text-xs font-medium text-starbucks-green">
-                    {lunarMonthSubtitle}
-                  </p>
-                ) : null}
               </div>
-              <label className="calendar-toolbar-chip flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-border-subtle bg-surface-raised px-2.5 py-1.5 text-xs font-semibold text-text-secondary transition-colors hover:border-green-accent/40 hover:bg-green-light/30 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-green-accent/50">
-                <input
-                  type="checkbox"
-                  checked={lunarView}
-                  onChange={toggleLunarView}
-                  className="size-3.5 rounded border-black/25 text-green-accent dark:border-white/30"
-                />
-                음력
-              </label>
               <Button
                 variant="outlined"
                 className="calendar-toolbar-btn !min-h-11 min-w-11 !px-3"
@@ -1196,29 +1159,27 @@ export default function CalendarPage() {
                     : 'bg-green-light/50'
                   : ''
 
-              const centerDayText =
-                lunarView && lunar
-                  ? lunarCenterDayText(lunar.label, lunar.emphasize)
-                  : String(day)
-              const centerDayClass =
-                lunarView && lunar
-                  ? lunar.emphasize
-                    ? 'text-starbucks-green/[0.22] md:text-[2.4rem]'
-                    : 'text-text-primary/[0.14] md:text-[2.8rem]'
-                  : isRedDay
-                    ? 'text-red-500/[0.11]'
-                    : isSaturday
-                      ? 'text-blue-500/[0.11]'
-                      : 'text-text-primary/[0.08]'
+              const centerDayText = String(day)
+              const centerDayClass = isRedDay
+                ? 'text-red-500/[0.11]'
+                : isSaturday
+                  ? 'text-blue-500/[0.11]'
+                  : 'text-text-primary/[0.08]'
+              const lunarDayClass = lunar?.emphasize
+                ? 'text-starbucks-green/[0.12]'
+                : isRedDay
+                  ? 'text-red-500/[0.07]'
+                  : isSaturday
+                    ? 'text-blue-500/[0.07]'
+                    : 'text-text-primary/[0.05]'
 
-              const dayAriaLabel =
-                starImportant
-                  ? lunarView && lunar
-                    ? `${iso} 양력 ${day}일, 음력 ${lunar.label}, 중요 일정 있음`
-                    : `${iso} 메모·일정, 중요 일정 있음`
-                  : lunarView && lunar
-                    ? `${iso} 양력 ${day}일, 음력 ${lunar.label}`
-                    : `${iso} 메모·일정`
+              const dayAriaLabel = starImportant
+                ? lunar
+                  ? `${iso} 양력 ${day}일, 음력 ${lunar.label}, 중요 일정 있음`
+                  : `${iso} 메모·일정, 중요 일정 있음`
+                : lunar
+                  ? `${iso} 양력 ${day}일, 음력 ${lunar.label}`
+                  : `${iso} 메모·일정`
 
               return (
                 <div
@@ -1261,23 +1222,29 @@ export default function CalendarPage() {
                       ★
                     </span>
                   ) : null}
-                  {lunarView ? (
-                    <span
-                      aria-hidden
-                      className="pointer-events-none absolute left-1 top-0.5 z-[2] select-none text-[0.625rem] font-semibold tabular-nums text-text-soft md:text-[0.6875rem]"
-                    >
-                      {day}
-                    </span>
-                  ) : null}
-                  <span
+                  <div
                     aria-hidden
-                    className={[
-                      'pointer-events-none absolute left-1/2 top-[42%] z-[1] -translate-x-1/2 -translate-y-1/2 select-none text-[2.6rem] font-semibold leading-none tabular-nums md:top-[44%] md:text-[3.1rem]',
-                      centerDayClass,
-                    ].join(' ')}
+                    className="pointer-events-none absolute left-1/2 top-[42%] z-[1] flex -translate-x-1/2 -translate-y-1/2 select-none flex-col items-center gap-0 md:top-[44%]"
                   >
-                    {centerDayText}
-                  </span>
+                    <span
+                      className={[
+                        'text-[2.6rem] font-semibold leading-none tabular-nums md:text-[3.1rem]',
+                        centerDayClass,
+                      ].join(' ')}
+                    >
+                      {centerDayText}
+                    </span>
+                    {lunar ? (
+                      <span
+                        className={[
+                          '-mt-0.5 text-[0.62rem] font-medium leading-none tabular-nums md:text-[0.68rem]',
+                          lunarDayClass,
+                        ].join(' ')}
+                      >
+                        {lunar.label}
+                      </span>
+                    ) : null}
+                  </div>
 
                   <div className="relative z-[1] flex min-h-0 flex-1 flex-col gap-0.5 pt-0.5">
                     {hasCellTicker ? (

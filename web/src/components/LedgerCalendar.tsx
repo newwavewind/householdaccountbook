@@ -11,7 +11,7 @@ import { NoSpendCelebrateBurst } from './NoSpendCelebrateBurst'
 import { MarqueeTicker, type MarqueeSegment } from './MarqueeTicker'
 import { MarqueeTickerRows, type MarqueeTickerRow } from './MarqueeTickerRows'
 
-const WEEK = ['일', '월', '화', '수', '목', '금', '토'] as const
+const WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
 
 const CELL_MIN_H = 'min-h-[6.25rem] md:min-h-[7.5rem]'
 
