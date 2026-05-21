@@ -42,15 +42,6 @@ export function DdaySummaryTicker({ lines }: Props) {
         >
           <CalendarDecoOverlay zone="dday" strength="card" />
           <div className="relative z-[1] flex min-h-[2.75rem] items-stretch">
-            <Link
-              to="/calendar/dday"
-              title="디데이 설정"
-              className="flex shrink-0 items-center border-r border-border-subtle bg-starbucks-green/[0.08] px-2 py-2 transition-colors hover:bg-starbucks-green/[0.14] md:px-3"
-            >
-              <span className="text-[0.65rem] font-bold uppercase tracking-wide text-starbucks-green md:text-xs">
-                D-Day
-              </span>
-            </Link>
             <p className="flex min-w-0 flex-1 items-center px-3 text-sm text-text-soft">
               생일·기념일·아기 개월수 등을 등록해 보세요
             </p>
@@ -70,31 +61,26 @@ export function DdaySummaryTicker({ lines }: Props) {
       >
         <CalendarDecoOverlay zone="dday" strength="panel" />
         <div className="relative z-[1] flex min-h-[2.75rem] items-stretch">
-          <Link
-            to="/calendar/dday"
-            title="디데이 설정"
-            className="flex shrink-0 items-center border-r border-border-subtle bg-starbucks-green/[0.08] px-2 py-2 transition-colors hover:bg-starbucks-green/[0.14] md:px-3"
-          >
-            <span className="text-[0.65rem] font-bold uppercase tracking-wide text-starbucks-green md:text-xs">
-              D-Day
-            </span>
-          </Link>
-
-          <MarqueeTicker
-            variant="banner"
-            segments={linesToSegments(lines)}
-            ariaLabel={ariaLabel}
-            className="pointer-events-auto"
-          />
-
           <button
             type="button"
-            className={actionBtnClass}
+            className="flex min-h-[2.75rem] min-w-0 flex-1 cursor-pointer items-stretch border-0 bg-transparent p-0 text-left transition-colors hover:bg-green-light/25 active:bg-green-light/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-accent/50 focus-visible:ring-inset touch-manipulation md:min-h-11"
             aria-expanded={expanded}
             aria-controls="dday-summary-expanded"
+            aria-label={
+              expanded
+                ? `디데이 전체 목록 접기. ${ariaLabel}`
+                : `디데이 전체 목록 펼치기. ${ariaLabel}`
+            }
             onClick={() => setExpanded((v) => !v)}
           >
-            {expanded ? '접기' : '전체 입력'}
+            <MarqueeTicker
+              variant="banner"
+              segments={linesToSegments(lines)}
+              ariaLabel={ariaLabel}
+              className="pointer-events-none w-full"
+              pauseOnHover={false}
+              embedded
+            />
           </button>
         </div>
       </div>

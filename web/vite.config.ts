@@ -31,7 +31,9 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('node_modules/date-holidays')) return 'date-holidays'
+          if (id.includes('node_modules/@hyunbinseo/holidays-kr')) {
+            return 'holidays-kr'
+          }
         },
       },
     },

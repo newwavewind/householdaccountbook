@@ -14,6 +14,7 @@ import { BulkRowManageIcon } from './bulkInput/BulkRowManageIcon'
 import { CategoryLabel } from './components/CategoryLabel'
 import { DayDetailModal } from './components/DayDetailModal'
 import { ExpenseCategoryBreakdown } from './components/ExpenseCategoryBreakdown'
+import { LedgerStatisticsPanel } from './components/LedgerStatisticsPanel'
 import { useLedger } from './hooks/useLedger'
 import { rollupByDate } from './lib/dayTotals'
 import { ledgerStartIso, monthNoSpendStats } from './lib/noSpendChallenge'
@@ -51,11 +52,26 @@ function compareTransactions(a: Transaction, b: Transaction, cfg: TxListSort) {
 const LEGACY_CARD_BRAND_SENTINEL = '__legacy_card__'
 type ExpensePayFilter = 'all' | 'cash' | 'ieum' | 'card'
 type TxListTab = 'all' | 'income' | 'expense'
-type LedgerDetailPanel = 'transactions' | 'category'
+type TxListPageSize = 5 | 10 | 30 | 'all'
+
+const TX_LIST_PAGE_SIZE_OPTIONS: { value: TxListPageSize; label: string }[] = [
+  { value: 5, label: '5개씩 보기' },
+  { value: 10, label: '10개씩 보기' },
+  { value: 30, label: '30개씩 보기' },
+  { value: 'all', label: '전체 보기' },
+]
+
+function txListPageCount(rowCount: number, pageSize: TxListPageSize): number {
+  if (pageSize === 'all' || rowCount === 0) return 1
+  return Math.max(1, Math.ceil(rowCount / pageSize))
+}
+
+type LedgerDetailPanel = 'transactions' | 'category' | 'stats'
 
 const LEDGER_DETAIL_PANELS: { id: LedgerDetailPanel; label: string }[] = [
   { id: 'transactions', label: '거래 내역' },
   { id: 'category', label: '분류별 지출' },
+  { id: 'stats', label: '통계' },
 ]
 
 function LedgerPanelNavButton({
@@ -121,7 +137,7 @@ function LedgerDetailPanelHeader({
         <div
           role="tablist"
           aria-label="화면 전환"
-          className="grid min-w-0 flex-1 grid-cols-2 gap-1 rounded-xl bg-black/[0.04] p-1 theme2:bg-neutral-cool/50"
+          className="grid min-w-0 flex-1 grid-cols-3 gap-1 rounded-xl bg-black/[0.04] p-1 theme2:bg-neutral-cool/50"
         >
           {LEDGER_DETAIL_PANELS.map((panel) => {
             const active = detailPanel === panel.id
@@ -131,7 +147,7 @@ function LedgerDetailPanelHeader({
                 type="button"
                 role="tab"
                 aria-selected={active}
-                className={`rounded-lg px-2 py-2.5 text-sm font-semibold transition-all duration-200 ${
+                className={`rounded-lg px-1.5 py-2.5 text-xs font-semibold transition-all duration-200 sm:px-2 sm:text-sm ${
                   active
                     ? 'bg-surface-raised text-starbucks-green shadow-[var(--shadow-frap-base)] ring-1 ring-starbucks-green/20'
                     : 'text-text-soft hover:bg-surface-raised/60 hover:text-text-primary'
@@ -453,6 +469,8 @@ export default function LedgerApp() {
   })
   const [detailPanel, setDetailPanel] = useState<LedgerDetailPanel>('transactions')
   const [txListTab, setTxListTab] = useState<TxListTab>('all')
+  const [txListPageSize, setTxListPageSize] = useState<TxListPageSize>(10)
+  const [txListPage, setTxListPage] = useState(1)
   const [txSort, setTxSort] = useState<TxListSort>({
     primary: 'amount',
     amountDir: 'desc',
@@ -673,6 +691,33 @@ export default function LedgerApp() {
     txSort,
   ])
 
+  const txListPageCountValue = useMemo(
+    () => txListPageCount(displayedTransactions.length, txListPageSize),
+    [displayedTransactions.length, txListPageSize],
+  )
+
+  const visibleTransactions = useMemo(() => {
+    if (txListPageSize === 'all') return displayedTransactions
+    const start = (txListPage - 1) * txListPageSize
+    return displayedTransactions.slice(start, start + txListPageSize)
+  }, [displayedTransactions, txListPageSize, txListPage])
+
+  useEffect(() => {
+    setTxListPage(1)
+  }, [
+    txListTab,
+    txSort,
+    expensePayFilter,
+    expenseCardBrandFilter,
+    selectedMember,
+    cursor.y,
+    cursor.m,
+  ])
+
+  useEffect(() => {
+    setTxListPage((p) => Math.min(p, txListPageCountValue))
+  }, [txListPageCountValue])
+
   const monthNetTotal = incomeTotal - expenseTotal
 
   const expenseFilteredTotal = useMemo(
@@ -883,8 +928,8 @@ export default function LedgerApp() {
           </p>
         </div>
       ) : null}
-      <header className="relative z-10 border-b border-border-subtle bg-gradient-to-r from-surface-raised via-ceramic/30 to-surface-raised">
-        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-3 px-4 md:h-[4.5rem] md:px-6 lg:h-[5.2rem]">
+      <header className="relative z-10 bg-transparent">
+        <div className="mx-auto flex min-h-16 max-w-5xl flex-wrap items-center justify-between gap-2 px-4 py-2 md:h-[4.5rem] md:flex-nowrap md:gap-3 md:py-0 md:px-6 lg:h-[5.2rem]">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <p className="truncate text-xl font-bold tracking-tight text-starbucks-green">
               가계부
@@ -908,6 +953,18 @@ export default function LedgerApp() {
               PC입력
             </NavLink>
           </div>
+          <NoSpendChallengeBanner
+            compact
+            className="max-w-[min(100%,14rem)] shrink sm:max-w-[18rem]"
+            count={noSpendStats.count}
+            eligibleDayCount={noSpendStats.eligibleDayCount}
+            monthLabel={formatMonthLabel(cursor.y, cursor.m)}
+            active={noSpendCelebrate}
+            onToggleCelebrate={() => {
+              goThisMonth()
+              toggleNoSpendCelebrate()
+            }}
+          />
         </div>
       </header>
 
@@ -916,63 +973,49 @@ export default function LedgerApp() {
         {/* 가족 구성원 관리 + 필터 */}
         <section aria-label="가족 구성원">
           <Card className="overflow-hidden !p-2.5 md:!p-3">
-            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
-              <div className="flex items-center gap-1.5">
-                <h2 className="m-0 text-sm font-bold tracking-tight text-starbucks-green">
+            <div className="flex w-full flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1.5">
+                <h2 className="m-0 shrink-0 text-sm font-bold tracking-tight text-starbucks-green">
                   가족 구성원
                 </h2>
-                <Button
+                <button
                   type="button"
-                  variant="outlined"
-                  className="!inline-flex !h-7 !min-h-0 !items-center !gap-1 !rounded-full !px-2.5 !py-0 !text-[11px]"
-                  onClick={() => setMemberManageOpen(true)}
+                  onClick={() => setSelectedMember(null)}
+                  className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                    selectedMember === null
+                      ? 'border-starbucks-green/40 bg-starbucks-green/10 text-starbucks-green ring-1 ring-starbucks-green/25'
+                      : 'border-border-pill bg-surface-raised text-text-soft hover:bg-neutral-cool/60'
+                  }`}
                 >
-                  <BulkRowManageIcon className="size-3" />
-                  관리
-                </Button>
+                  전체
+                </button>
+                {cloudMembers.map((m) => {
+                  const active = selectedMember === m
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setSelectedMember(active ? null : m)}
+                      className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                        active
+                          ? 'border-starbucks-green/40 bg-starbucks-green/10 text-starbucks-green ring-1 ring-starbucks-green/25'
+                          : 'border-border-pill bg-surface-raised text-text-primary hover:bg-neutral-cool/60'
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  )
+                })}
               </div>
-              <NoSpendChallengeBanner
-                compact
-                count={noSpendStats.count}
-                eligibleDayCount={noSpendStats.eligibleDayCount}
-                monthLabel={formatMonthLabel(cursor.y, cursor.m)}
-                active={noSpendCelebrate}
-                onToggleCelebrate={() => {
-                  goThisMonth()
-                  toggleNoSpendCelebrate()
-                }}
-              />
-            </div>
-
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              <button
+              <Button
                 type="button"
-                onClick={() => setSelectedMember(null)}
-                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                  selectedMember === null
-                    ? 'border-starbucks-green/40 bg-starbucks-green/10 text-starbucks-green ring-1 ring-starbucks-green/25'
-                    : 'border-border-pill bg-surface-raised text-text-soft hover:bg-neutral-cool/60'
-                }`}
+                variant="outlined"
+                className="!inline-flex !h-7 !min-h-0 shrink-0 !items-center !gap-1 !rounded-full !px-2.5 !py-0 !text-[11px]"
+                onClick={() => setMemberManageOpen(true)}
               >
-                전체
-              </button>
-              {cloudMembers.map((m) => {
-                const active = selectedMember === m
-                return (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => setSelectedMember(active ? null : m)}
-                    className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                      active
-                        ? 'border-starbucks-green/40 bg-starbucks-green/10 text-starbucks-green ring-1 ring-starbucks-green/25'
-                        : 'border-border-pill bg-surface-raised text-text-primary hover:bg-neutral-cool/60'
-                    }`}
-                  >
-                    {m}
-                  </button>
-                )
-              })}
+                <BulkRowManageIcon className="size-3" />
+                관리
+              </Button>
             </div>
 
           </Card>
@@ -1428,28 +1471,97 @@ export default function LedgerApp() {
                         : '선택한 수단에 해당하는 거래가 없습니다.'}
               </p>
             ) : (
-              <ul className="mt-1 divide-y divide-border-subtle/70">
-                {displayedTransactions.map((t) => (
-                  <TransactionLedgerRow
-                    key={t.id}
-                    t={t}
-                    fmtKrw={fmtKrw}
-                    onSelectDate={(iso) => {
-                      setDayModalIso(iso)
-                      setSelectedIso(iso)
-                    }}
-                  />
-                ))}
-              </ul>
+              <>
+                <div className="mt-3 flex flex-col gap-2 border-t border-border-subtle/80 pt-3 sm:flex-row sm:items-center sm:justify-between">
+                  <label className="flex items-center gap-1.5 text-xs text-text-soft">
+                    <span className="font-medium text-text-muted">목록 개수</span>
+                    <select
+                      aria-label="거래 내역 목록 개수"
+                      value={txListPageSize}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        const next: TxListPageSize =
+                          v === 'all' ? 'all' : (Number(v) as 5 | 10 | 30)
+                        setTxListPageSize(next)
+                        setTxListPage(1)
+                      }}
+                      className="h-8 rounded-lg border border-border-subtle bg-surface-raised px-2 text-xs font-semibold text-text-secondary outline-none focus:border-green-accent"
+                    >
+                      {TX_LIST_PAGE_SIZE_OPTIONS.map((opt) => (
+                        <option key={String(opt.value)} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {txListPageSize !== 'all' ? (
+                    <nav
+                      className="flex items-center justify-center gap-2"
+                      aria-label="거래 내역 페이지"
+                    >
+                      <button
+                        type="button"
+                        disabled={txListPage <= 1}
+                        onClick={() => setTxListPage((p) => Math.max(1, p - 1))}
+                        className="flex h-8 min-w-8 items-center justify-center rounded-lg border border-border-subtle bg-surface-raised text-xs font-semibold text-text-secondary outline-none transition-colors hover:bg-green-light/30 disabled:opacity-40 focus:border-green-accent"
+                        aria-label="이전 페이지"
+                      >
+                        ◀
+                      </button>
+                      <span className="min-w-[3.5rem] text-center text-xs font-semibold tabular-nums text-text-secondary">
+                        {txListPage} / {txListPageCountValue}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={txListPage >= txListPageCountValue}
+                        onClick={() =>
+                          setTxListPage((p) =>
+                            Math.min(txListPageCountValue, p + 1),
+                          )
+                        }
+                        className="flex h-8 min-w-8 items-center justify-center rounded-lg border border-border-subtle bg-surface-raised text-xs font-semibold text-text-secondary outline-none transition-colors hover:bg-green-light/30 disabled:opacity-40 focus:border-green-accent"
+                        aria-label="다음 페이지"
+                      >
+                        ▶
+                      </button>
+                    </nav>
+                  ) : null}
+                  <p className="text-center text-xs text-text-soft sm:text-right">
+                    {txListPageSize === 'all'
+                      ? `전체 ${displayedTransactions.length}건`
+                      : `${(txListPage - 1) * txListPageSize + 1}–${Math.min(txListPage * txListPageSize, displayedTransactions.length)} / ${displayedTransactions.length}건`}
+                  </p>
+                </div>
+                <ul className="mt-1 divide-y divide-border-subtle/70">
+                  {visibleTransactions.map((t) => (
+                    <TransactionLedgerRow
+                      key={t.id}
+                      t={t}
+                      fmtKrw={fmtKrw}
+                      onSelectDate={(iso) => {
+                        setDayModalIso(iso)
+                        setSelectedIso(iso)
+                      }}
+                    />
+                  ))}
+                </ul>
+              </>
             )}
               </>
-            ) : (
+            ) : detailPanel === 'category' ? (
               <div className="mt-5">
                 <ExpenseCategoryBreakdown
                   expenses={monthExpenseTransactions}
                   fmtKrw={fmtKrw}
                 />
               </div>
+            ) : (
+              <LedgerStatisticsPanel
+                transactions={filtered}
+                year={cursor.y}
+                monthIndex={cursor.m}
+                fmtKrw={fmtKrw}
+              />
             )}
           </Card>
         </section>

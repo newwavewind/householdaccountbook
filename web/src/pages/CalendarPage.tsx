@@ -29,11 +29,14 @@ import { useHouseholdDDays } from '../dday/useHouseholdDDays'
 import { useLedger } from '../hooks/useLedger'
 import {
   calendarLabelTextClass,
+  ensureOfficialHolidaysRemote,
   getCalendarDayLabels,
   holidayLabel,
+  invalidateHolidayLabelCaches,
   isRedCalendarDay,
 } from '../lib/holidays'
 import { CalendarDayLabelsInline } from '../components/CalendarDayLabelsInline'
+import { MarqueeTicker, type MarqueeSegment } from '../components/MarqueeTicker'
 import { MarqueeTickerRows, type MarqueeTickerRow } from '../components/MarqueeTickerRows'
 import { isCloudSyncEnabled } from '../lib/supabaseClient'
 import { ledgerBackendMode } from '../lib/ledgerBackend'
@@ -64,7 +67,7 @@ import type { DdayEvent } from '../dday/ddayTypes'
 const WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
 
 const CALENDAR_DAY_CELL =
-  'calendar-day-cell relative flex min-h-[5rem] w-full cursor-pointer flex-col overflow-hidden rounded-none border-0 px-1 py-1.5 text-left transition-colors active:scale-[0.98] md:min-h-[6.25rem] md:px-1.5 md:py-2'
+  'calendar-day-cell relative flex min-h-[5.75rem] w-full cursor-pointer flex-col overflow-hidden rounded-none border-0 px-1 py-1.5 text-left transition-colors active:scale-[0.98] md:min-h-[7rem] md:px-1.5 md:py-2'
 
 function onCalendarDayCellKeyDown(
   e: ReactKeyboardEvent,
@@ -728,6 +731,7 @@ export default function CalendarPage() {
   const [cursorM, setCursorM] = useState(now.getMonth())
   const [selectedIso, setSelectedIso] = useState<string>(() => todayIso())
   const [peekIso, setPeekIso] = useState<string | null>(null)
+  const [holidaysRevision, setHolidaysRevision] = useState(0)
   const { transactions, userId, householdId } = useLedger()
   const { zonePhotoActive, hostStyle } = useCalendarDecoration()
   const calendarPhoto = zonePhotoActive('calendar')
@@ -769,6 +773,18 @@ export default function CalendarPage() {
   )
 
   const today = todayIso()
+
+  useEffect(() => {
+    let cancelled = false
+    void ensureOfficialHolidaysRemote().then((ok) => {
+      if (cancelled || !ok) return
+      invalidateHolidayLabelCaches()
+      setHolidaysRevision((n) => n + 1)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     if (!peekIso) return
@@ -1023,7 +1039,10 @@ export default function CalendarPage() {
           </div>
 
           <div className="calendar-days-frame relative">
-            <div className="calendar-days-grid relative z-[1]">
+            <div
+              className="calendar-days-grid relative z-[1]"
+              key={holidaysRevision}
+            >
             {cells.map(({ iso, day, inMonth }, cellIdx) => {
               const isSel = iso === selectedIso
 
@@ -1071,15 +1090,14 @@ export default function CalendarPage() {
                 ? 'font-semibold drop-shadow-[0_0_4px_rgba(255,255,255,0.95)]'
                 : ''
               const cellTickerRows: MarqueeTickerRow[] = []
+              const labelFooterSegments: MarqueeSegment[] = []
               if (dayLabels && inMonth) {
                 for (const e of dayLabels.entries) {
-                  cellTickerRows.push({
+                  labelFooterSegments.push({
                     id: `label-${e.kind}-${e.name}`,
-                    ariaLabel: e.name,
-                    forceMarquee: e.name.length >= 6,
                     node: (
                       <span
-                        className={`text-[0.62rem] font-medium leading-tight md:text-[0.68rem] ${calendarLabelTextClass(e.kind)} ${cellTextShadow}`}
+                        className={`text-[0.58rem] font-medium leading-none md:text-[0.62rem] ${calendarLabelTextClass(e.kind)} ${cellTextShadow}`}
                       >
                         {e.name}
                       </span>
@@ -1132,6 +1150,8 @@ export default function CalendarPage() {
                 }
               }
               const hasCellTicker = cellTickerRows.length > 0
+              const hasLabelFooter = labelFooterSegments.length > 0
+              const labelFooterText = dayLabels?.text ?? ''
 
               const inMonthBase = hasMemo
                 ? cellBgImage
@@ -1165,21 +1185,24 @@ export default function CalendarPage() {
                 : isSaturday
                   ? 'text-blue-500/[0.11]'
                   : 'text-text-primary/[0.08]'
-              const lunarDayClass = lunar?.emphasize
-                ? 'text-starbucks-green/[0.12]'
-                : isRedDay
-                  ? 'text-red-500/[0.07]'
+              const lunarDayClass = isRedDay
+                ? lunar?.emphasize
+                  ? 'font-semibold text-red-500/[0.18]'
+                  : 'text-red-500/[0.14]'
+                : lunar?.emphasize
+                  ? 'font-semibold text-starbucks-green/[0.22]'
                   : isSaturday
-                    ? 'text-blue-500/[0.07]'
-                    : 'text-text-primary/[0.05]'
+                    ? 'text-blue-500/[0.14]'
+                    : 'text-text-primary/[0.12]'
 
+              const labelsSuffix = dayLabels?.text ? `, ${dayLabels.text}` : ''
               const dayAriaLabel = starImportant
                 ? lunar
-                  ? `${iso} 양력 ${day}일, 음력 ${lunar.label}, 중요 일정 있음`
-                  : `${iso} 메모·일정, 중요 일정 있음`
+                  ? `${iso} 양력 ${day}일, 음력 ${lunar.label}${labelsSuffix}, 중요 일정 있음`
+                  : `${iso} 메모·일정${labelsSuffix}, 중요 일정 있음`
                 : lunar
-                  ? `${iso} 양력 ${day}일, 음력 ${lunar.label}`
-                  : `${iso} 메모·일정`
+                  ? `${iso} 양력 ${day}일, 음력 ${lunar.label}${labelsSuffix}`
+                  : `${iso} 메모·일정${labelsSuffix}`
 
               return (
                 <div
@@ -1252,6 +1275,22 @@ export default function CalendarPage() {
                         rows={cellTickerRows}
                         staggerKeyPrefix={iso}
                         className="w-full shrink-0"
+                      />
+                    ) : null}
+                  </div>
+                  <div className="relative z-[1] mt-auto flex w-full shrink-0 min-h-[1.125rem] items-center border-t border-black/10 dark:border-white/10 md:min-h-[1.25rem]">
+                    {hasLabelFooter ? (
+                      <MarqueeTicker
+                        variant="cell"
+                        segments={labelFooterSegments}
+                        ariaLabel={labelFooterText}
+                        staggerKey={`${iso}-labels`}
+                        forceMarquee={
+                          labelFooterSegments.length > 1 ||
+                          labelFooterText.length >= 6
+                        }
+                        pauseOnHover={false}
+                        className="!min-h-0 h-[1.05rem] w-full !flex-none md:h-[1.125rem]"
                       />
                     ) : null}
                   </div>

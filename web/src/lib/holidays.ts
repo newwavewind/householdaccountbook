@@ -1,11 +1,14 @@
-import Holidays from 'date-holidays'
 import {
   LABEL_KIND_PRIORITY,
   type CalendarDayLabels,
   type CalendarLabelEntry,
   type CalendarLabelKind,
 } from './calendarLabelTypes'
+import { getOfficialHolidayYearMap, officialHolidayKind } from './krOfficialHolidays'
+
+export { ensureOfficialHolidaysRemote } from './krOfficialHolidays'
 import { getObservanceMapForYear } from './krCalendarObservances'
+import { getSamBokMapForYear } from './krSamBok'
 import { getSolarTermMapForYear } from './krSolarTerms'
 import { getSpecialDayEntry } from './krSpecialDays'
 import specialDaysJson from '../data/krSpecialDays.json'
@@ -18,10 +21,14 @@ export type {
 export { isRedCalendarDay } from './calendarLabelTypes'
 export { calendarLabelTextClass, calendarLabelMutedClass } from './calendarDayLabelStyles'
 
-const kr = new Holidays('KR')
-
 const publicCache = new Map<number, Map<string, CalendarLabelEntry[]>>()
 const mergedCache = new Map<number, Map<string, CalendarDayLabels>>()
+
+/** 관보·원격 공휴일 반영 후 달력 라벨 다시 계산 */
+export function invalidateHolidayLabelCaches(): void {
+  publicCache.clear()
+  mergedCache.clear()
+}
 
 const specialDaysData = specialDaysJson as Record<
   string,
@@ -62,19 +69,22 @@ function mergeEntryMaps(
   return out
 }
 
-/** date-holidays 법정 공휴일·대체공휴일 */
+/** 관보·우주항공청 공휴일 (대체공휴일·설·추석 연휴·선거·임시공휴일 포함) */
 export function getPublicHolidayMapForYear(
   year: number,
 ): Map<string, CalendarLabelEntry[]> {
   let m = publicCache.get(year)
   if (m) return m
   m = new Map()
-  const list = kr.getHolidays(year, 'ko')
-  if (list) {
-    for (const h of list) {
-      const key = h.date.slice(0, 10)
-      const kind: CalendarLabelKind = h.substitute ? 'substitute' : 'public'
-      pushEntry(m, key, { name: h.name, kind })
+  const yearMap = getOfficialHolidayYearMap(year)
+  if (yearMap) {
+    for (const [iso, names] of Object.entries(yearMap)) {
+      for (const name of names) {
+        pushEntry(m, iso, {
+          name,
+          kind: officialHolidayKind(name),
+        })
+      }
     }
   }
   publicCache.set(year, m)
@@ -96,6 +106,7 @@ function getMergedEntryMapForYear(year: number): Map<string, CalendarLabelEntry[
   return mergeEntryMaps([
     getPublicHolidayMapForYear(year),
     getObservanceMapForYear(year),
+    getSamBokMapForYear(year),
     getSolarTermMapForYear(year),
     getSpecialDayMapForYear(year),
   ])

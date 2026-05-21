@@ -22,6 +22,8 @@ type Props = {
   staggerKey?: string
   /** 달력 칸 등 — 측정 전에도 긴 글자면 마키 활성화 */
   forceMarquee?: boolean
+  /** 상위 버튼 등에 넣을 때 — 중복 라벨·포커스 제거 */
+  embedded?: boolean
 }
 
 /** 달력 칸 — 이 길이 이상이면 너비 측정과 무관하게 마키 */
@@ -68,6 +70,7 @@ export function MarqueeTicker({
   pauseOnHover = true,
   staggerKey,
   forceMarquee = false,
+  embedded = false,
 }: Props) {
   const reducedMotion = usePrefersReducedMotion()
   const [hoverPause, setHoverPause] = useState(false)
@@ -177,18 +180,21 @@ export function MarqueeTicker({
       className={[
         'pointer-events-none relative min-w-0 flex-1 overflow-hidden',
         minH,
-        isCell ? '' : 'flex items-center',
+        'flex items-center',
         className,
       ]
         .filter(Boolean)
         .join(' ')}
-      aria-labelledby={labelId}
+      aria-hidden={embedded ? true : undefined}
+      aria-labelledby={embedded ? undefined : labelId}
       onMouseEnter={pauseOnHover ? () => setHoverPause(true) : undefined}
       onMouseLeave={pauseOnHover ? () => setHoverPause(false) : undefined}
     >
-      <span id={labelId} className="sr-only">
-        {ariaLabel}
-      </span>
+      {embedded ? null : (
+        <span id={labelId} className="sr-only">
+          {ariaLabel}
+        </span>
+      )}
 
       <div
         ref={measureRef}
@@ -208,10 +214,12 @@ export function MarqueeTicker({
         <div
           className={[
             'overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
-            isCell ? 'py-0' : 'flex w-full items-center px-3',
+            isCell
+              ? 'flex h-full w-full min-h-0 items-center py-0'
+              : 'flex w-full items-center px-3',
             isCell && marqueeActive ? 'marquee-ticker-touch-scroll' : '',
           ].join(' ')}
-          tabIndex={marqueeActive ? 0 : undefined}
+          tabIndex={embedded || !marqueeActive ? undefined : 0}
         >
           <div className="flex w-max items-center whitespace-nowrap">
             <SegmentRow
