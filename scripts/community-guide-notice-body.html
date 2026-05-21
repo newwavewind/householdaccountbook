@@ -1,0 +1,130 @@
+<div class="community-guide">
+<p><strong>우리 가계부·다이어리</strong>는 한 가족이 <strong>수입·지출(가계부)</strong>과 <strong>일정·기념일(다이어리)</strong>을 한곳에서 관리하고, 필요하면 <strong>커뮤니티</strong>로 소통할 수 있는 웹 서비스입니다. 모바일·PC 모두 사용할 수 있으며, 로그인 후 클라우드에 저장하면 여러 기기에서 같은 데이터를 볼 수 있습니다.</p>
+<p>접속 주소: <a href="https://newwavewind.github.io/householdaccountbook/" target="_blank" rel="noopener noreferrer">https://newwavewind.github.io/householdaccountbook/</a></p>
+
+<h2>이 웹의 핵심 특징</h2>
+<ul>
+<li><strong>가계부 + 다이어리 통합</strong> — 달력에서 거래가 있는 날은 녹색 점으로 표시되고, 일정 패널에서 바로 장부·일정을 오갈 수 있습니다.</li>
+<li><strong>가족 단위 공유</strong> — Supabase 로그인 후 「가구」를 만들거나 공유 코드로 참여하면 구성원·장부·다이어리가 함께 동기화됩니다.</li>
+<li><strong>무지출 챌린지</strong> — 지출이 없는 날을 달력에 강조하고, 배너를 눌러 축하 효과를 볼 수 있습니다.</li>
+<li><strong>한국형 달력</strong> — 음력 날짜, 공휴일·대체공휴일, 24절기, 삼복(초복·중복·말복) 등이 달력 칸에 표시됩니다.</li>
+<li><strong>PC 일괄 입력</strong> — 표 형식으로 한 달 거래를 빠르게 넣고 장부에 반영할 수 있습니다.</li>
+<li><strong>통계·분류</strong> — 월별 수입·지출 비율, 일별·요일별 지출, 카드사별 사용량, 분류 TOP 5 등을 그래프로 확인합니다.</li>
+<li><strong>꾸미기</strong> — 테마(3종), 다크 모드, 다이어리 배경 사진, 스티커 메모 보드, D-day 티커를 지원합니다.</li>
+</ul>
+
+<h2>화면 이동 (공통)</h2>
+<h3>하단·상단 메뉴</h3>
+<ul>
+<li><strong>다이어리</strong> — 일정·메모·스티커·D-day가 있는 달력 화면</li>
+<li><strong>가계부</strong> — 월별 수입·지출 달력과 거래 목록</li>
+<li><strong>커뮤니티</strong> — 게시판(전체글·개념글·공지)</li>
+<li><strong>관리</strong> — 관리자만 보이는 게시글·회원 등급 관리</li>
+</ul>
+<h3>헤더 버튼</h3>
+<ul>
+<li><strong>화면·꾸미기 설정</strong> — 테마 1~3, Liquid Glass, 다크 모드. 다이어리 화면에서는 달력·D-day·스티커 영역 <strong>배경 사진</strong>도 설정합니다.</li>
+<li><strong>설정(톱니)</strong> — 회원 정보, 환경 설정(메모 글꼴·크기)</li>
+<li><strong>로그인 · 가입</strong> — Google 계정으로 로그인(커뮤니티·클라우드 저장용)</li>
+<li><strong>닉네임</strong> — 커뮤니티에 표시되는 이름(2자 이상)</li>
+</ul>
+
+<h2>1. 가계부 (메인 화면)</h2>
+<h3>상단</h3>
+<ul>
+<li><strong>PC입력</strong> — 키보드로 한 달치 거래를 표에 입력하는 화면으로 이동</li>
+<li><strong>무지출 챌린지</strong> — 이번 달 「지출이 없는 날」 개수. 탭하면 해당 월로 이동하며 축하 애니메이션이 재생될 수 있습니다.</li>
+<li><strong>가족 구성원</strong> — 「전체」 또는 특정 구성원만 필터. <strong>관리</strong>에서 이름 추가·순서 변경·삭제(2단계 확인), Supabase 사용 시 <strong>가구 공유 코드</strong> 복사</li>
+</ul>
+<h3>월 달력</h3>
+<ul>
+<li><strong>‹ ›</strong> — 이전·다음 달</li>
+<li>날짜 칸 클릭 — 그날 거래 목록 모달(수정·삭제·추가)</li>
+<li>마우스를 올리면 — 그날 수입·지출 요약 툴팁</li>
+<li>무지출 날 — 시각적으로 구분</li>
+</ul>
+<h3>하단 패널 (거래 내역 / 분류별 지출 / 통계)</h3>
+<p>좌우 화살표 또는 탭 버튼으로 전환합니다.</p>
+<h4>① 거래 내역</h4>
+<ul>
+<li><strong>전체 · 수입 · 지출</strong> — 보여 줄 거래 유형</li>
+<li>수입·지출·순액 카드 — 당월 합계와 연간 합계·건수</li>
+<li><strong>결제 필터</strong>(지출 시) — 전체, 현금, 이음카드, 신용카드(카드사별 세부 선택 가능)</li>
+<li><strong>금액순 · 날짜순</strong> — 정렬(누를 때마다 오름·내림 전환)</li>
+<li><strong>목록 개수</strong> — 5·10·30·전체 보기 + 페이지 ◀ ▶</li>
+<li><strong>거래 추가</strong>(우하단 FAB) — 수입/지출, 금액, 날짜, 분류, 메모, 결제 수단·카드, 구성원 입력</li>
+</ul>
+<h4>② 분류별 지출</h4>
+<ul>
+<li>식비·마트·교통 등 <strong>분류별 합계 막대</strong> — 항목을 누르면 해당 분류의 이번 달 거래 목록이 펼쳐집니다.</li>
+</ul>
+<h4>③ 통계</h4>
+<ul>
+<li><strong>수입·지출 비율</strong> — 도넛 차트와 순액 막대</li>
+<li><strong>결제 수단</strong> — 카드사별 사용량(색으로 구분된 막대)</li>
+<li><strong>일별 지출 추이</strong> — 1일~말일 막대 그래프, 최다 지출일 표시</li>
+<li><strong>지출 패턴</strong> — 하루 평균 지출(지출 있는 날 기준), 요일별 지출 막대</li>
+<li><strong>지출 분류 TOP 5</strong></li>
+<li>구성원이 2명 이상이면 <strong>구성원별</strong> 수입·지출 비교</li>
+</ul>
+
+<h2>2. PC 일괄 입력 (/input)</h2>
+<ul>
+<li>연도 <strong>‹ ›</strong>, <strong>월 선택</strong> — 입력할 달 변경(장부 달과 다르면 「· 차이」 표시)</li>
+<li>맨 위 <strong>입력 칸</strong> — 일, 구분(수입/지출), 금액, 카테고리, 메모, 결제, 카드, 구성원 입력 후 <strong>확인</strong></li>
+<li><strong>확인된 내역</strong> — 반영된 줄 목록, <strong>관리</strong>로 수정·삭제</li>
+<li><strong>Enter / Shift+Enter</strong> — 칸 이동·확인(키보드 중심)</li>
+<li>해당 월 데이터는 장부에 <strong>월 단위로 교체 반영</strong>됩니다. 다른 경로로 넣은 거래와 차이가 나면 안내가 표시됩니다.</li>
+</ul>
+
+<h2>3. 다이어리 (/calendar)</h2>
+<h3>상단 D-day 티커</h3>
+<ul>
+<li>등록한 기념일·시험·생일 등의 D-day가 흐릅니다. 탭하면 펼쳐 보기. <strong>설정</strong> → D-day 종류·날짜(양력/음력) 관리</li>
+</ul>
+<h3>스티커 메모 보드</h3>
+<ul>
+<li>자유 배치 메모(색·글꼴·드래그). 가족과 공유(클라우드 연동 시)</li>
+</ul>
+<h3>월 달력</h3>
+<ul>
+<li>음력·공휴일·절기·삼복 라벨 — 칸 하단 또는 푸터 마키</li>
+<li>날짜 클릭 — 요약 시트 + 하단 <strong>일정·메모 패널</strong></li>
+<li>장부 거래가 있으면 <strong>녹색 점</strong></li>
+<li>Peek(요약): <strong>닫기</strong>, <strong>입력</strong>, <strong>중요</strong> 체크, <strong>이 날 거래 N건</strong>(가계부로 이동)</li>
+</ul>
+<h3>일정 패널</h3>
+<ul>
+<li><strong>일정 추가</strong> — 시간, 제목, 메모(리치 텍스트·메모지 색·이미지)</li>
+<li><strong>저장</strong>, 삭제, <strong>카카오톡 공유</strong>(키 설정 시)</li>
+<li>「이 날짜 일정·메모 편집(달력)」 링크로 장부 일 모달과 연동</li>
+</ul>
+<p><em>백업·복구</em> — 주소 <code>/calendar/recovery</code> 에서 JSON 백업·붙여넣기 복구(메뉴에는 없음, 북마크용).</p>
+
+<h2>4. 커뮤니티</h2>
+<ul>
+<li><strong>전체글 · 개념글 · 공지</strong> — 탭 필터(개념글 = 추천 수 기준 이상)</li>
+<li><strong>검색</strong> — 제목·내용·전체 범위</li>
+<li><strong>글쓰기</strong> — 로그인 + 닉네임 필요. 리치 에디터(이미지·동영상·유튜브·투표). 우수 등급 이상 또는 관리자는 <strong>공지 등록</strong> 가능</li>
+<li>글 상세 — 추천/비추천, 댓글, 공유 링크</li>
+</ul>
+
+<h2>5. 로그인·가구·설정</h2>
+<ul>
+<li><strong>Google 로그인</strong> — /auth/setup 안내에 따라 OAuth 설정</li>
+<li>가계부·다이어리 첫 사용 시 <strong>가구 만들기</strong> 또는 <strong>공유 코드 참여</strong></li>
+<li><strong>회원 정보</strong> — 닉네임, 등급, 로그아웃</li>
+<li><strong>환경 설정</strong> — 다이어리 메모 글꼴·크기 기본값</li>
+</ul>
+
+<h2>6. 자주 묻는 사용 팁</h2>
+<ul>
+<li>가계부 URL에 <code>?ledgerDay=2026-05-21</code> 형태로 들어오면 해당 날짜 모달이 열립니다.</li>
+<li>다이어리는 <code>?day=2026-05-21</code> 로 특정 날 선택 상태를 공유할 수 있습니다.</li>
+<li>구성원 필터는 가계부 전체(달력·목록·통계)에 동시 적용됩니다.</li>
+<li>PC에서는 일괄 입력, 모바일에서는 FAB·달력 터치가 편합니다.</li>
+<li>문의·개선 제안은 커뮤니티에 글을 남겨 주세요.</li>
+</ul>
+
+<p>— 운영: <strong>김상현</strong> · 본 글은 서비스 전체 기능을 한눈에 보려고 정리한 <strong>공지 가이드</strong>입니다. 업데이트될 때마다 내용을 보강하겠습니다.</p>
+</div>
