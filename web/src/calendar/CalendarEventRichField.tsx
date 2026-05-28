@@ -551,6 +551,7 @@ export function CalendarEventRichField({
           />
         </div>
         <CalendarDetailDecoBand
+          overflowVisible
           className={`calendar-detail-event-toolbar flex shrink-0 flex-wrap items-center gap-0.5 px-1.5 py-1 ${stickyFooterClass}`}
         >
           <div

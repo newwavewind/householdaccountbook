@@ -42,6 +42,7 @@ import { isCloudSyncEnabled } from '../lib/supabaseClient'
 import { ledgerBackendMode } from '../lib/ledgerBackend'
 import {
   calendarEventInkTextClass,
+  calendarEventInkTextStyle,
   resolveCalendarEventMemoInk,
   type CalendarEventInkId,
 } from '../calendar/calendarEventInk'
@@ -475,6 +476,7 @@ function DayMemoPanel({
                     className={`flex min-h-0 flex-1 flex-col ${calendarEventInkTextClass(
                       resolveCalendarEventMemoInk(ev),
                     )}`}
+                    style={calendarEventInkTextStyle(resolveCalendarEventMemoInk(ev))}
                   >
                     <CalendarEventRichField
                       variant="sticky"
@@ -662,6 +664,7 @@ function CalendarDayPeekSheet({
                       className={`mt-1 text-[0.95rem] [&_*]:leading-snug [&_strong]:font-semibold ${calendarEventInkTextClass(
                         resolveCalendarEventMemoInk(u),
                       )}`}
+                      style={calendarEventInkTextStyle(resolveCalendarEventMemoInk(u))}
                     >
                       {u.noteHtml?.trim() ? (
                         <span
@@ -1123,6 +1126,7 @@ export default function CalendarPage() {
                           calendarEventInkTextClass(preview.ink),
                         ].join(' ')}
                         style={{
+                          ...calendarEventInkTextStyle(preview.ink),
                           fontFamily: preview.fontFamily,
                           fontSize: preview.fontSize,
                         }}

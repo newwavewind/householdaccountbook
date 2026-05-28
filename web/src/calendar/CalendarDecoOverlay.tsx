@@ -40,16 +40,18 @@ export function calendarDecoHostClass(decorated: boolean): string {
 export function CalendarDetailDecoBand({
   className = '',
   children,
+  overflowVisible = false,
 }: {
   className?: string
   children: ReactNode
+  overflowVisible?: boolean
 }) {
   const { zonePhotoActive } = useCalendarDecoration()
   const scrim = zonePhotoActive('detail')
   return (
     <div
       className={[
-        'calendar-detail-deco-band relative overflow-hidden',
+        `calendar-detail-deco-band relative ${overflowVisible ? 'overflow-visible' : 'overflow-hidden'}`,
         scrim ? 'calendar-deco-scrim' : '',
         className,
       ]

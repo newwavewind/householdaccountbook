@@ -1,4 +1,4 @@
-﻿/** 일정 제목·메모 글자색 (Tailwind 클래스로 매핑) */
+﻿/** 일정 제목·메모 글자색 프리셋 (Tailwind 클래스로 매핑) */
 export const CALENDAR_EVENT_INK_IDS = [
   'default',
   'blue',
@@ -11,15 +11,27 @@ export const CALENDAR_EVENT_INK_IDS = [
   'slate',
 ] as const
 
-export type CalendarEventInkId = (typeof CALENDAR_EVENT_INK_IDS)[number]
+export type CalendarEventInkPresetId = (typeof CALENDAR_EVENT_INK_IDS)[number]
+export type CalendarEventInkId = CalendarEventInkPresetId | `#${string}`
 
 const INK_SET = new Set<string>(CALENDAR_EVENT_INK_IDS)
+const HEX_COLOR_RE = /^#([0-9a-f]{6})$/i
 
 export function normalizeCalendarEventInk(
   raw: unknown,
 ): CalendarEventInkId | undefined {
   if (typeof raw !== 'string' || !raw) return undefined
-  return INK_SET.has(raw) ? (raw as CalendarEventInkId) : undefined
+  const v = raw.trim()
+  if (!v) return undefined
+  if (INK_SET.has(v)) return v as CalendarEventInkPresetId
+  if (HEX_COLOR_RE.test(v)) return v.toLowerCase() as CalendarEventInkId
+  return undefined
+}
+
+export function isCalendarEventInkPreset(
+  ink: CalendarEventInkId | undefined,
+): ink is CalendarEventInkPresetId {
+  return !!ink && INK_SET.has(ink)
 }
 
 /** 저장 필드 `ink`(구버전)까지 고려한 제목용 색 */
@@ -62,6 +74,7 @@ export function resolveCalendarEventMemoInk(e: {
 export function calendarEventInkTextClass(
   ink: CalendarEventInkId | undefined,
 ): string {
+  if (ink && !isCalendarEventInkPreset(ink)) return ''
   switch (ink ?? 'default') {
     case 'blue':
       return 'text-blue-600'
@@ -82,6 +95,13 @@ export function calendarEventInkTextClass(
     default:
       return 'text-text-primary'
   }
+}
+
+export function calendarEventInkTextStyle(
+  ink: CalendarEventInkId | undefined,
+): { color: string } | undefined {
+  if (!ink || isCalendarEventInkPreset(ink)) return undefined
+  return { color: ink }
 }
 
 export const CALENDAR_EVENT_INK_SWATCHES: {
