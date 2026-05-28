@@ -259,11 +259,13 @@ function DayMemoPanel({
   onPersist,
 }: DayMemoPanelProps) {
   const [events, setEvents] = useState<CalendarDayEvent[]>([emptyEventRow()])
+  const [pendingDeleteIndex, setPendingDeleteIndex] = useState<number | null>(null)
 
   useEffect(() => {
     const raw = getDayEvents(initial)
     const list = raw.map(mergeCalendarEventToUnifiedMemo)
     setEvents(list.length > 0 ? list : [emptyEventRow()])
+    setPendingDeleteIndex(null)
   }, [iso, initial])
 
   const hol = holidayLabel(iso)
@@ -271,6 +273,8 @@ function DayMemoPanel({
   const { zonePhotoActive } = useCalendarDecoration()
   const detailPhoto = zonePhotoActive('detail')
   const detailHostClass = calendarDecoHostClass(detailPhoto)
+  const pendingDeleteLabel =
+    pendingDeleteIndex != null ? events[pendingDeleteIndex] : undefined
 
   return (
     <Card
@@ -457,12 +461,7 @@ function DayMemoPanel({
                       type="button"
                       className={stickyTheme.headerBtnClass}
                       aria-label={`일정 ${i + 1} 삭제`}
-                      onClick={() => {
-                        setEvents((prev) => {
-                          const next = prev.filter((_, j) => j !== i)
-                          return next.length > 0 ? next : [emptyEventRow()]
-                        })
-                      }}
+                      onClick={() => setPendingDeleteIndex(i)}
                     >
                       <span className="px-1 text-sm leading-none">×</span>
                     </button>
@@ -519,6 +518,56 @@ function DayMemoPanel({
           </div>
         </div>
       </div>
+      {pendingDeleteIndex != null && pendingDeleteLabel && typeof document !== 'undefined'
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[120] flex items-center justify-center bg-black/45 p-4"
+              role="presentation"
+              onMouseDown={(e) => {
+                if (e.target === e.currentTarget) setPendingDeleteIndex(null)
+              }}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-label="일정 삭제 확인"
+                className="w-full max-w-xs rounded-xl border border-border-subtle bg-surface-raised p-4 shadow-2xl"
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <p className="text-sm font-semibold text-text-primary">
+                  삭제 하시겠습니까?
+                </p>
+                <p className="mt-1 text-xs text-text-soft">
+                  {pendingDeleteIndex + 1}번 일정이 삭제됩니다.
+                </p>
+                <div className="mt-4 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    className="rounded-md border border-border-muted px-3 py-1.5 text-xs text-text-secondary transition-colors hover:bg-well"
+                    onClick={() => setPendingDeleteIndex(null)}
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-md bg-red-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-600"
+                    onClick={() => {
+                      const idx = pendingDeleteIndex
+                      setEvents((prev) => {
+                        const next = prev.filter((_, j) => j !== idx)
+                        return next.length > 0 ? next : [emptyEventRow()]
+                      })
+                      setPendingDeleteIndex(null)
+                    }}
+                  >
+                    삭제
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </Card>
   )
 }

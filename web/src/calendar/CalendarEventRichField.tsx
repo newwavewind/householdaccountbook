@@ -6,6 +6,7 @@ import Underline from '@tiptap/extension-underline'
 import { TextStyle } from '@tiptap/extension-text-style'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
+import { createPortal } from 'react-dom'
 import {
   useEffect,
   useRef,
@@ -60,13 +61,15 @@ export const HIGHLIGHT_PALETTE = [
 
 function useCloseOnDismiss(
   open: boolean,
-  rootRef: RefObject<HTMLElement | null>,
+  rootRefs: ReadonlyArray<RefObject<HTMLElement | null>>,
   onClose: () => void,
 ) {
   useEffect(() => {
     if (!open) return
     const onDocMouse = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) onClose()
+      const t = e.target as Node
+      const inside = rootRefs.some((r) => r.current?.contains(t))
+      if (!inside) onClose()
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -77,7 +80,7 @@ function useCloseOnDismiss(
       document.removeEventListener('mousedown', onDocMouse, true)
       document.removeEventListener('keydown', onKey)
     }
-  }, [open, rootRef, onClose])
+  }, [open, rootRefs, onClose])
 }
 
 type Props = {
@@ -123,10 +126,38 @@ export function CalendarEventRichField({
   const [highlightOpen, setHighlightOpen] = useState(false)
   const [imageUploading, setImageUploading] = useState(false)
   const [, setToolbarTick] = useState(0)
+  const isSticky = variant === 'sticky'
   const hlWrapRef = useRef<HTMLDivElement>(null)
+  const hlButtonRef = useRef<HTMLButtonElement>(null)
+  const hlPanelRef = useRef<HTMLDivElement>(null)
+  const [hlFixedPos, setHlFixedPos] = useState<{ left: number; top: number; width: number } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  useCloseOnDismiss(highlightOpen, hlWrapRef, () => setHighlightOpen(false))
+  useCloseOnDismiss(highlightOpen, [hlWrapRef, hlPanelRef], () => setHighlightOpen(false))
+
+  useEffect(() => {
+    if (!highlightOpen || !isSticky) return
+    const updatePos = () => {
+      const btn = hlButtonRef.current
+      if (!btn) return
+      const rect = btn.getBoundingClientRect()
+      const margin = 8
+      const maxWidth = 11.5 * 16
+      const width = Math.min(window.innerWidth - margin * 2, maxWidth)
+      const left = Math.min(
+        Math.max(rect.left + rect.width / 2 - width / 2, margin),
+        window.innerWidth - margin - width,
+      )
+      setHlFixedPos({ left, top: rect.top - 4, width })
+    }
+    updatePos()
+    window.addEventListener('resize', updatePos)
+    window.addEventListener('scroll', updatePos, true)
+    return () => {
+      window.removeEventListener('resize', updatePos)
+      window.removeEventListener('scroll', updatePos, true)
+    }
+  }, [highlightOpen, isSticky])
 
   const editor = useEditor({
     extensions: [
@@ -230,7 +261,6 @@ export function CalendarEventRichField({
   if (!editor) return null
 
   const highlightOn = editor.isActive('highlight')
-  const isSticky = variant === 'sticky'
   const st = STICKY_THEMES[paperTint]
 
   function pushChange() {
@@ -256,11 +286,12 @@ export function CalendarEventRichField({
     }
   }
 
-  const highlightPanel = highlightOpen ? (
+  const highlightPanelInner = (
     <div
+      ref={hlPanelRef}
       role="dialog"
       aria-label="형광 색 선택"
-      className={`absolute ${isSticky ? 'bottom-full right-0 mb-1' : 'right-0 top-full mt-1'} z-[60] w-[min(100vw-2rem,11.5rem)] rounded-[var(--radius-card)] border border-border-subtle bg-surface-raised p-2 shadow-[var(--shadow-frap-stack)]`}
+      className="rounded-[var(--radius-card)] border border-border-subtle bg-surface-raised p-2 shadow-[var(--shadow-frap-stack)]"
     >
       <div className="grid grid-cols-5 gap-1">
         {HIGHLIGHT_PALETTE.map((opt) => {
@@ -302,7 +333,32 @@ export function CalendarEventRichField({
         형광 모두 해제
       </button>
     </div>
-  ) : null
+  )
+
+  const highlightPanel = highlightOpen
+    ? isSticky
+      ? hlFixedPos && typeof document !== 'undefined'
+        ? createPortal(
+            <div
+              className="fixed z-[90]"
+              style={{
+                left: hlFixedPos.left,
+                top: hlFixedPos.top,
+                width: hlFixedPos.width,
+                transform: 'translateY(-100%)',
+              }}
+            >
+              {highlightPanelInner}
+            </div>,
+            document.body,
+          )
+        : null
+      : (
+          <div className="absolute right-0 top-full z-[60] mt-1 w-[min(calc(100vw-1rem),11.5rem)]">
+            {highlightPanelInner}
+          </div>
+        )
+    : null
 
   const toolbarSelectClass = isSticky
     ? `${st.toolbarBtnClass} h-7 max-w-[4.75rem] shrink-0 rounded border border-black/10 bg-white/80 px-1 text-[9px] dark:border-white/15 dark:bg-white/10 dark:text-text-primary`
@@ -464,6 +520,7 @@ export function CalendarEventRichField({
       className={`relative flex min-w-0 items-center ${isSticky ? '' : 'flex-1 sm:flex-initial'}`}
     >
       <button
+        ref={hlButtonRef}
         type="button"
         aria-expanded={highlightOpen}
         aria-haspopup="dialog"
@@ -505,9 +562,9 @@ export function CalendarEventRichField({
       {fontSelect}
       {fontSizeSelect}
       {memoInkControl}
+      {highlightBlock}
       {boldItalic}
       {underlineStrikeListImgSticky}
-      {highlightBlock}
     </>
   ) : (
     <>
