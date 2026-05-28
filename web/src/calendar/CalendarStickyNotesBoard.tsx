@@ -132,7 +132,7 @@ export default function CalendarStickyNotesBoard({ notes, patchNotes }: Props) {
   return (
     <section
       aria-label="스티커 메모"
-      className={`calendar-sticky-shell overflow-hidden rounded-[var(--radius-card)] border border-border-subtle bg-gradient-to-b from-ceramic/60 to-surface-raised px-3 md:px-5 ${hostClass} ${
+      className={`calendar-sticky-shell rounded-[var(--radius-card)] border border-border-subtle bg-gradient-to-b from-ceramic/60 to-surface-raised px-3 md:px-5 ${hostClass} overflow-visible ${
         hasNotes ? 'py-2 md:py-2.5' : 'py-3 md:py-4'
       }`}
     >

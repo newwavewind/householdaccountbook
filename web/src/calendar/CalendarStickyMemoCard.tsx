@@ -312,7 +312,7 @@ function StickyMemoExpandedCard({
 
       <div
         data-sticky-no-drag
-        className={`flex min-h-0 flex-1 flex-col overflow-hidden ${theme.bodyClass}`}
+        className={`flex min-h-0 flex-1 flex-col overflow-visible ${theme.bodyClass}`}
       >
         <CalendarEventRichField
           aria-label="스티커 메모"

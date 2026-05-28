@@ -540,7 +540,7 @@ export function CalendarEventRichField({
 
   if (isSticky) {
     return (
-      <div className="calendar-sticky-rich-editor flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-transparent">
+      <div className="calendar-sticky-rich-editor flex h-full min-h-0 w-full flex-1 flex-col overflow-visible bg-transparent">
         {hiddenFileInput}
         <div
           className={`calendar-detail-editor-pane min-h-0 flex-1 overflow-y-auto ${calendarDecorated ? 'bg-transparent' : ''} ${st.placeholderClass} [&_.ProseMirror]:bg-transparent [&_.ProseMirror]:px-3 [&_.ProseMirror]:py-2`}
