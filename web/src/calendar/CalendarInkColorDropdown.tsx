@@ -33,7 +33,6 @@ export function CalendarInkColorDropdown({
         id={id}
         type="button"
         aria-label={`${ariaLabel} — ${currentLabel} 컬러피커`}
-        onClick={() => colorInputRef.current?.click()}
         className={
           [
             toolbar
@@ -60,13 +59,12 @@ export function CalendarInkColorDropdown({
       <input
         ref={colorInputRef}
         type="color"
-        className="sr-only"
+        className="absolute inset-0 z-[1] h-full w-full cursor-pointer opacity-0"
         value={currentColor}
         onChange={(e) => {
           onPick(e.target.value as CalendarEventInkId)
         }}
-        aria-hidden
-        tabIndex={-1}
+        aria-label={`${ariaLabel} 컬러 선택`}
       />
     </div>
   )

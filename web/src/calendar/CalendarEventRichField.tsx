@@ -260,7 +260,7 @@ export function CalendarEventRichField({
     <div
       role="dialog"
       aria-label="형광 색 선택"
-      className={`absolute ${isSticky ? 'bottom-full left-0 mb-1' : 'right-0 top-full mt-1'} z-[60] w-[min(100vw-2rem,11.5rem)] rounded-[var(--radius-card)] border border-border-subtle bg-surface-raised p-2 shadow-[var(--shadow-frap-stack)]`}
+      className={`absolute ${isSticky ? 'bottom-full right-0 mb-1' : 'right-0 top-full mt-1'} z-[60] w-[min(100vw-2rem,11.5rem)] rounded-[var(--radius-card)] border border-border-subtle bg-surface-raised p-2 shadow-[var(--shadow-frap-stack)]`}
     >
       <div className="grid grid-cols-5 gap-1">
         {HIGHLIGHT_PALETTE.map((opt) => {
