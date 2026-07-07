@@ -42,8 +42,8 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      // autoUpdate는 열린 탭에서 SW 갱신·리로드가 누락되는 경우가 있어 prompt + 배너로 확실히 반영
-      registerType: 'prompt',
+      // iOS PWA에서 prompt+배너는 waiting SW가 풀리지 않아 매 실행마다 뜨는 경우가 많아 autoUpdate 사용
+      registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'pwa-192.png', 'pwa-512.png'],
       manifest: {
         name: 'MJ가계부',
@@ -83,7 +83,8 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,svg,png,webp,woff2}'],
         cleanupOutdatedCaches: true,
-        // prompt 모드: skipWaiting/clientsClaim 은 플러그인이 SW 활성화 타이밍에 맞게 둔다
+        skipWaiting: true,
+        clientsClaim: true,
         navigateFallback: 'index.html',
         navigateFallbackDenylist: [/^\/api/],
       },
