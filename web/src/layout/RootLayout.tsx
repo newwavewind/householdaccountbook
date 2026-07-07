@@ -69,7 +69,7 @@ function mobileNavLinkClass({ isActive }: { isActive: boolean }) {
 
 const MAIN_NAV_ITEMS: NavItem[] = [
   { to: '/ledger', label: '가계부', icon: <LedgerNavIcon />, end: true },
-  { to: '/', label: '다이어리', icon: <DiaryNavIcon />, end: true },
+  { to: '/calendar', label: '다이어리', icon: <DiaryNavIcon />, end: true },
   { to: '/community', label: '커뮤니티', icon: <CommunityNavIcon /> },
 ]
 

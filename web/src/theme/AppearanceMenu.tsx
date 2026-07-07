@@ -87,7 +87,6 @@ function ToggleRow({
 
 function isDiaryDecorateRoute(pathname: string): boolean {
   return (
-    pathname === '/' ||
     pathname === '/calendar' ||
     (pathname.startsWith('/calendar/') && pathname !== '/calendar/recovery')
   )

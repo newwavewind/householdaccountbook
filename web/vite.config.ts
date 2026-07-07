@@ -12,6 +12,8 @@ function pwaBasePrefix(): string {
 }
 
 const pwaPathPrefix = pwaBasePrefix()
+const pwaStartUrl =
+  pwaPathPrefix === '/' ? '/calendar' : `${pwaPathPrefix}calendar`
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -49,7 +51,7 @@ export default defineConfig({
         name: 'MJ가계부',
         short_name: 'MJ가계부',
         description: 'MJ가계부 — 심플한 가계부 앱',
-        start_url: pwaPathPrefix,
+        start_url: pwaStartUrl,
         scope: pwaPathPrefix,
         display: 'standalone',
         display_override: ['standalone', 'browser'],
@@ -81,12 +83,22 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,svg,png,webp,woff2}'],
+        // index.html 을 precache 하면 배포 후 옛 HTML + 새 JS 조합으로 하얀 화면이 날 수 있음
+        globPatterns: ['**/*.{js,css,ico,svg,png,webp,woff2}'],
         cleanupOutdatedCaches: true,
         skipWaiting: true,
         clientsClaim: true,
-        navigateFallback: 'index.html',
-        navigateFallbackDenylist: [/^\/api/],
+        navigateFallback: null,
+        runtimeCaching: [
+          {
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'pages-cache',
+              networkTimeoutSeconds: 5,
+            },
+          },
+        ],
       },
     }),
   ],

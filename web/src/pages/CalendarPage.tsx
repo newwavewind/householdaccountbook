@@ -960,7 +960,7 @@ export default function CalendarPage() {
                   type="button"
                   variant="primary"
                   className="mt-2 w-full min-h-11 sm:w-auto"
-                  onClick={() => nav('/')}
+                  onClick={() => nav('/ledger')}
                 >
                   장부에서 가구 설정
                 </Button>
@@ -1393,7 +1393,7 @@ export default function CalendarPage() {
                 const iso = peekIso
                 setPeekIso(null)
                 if (!iso) return
-                nav(`/?ledgerDay=${encodeURIComponent(iso)}`)
+                nav(`/ledger?ledgerDay=${encodeURIComponent(iso)}`)
               }}
               onToggleEventImportant={patchPeekDayEventImportant}
             />,

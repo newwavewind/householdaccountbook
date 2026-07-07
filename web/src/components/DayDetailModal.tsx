@@ -164,7 +164,7 @@ export function DayDetailModal({
 
         <div className="border-t border-border-muted px-4 py-3">
           <Link
-            to={`/?day=${encodeURIComponent(iso)}`}
+            to={`/calendar?day=${encodeURIComponent(iso)}`}
             onClick={onClose}
             className="block text-center text-sm font-medium text-starbucks-green underline-offset-2 hover:underline"
           >

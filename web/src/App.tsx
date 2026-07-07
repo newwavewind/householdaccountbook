@@ -20,11 +20,11 @@ import DiaryRecoveryPage from './pages/DiaryRecoveryPage'
 import { CalendarDecorationProvider } from './calendar/CalendarDecorationContext'
 import { RequireAdmin, RequireNickname } from './routes/RouteGuards'
 
-function LegacyCalendarRedirect() {
+function HomeRedirect() {
   const loc = useLocation()
   return (
     <Navigate
-      to={{ pathname: '/', search: loc.search, hash: loc.hash }}
+      to={{ pathname: '/calendar', search: loc.search, hash: loc.hash }}
       replace
     />
   )
@@ -39,12 +39,12 @@ export default function App() {
         <Route element={<RootLayout />}>
           <Route path="/calendar/recovery" element={<DiaryRecoveryPage />} />
           <Route path="/calendar/dday" element={<DDaySettingsPage />} />
-          <Route path="/calendar" element={<LegacyCalendarRedirect />} />
+          <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/input" element={<BulkInputPage />} />
           <Route path="/settings" element={<SettingsHubPage />} />
           <Route path="/settings/account" element={<AccountSettingsPage />} />
           <Route path="/settings/appearance" element={<AppearanceSettingsPage />} />
-          <Route path="/" element={<CalendarPage />} />
+          <Route path="/" element={<HomeRedirect />} />
           <Route path="/ledger" element={<LedgerApp />} />
           <Route path="/community" element={<CommunityListPage />} />
           <Route

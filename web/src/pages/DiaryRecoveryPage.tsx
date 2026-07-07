@@ -217,7 +217,7 @@ export default function DiaryRecoveryPage() {
             지금 이 기기 데이터 내보내기 (.json)
           </Button>
           <Link
-            to="/"
+            to="/calendar"
             className="text-sm font-medium text-green-accent underline underline-offset-2"
           >
             다이어리로 돌아가기
