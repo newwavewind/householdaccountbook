@@ -218,7 +218,7 @@ export default function DDaySettingsPage() {
           type="button"
           variant="outlined"
           className="shrink-0"
-          onClick={() => nav('/calendar')}
+          onClick={() => nav('/')}
         >
           달력으로
         </Button>

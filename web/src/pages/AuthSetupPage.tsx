@@ -236,7 +236,7 @@ function SupabaseLoginScreen() {
                 ·
               </span>
               <Link
-                to="/"
+                to="/ledger"
                 className="font-medium text-text-soft underline-offset-2 hover:text-starbucks-green"
               >
                 가계부 홈

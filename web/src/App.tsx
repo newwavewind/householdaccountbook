@@ -1,4 +1,4 @@
-import { Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { CommunityAuthProvider } from './community/CommunityAuthContext'
 import { LedgerProvider } from './hooks/useLedger'
 import LedgerApp from './LedgerApp'
@@ -20,6 +20,16 @@ import DiaryRecoveryPage from './pages/DiaryRecoveryPage'
 import { CalendarDecorationProvider } from './calendar/CalendarDecorationContext'
 import { RequireAdmin, RequireNickname } from './routes/RouteGuards'
 
+function LegacyCalendarRedirect() {
+  const loc = useLocation()
+  return (
+    <Navigate
+      to={{ pathname: '/', search: loc.search, hash: loc.hash }}
+      replace
+    />
+  )
+}
+
 export default function App() {
   return (
     <CommunityAuthProvider>
@@ -27,14 +37,15 @@ export default function App() {
         <CalendarDecorationProvider>
         <Routes>
         <Route element={<RootLayout />}>
-          <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/calendar/recovery" element={<DiaryRecoveryPage />} />
           <Route path="/calendar/dday" element={<DDaySettingsPage />} />
+          <Route path="/calendar" element={<LegacyCalendarRedirect />} />
           <Route path="/input" element={<BulkInputPage />} />
           <Route path="/settings" element={<SettingsHubPage />} />
           <Route path="/settings/account" element={<AccountSettingsPage />} />
           <Route path="/settings/appearance" element={<AppearanceSettingsPage />} />
-          <Route path="/" element={<LedgerApp />} />
+          <Route path="/" element={<CalendarPage />} />
+          <Route path="/ledger" element={<LedgerApp />} />
           <Route path="/community" element={<CommunityListPage />} />
           <Route
             path="/community/new"
