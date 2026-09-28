@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { revenueProxy } from './revenueProxy'
 
 /** GitHub Pages 서브패스 배포 시 manifest start_url·scope·아이콘 URL이 루트(`/`)로 깨지지 않도록 */
 function pwaBasePrefix(): string {
@@ -23,6 +24,7 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: {
+      '/api/app-revenue': revenueProxy(),
       '/api': {
         target: 'http://localhost:4000',
         changeOrigin: true,
@@ -86,17 +88,12 @@ export default defineConfig({
         // index.html 을 precache 하면 배포 후 옛 HTML + 새 JS 조합으로 하얀 화면이 날 수 있음
         globPatterns: ['**/*.{js,css,ico,svg,png,webp,woff2}'],
         cleanupOutdatedCaches: true,
-        skipWaiting: true,
-        clientsClaim: true,
         navigateFallback: null,
         runtimeCaching: [
           {
+            // HTML 캐시는 OAuth 복귀·배포 직후 옛 index+새 JS 하얀 화면을 유발 → 네트워크만
             urlPattern: ({ request }) => request.mode === 'navigate',
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'pages-cache',
-              networkTimeoutSeconds: 5,
-            },
+            handler: 'NetworkOnly',
           },
         ],
       },

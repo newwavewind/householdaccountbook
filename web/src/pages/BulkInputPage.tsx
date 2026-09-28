@@ -101,6 +101,20 @@ export default function BulkInputPage() {
     setActiveMonthIndex(year === nowYear ? nowMonth : 0)
   }, [year, nowYear, nowMonth])
 
+  // auto-confirm 직후 월 선택이 이번 달로 덮이지 않도록 한 번 더 맞춤
+  useEffect(() => {
+    const KEY = 'gaegyeobu-bulk-auto-confirm-month-v1'
+    try {
+      const raw = localStorage.getItem(KEY)
+      if (raw == null) return
+      const mi = Number(raw)
+      localStorage.removeItem(KEY)
+      if (Number.isFinite(mi) && mi >= 0 && mi <= 11) setActiveMonthIndex(mi)
+    } catch {
+      /* ignore */
+    }
+  }, [year])
+
   const monthDraftLedgerCmp = useMemo(
     () =>
       Array.from({ length: 12 }, (_, mi) =>
@@ -125,7 +139,7 @@ export default function BulkInputPage() {
   )
 
   /** rows를 직접 받아 처리 — MonthInputSection이 rowsRef.current(최신)를 전달하므로 stale 없음 */
-  const applyMonth = (latestRows: BulkDraftRow[], monthIndex: number, silent = false) => {
+  const applyMonth = useCallback((latestRows: BulkDraftRow[], monthIndex: number, silent = false) => {
     const { ok, skippedCard, skippedDay } = draftsToTransactions(
       year,
       monthIndex,
@@ -170,8 +184,85 @@ export default function BulkInputPage() {
       if (skippedDay) parts.push(`무효 일 ${skippedDay}건`)
       if (skippedCard) parts.push(`카드 미선택 ${skippedCard}건`)
       window.alert(parts.join('\n'))
+    } else {
+      setSt((prev) => {
+        const base = [...(prev.years[prev.year] ?? initialMonths())]
+        const nm = [...base]
+        nm[monthIndex] = [
+          emptyDraftRow(),
+          ...replacement.map(transactionToBulkDraftRow),
+        ]
+        return {
+          year: prev.year,
+          years: { ...prev.years, [prev.year]: nm },
+        }
+      })
     }
-  }
+  }, [year, replaceCalendarMonth])
+
+  /**
+   * 「확인」과 동일하게 applyMonth로 장부 반영.
+   * localStorage `gaegyeobu-bulk-auto-confirm-v1` =
+   * { year, monthIndex, rows: BulkDraftRow[] } (작업 빈 줄 없이 데이터 줄만)
+   */
+  useEffect(() => {
+    if (!syncReady) return
+    const KEY = 'gaegyeobu-bulk-auto-confirm-v1'
+    try {
+      const raw = localStorage.getItem(KEY)
+      if (!raw) return
+      const payload = JSON.parse(raw) as {
+        year?: unknown
+        monthIndex?: unknown
+        rows?: unknown
+      }
+      const y = Number(payload.year)
+      const mi = Number(payload.monthIndex)
+      if (!Number.isFinite(y) || !Number.isFinite(mi) || y !== year) return
+      if (!Array.isArray(payload.rows) || payload.rows.length === 0) {
+        localStorage.removeItem(KEY)
+        return
+      }
+      localStorage.removeItem(KEY)
+      const dataRows = payload.rows.map((r) => {
+        // normalize via storage helper shape
+        const o = (r && typeof r === 'object' ? r : {}) as Partial<BulkDraftRow>
+        return {
+          ...emptyDraftRow(),
+          ...o,
+          localKey:
+            typeof o.localKey === 'string' && o.localKey.length >= 8
+              ? o.localKey
+              : crypto.randomUUID(),
+          day: String(o.day ?? '').replace(/\D/g, '').slice(0, 2),
+          kind: o.kind === 'income' ? 'income' : 'expense',
+          amount: String(o.amount ?? '').replace(/\D/g, ''),
+          memo: typeof o.memo === 'string' ? o.memo : '',
+          category: typeof o.category === 'string' ? o.category : '',
+          paymentMethod:
+            o.paymentMethod === 'cash' || o.paymentMethod === 'ieum'
+              ? o.paymentMethod
+              : 'card',
+          cardBrand: typeof o.cardBrand === 'string' ? o.cardBrand : '',
+          memberName: typeof o.memberName === 'string' ? o.memberName : '',
+        } satisfies BulkDraftRow
+      })
+      try {
+        localStorage.setItem('gaegyeobu-bulk-auto-confirm-month-v1', String(mi))
+      } catch {
+        /* ignore */
+      }
+      setActiveMonthIndex(mi)
+      const rows = [emptyDraftRow(), ...dataRows]
+      applyMonth(rows, mi, true)
+    } catch {
+      try {
+        localStorage.removeItem(KEY)
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [syncReady, year, applyMonth])
 
   return (
     <main className="mx-auto max-w-5xl px-3 pb-20 pt-4 sm:px-4 md:px-6">

@@ -16,6 +16,86 @@ import { getSupabase, isCloudSyncEnabled, ledgerId } from '../lib/supabaseClient
 import { ledgerBackendMode } from '../lib/ledgerBackend'
 
 const STORAGE_KEY = 'gaegyeobu-ledger-v1'
+const PENDING_IMPORT_KEY = 'gaegyeobu-pending-import-v1'
+/** PC입력·가져오기 직후, 클라우드/다른 탭의 옛 payload가 줄을 지우지 못하게 잠시 지문 보관 */
+const IMPORT_GUARD_KEY = 'gaegyeobu-import-guard-v1'
+const IMPORT_GUARD_TTL_MS = 15 * 60 * 1000
+
+function txFingerprint(t: Transaction): string {
+  return `${t.date}|${t.amount}|${t.memo ?? ''}|${t.memberName ?? ''}|${t.cardBrand ?? ''}`
+}
+
+function peekPendingImport(): Transaction[] {
+  try {
+    const raw = localStorage.getItem(PENDING_IMPORT_KEY)
+    if (!raw) return []
+    return parseTransactionsPayload(JSON.parse(raw))
+  } catch {
+    return []
+  }
+}
+
+function peekImportGuard(): Transaction[] {
+  try {
+    const raw = localStorage.getItem(IMPORT_GUARD_KEY)
+    if (!raw) return []
+    const g = JSON.parse(raw) as { until?: unknown; txs?: unknown }
+    if (typeof g.until !== 'number' || Date.now() > g.until) {
+      localStorage.removeItem(IMPORT_GUARD_KEY)
+      return []
+    }
+    return parseTransactionsPayload(g.txs)
+  } catch {
+    return []
+  }
+}
+
+function setImportGuard(txs: Transaction[]) {
+  if (txs.length === 0) return
+  try {
+    const byFp = new Map<string, Transaction>()
+    for (const t of [...peekImportGuard(), ...txs]) {
+      if (!isValidTx(t)) continue
+      byFp.set(txFingerprint(t), t)
+    }
+    localStorage.setItem(
+      IMPORT_GUARD_KEY,
+      JSON.stringify({
+        until: Date.now() + IMPORT_GUARD_TTL_MS,
+        txs: [...byFp.values()],
+      }),
+    )
+  } catch {
+    /* quota */
+  }
+}
+
+function mergeFingerprintAdditions(
+  base: Transaction[],
+  extras: Transaction[],
+): Transaction[] {
+  if (extras.length === 0) return base
+  const existing = new Set(base.map(txFingerprint))
+  const additions = extras.filter((t) => !existing.has(txFingerprint(t)))
+  if (additions.length === 0) return base
+  return [...additions, ...base]
+}
+
+/** pending·import-guard 줄을 base에 합칩니다. clear=true 일 때만 pending 키를 제거합니다. */
+function mergeWithPending(base: Transaction[], clear: boolean): Transaction[] {
+  const pending = peekPendingImport()
+  if (clear) {
+    try {
+      localStorage.removeItem(PENDING_IMPORT_KEY)
+    } catch {
+      /* ignore */
+    }
+  }
+  return mergeFingerprintAdditions(
+    mergeFingerprintAdditions(base, pending),
+    peekImportGuard(),
+  )
+}
 
 function txInCalendarMonth(
   tx: Transaction,
@@ -200,9 +280,13 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     setSyncState({ mode: 'cloud', cloudBackend: 'supabase', status: 'loading' })
 
     const applyPayload = (raw: unknown) => {
-      const parsed = parseTransactionsPayload(raw)
+      // 클라우드 반영 시점에 pending·guard를 합치고 pending 키를 제거 (로컬 ready와의 레이스 방지)
+      const remoteParsed = parseTransactionsPayload(raw)
+      const remoteJ = JSON.stringify(remoteParsed)
+      const parsed = mergeWithPending(remoteParsed, true)
       const j = JSON.stringify(parsed)
-      lastRemoteJsonRef.current = j
+      // 원격 원문 기준 → merge로 줄이 늘면 push effect가 클라우드에 다시 올림
+      lastRemoteJsonRef.current = remoteJ
       setTransactions(parsed)
       try { localStorage.setItem(STORAGE_KEY, j) } catch { /* quota */ }
     }
@@ -266,10 +350,13 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
         (payload) => {
           const row = payload.new as { payload?: unknown } | undefined
           if (row?.payload == null) return
-          const next = parseTransactionsPayload(row.payload)
+          const remoteParsed = parseTransactionsPayload(row.payload)
+          const remoteJ = JSON.stringify(remoteParsed)
+          const next = mergeWithPending(remoteParsed, true)
           const j = JSON.stringify(next)
-          if (j === lastRemoteJsonRef.current) return
-          lastRemoteJsonRef.current = j
+          if (j === lastRemoteJsonRef.current && remoteJ === lastRemoteJsonRef.current) return
+          // 원격 원문을 기억 → merge로 보강된 로컬은 push effect가 다시 업로드
+          lastRemoteJsonRef.current = remoteJ
           setTransactions(next)
           try { localStorage.setItem(STORAGE_KEY, j) } catch { /* quota */ }
           setSyncState({ mode: 'cloud', cloudBackend: 'supabase', status: 'ready' })
@@ -290,9 +377,13 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     const lid = ledgerId()
 
     const applyPayload = (raw: unknown) => {
-      const parsed = parseTransactionsPayload(raw)
+      // 클라우드 반영 시점에 pending·guard를 합치고 pending 키를 제거 (로컬 ready와의 레이스 방지)
+      const remoteParsed = parseTransactionsPayload(raw)
+      const remoteJ = JSON.stringify(remoteParsed)
+      const parsed = mergeWithPending(remoteParsed, true)
       const j = JSON.stringify(parsed)
-      lastRemoteJsonRef.current = j
+      // 원격 원문 기준 → merge로 줄이 늘면 push effect가 클라우드에 다시 올림
+      lastRemoteJsonRef.current = remoteJ
       setTransactions(parsed)
       try { localStorage.setItem(STORAGE_KEY, j) } catch { /* quota */ }
     }
@@ -444,9 +535,29 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     ])
   }, [])
 
+  /** 로컬 전용 모드 보완. 클라우드 동기화 전이면 키를 남김(applyPayload가 처리). */
+  useEffect(() => {
+    if (syncState.status !== 'ready') return
+    if (syncState.mode === 'cloud') return
+    if (!localStorage.getItem(PENDING_IMPORT_KEY)) return
+    const clear = !userId
+    setTransactions((prev) => mergeWithPending(prev, clear))
+  }, [syncState.status, syncState.mode, userId])
+
+  /** PC입력·에이전트용: pending을 즉시 React 장부에 합칩니다. */
+  useEffect(() => {
+    const apply = () => {
+      if (!localStorage.getItem(PENDING_IMPORT_KEY)) return
+      setTransactions((prev) => mergeWithPending(prev, true))
+    }
+    window.addEventListener('gaegyeobu-apply-pending-import', apply)
+    return () => window.removeEventListener('gaegyeobu-apply-pending-import', apply)
+  }, [])
+
   const replaceCalendarMonth = useCallback(
     (calendarYear: number, monthIndex: number, replacements: Transaction[]) => {
       const next = replacements.filter(isValidTx)
+      setImportGuard(next)
       setTransactions((prev) => [
         ...next,
         ...prev.filter((t) => !txInCalendarMonth(t, calendarYear, monthIndex)),

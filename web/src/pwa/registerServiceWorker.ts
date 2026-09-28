@@ -14,6 +14,8 @@ export function registerAppServiceWorker() {
     onRegistered(registration) {
       if (!registration) return
 
+      void caches.delete('pages-cache')
+
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
           void registration.update()

@@ -15,6 +15,7 @@ import {
 } from './navIcons'
 import { triggerSelectionHaptic } from '../lib/haptics'
 import { useScrollHeaderVisibility } from './useScrollHeaderVisibility'
+import { RevenueIcon } from '../revenue/RevenueIcon'
 
 function SettingsGearButton({ onClick }: { onClick: () => void }) {
   return (
@@ -70,6 +71,7 @@ function mobileNavLinkClass({ isActive }: { isActive: boolean }) {
 const MAIN_NAV_ITEMS: NavItem[] = [
   { to: '/ledger', label: '가계부', icon: <LedgerNavIcon />, end: true },
   { to: '/calendar', label: '다이어리', icon: <DiaryNavIcon />, end: true },
+  { to: '/app-revenue', label: '앱 수익', icon: <RevenueIcon name="chart" size={24} /> },
   { to: '/community', label: '커뮤니티', icon: <CommunityNavIcon /> },
 ]
 
