@@ -122,10 +122,9 @@ export async function parseReport(doc: StoreDocument): Promise<RevenueRow[]> {
           platform: "apple",
           country: get("Country of Sale", "Country Code"),
           currency: get("Customer Currency"),
-          proceedsCurrency: get(
-            "Partner Share Currency",
-            "Currency of Proceeds",
-          ),
+          proceedsCurrency:
+            get("Partner Share Currency", "Currency of Proceeds") ||
+            get("Customer Currency"),
           gross: isRefund ? 0 : price * Math.abs(units),
           refunds: isRefund ? price * Math.abs(units) : 0,
           fee: null,
