@@ -138,6 +138,24 @@ const supabaseStore: JobStore = {
       .limit(1)
       .maybeSingle()
     if (!data) return null
+    const started = Date.parse(data.created_at) || Date.now()
+    if (Date.now() - started >= STALE_MS) {
+      await sb
+        .from('app_revenue_jobs')
+        .update({
+          state: 'done',
+          progress: '시간 초과로 종료됨',
+          result: {
+            apps: [],
+            documents: [],
+            errors: ['이전 동기화가 응답 없이 남아 자동 종료했습니다. 다시 동기화해 주세요.'],
+            completed: [],
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', data.id)
+      return null
+    }
     return {
       id: data.id,
       state: 'running',
@@ -146,7 +164,7 @@ const supabaseStore: JobStore = {
       documents: [],
       errors: [],
       completed: [],
-      started: Date.parse(data.created_at) || Date.now(),
+      started,
       userId: auth.user.id,
     }
   },
