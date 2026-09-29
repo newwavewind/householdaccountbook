@@ -100,6 +100,7 @@ export interface StoreDocument {
 export interface ConnectorStatus {
   apple: { configured: boolean; reports: boolean; missing: string[] };
   google: { configured: boolean; reports: boolean; missing: string[] };
+  connector?: { online: boolean; uptimeMs: number; port: number };
 }
 export interface SyncResult {
   id: string;

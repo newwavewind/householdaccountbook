@@ -3,6 +3,12 @@
   "private": true,
   "description": "가계부앱 — 로컬에서 루트 빌드: 먼저 web에서 npm ci 또는 npm install",
   "scripts": {
-    "build": "npm run build --prefix web"
+    "build": "npm run build --prefix web",
+    "revenue:connector": "bash scripts/revenue-connector.sh start",
+    "revenue:connector:stop": "bash scripts/revenue-connector.sh stop",
+    "revenue:connector:status": "bash scripts/revenue-connector.sh status",
+    "revenue:connector:keep": "bash scripts/revenue-connector.sh keep",
+    "revenue:connector:install": "bash scripts/revenue-connector.sh install-launchagent",
+    "revenue:connector:uninstall": "bash scripts/revenue-connector.sh uninstall-launchagent"
   }
 }

@@ -123,7 +123,7 @@ export async function parseReport(doc: StoreDocument): Promise<RevenueRow[]> {
           country: get("Country of Sale", "Country Code"),
           currency: get("Customer Currency"),
           proceedsCurrency:
-            get("Partner Share Currency", "Currency of Proceeds") ||
+            (get("Partner Share Currency", "Currency of Proceeds") || "").trim() ||
             get("Customer Currency"),
           gross: isRefund ? 0 : price * Math.abs(units),
           refunds: isRefund ? price * Math.abs(units) : 0,
@@ -174,8 +174,9 @@ export async function parseReport(doc: StoreDocument): Promise<RevenueRow[]> {
           appName: get("Product Title"),
           platform: "google",
           country: get("Buyer Country"),
-          currency: get("Currency of Sale"),
-          proceedsCurrency: get("Currency of Sale"),
+          currency: get("Currency of Sale") || get("Buyer Currency") || "KRW",
+          proceedsCurrency:
+            (get("Currency of Sale") || get("Buyer Currency") || "KRW").trim(),
           gross: refund ? 0 : amount,
           refunds: refund ? amount : 0,
           fee: null,

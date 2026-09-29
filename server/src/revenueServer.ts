@@ -6,12 +6,25 @@ import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { spawnSync } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { gunzipSync } from 'node:zlib'
 import { unzipSync, strFromU8 } from 'fflate'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
-config({ path: resolve(root, '.env.revenue.local'), quiet: true } as Parameters<typeof config>[0])
+const startedAt = Date.now()
+config({ path: resolve(root, '.env.revenue.local'), override: true, quiet: true } as Parameters<typeof config>[0])
+for (const key of [
+  'ASC_KEY_PATH',
+  'ASC_FINANCE_KEY_PATH',
+  'ASC_APPS_KEY_PATH',
+  'GOOGLE_PLAY_SA_JSON',
+  'ASC_PRIVATE_KEY_PATH',
+]) {
+  const raw = process.env[key]
+  if (raw && raw.length >= 2 && ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'")))) {
+    process.env[key] = raw.slice(1, -1)
+  }
+}
 const tokenFile = resolve(root, '.revenue-local-token')
 if (!existsSync(tokenFile)) writeFileSync(tokenFile, randomBytes(32).toString('hex'), { mode: 0o600, flag: 'wx' })
 const localToken = readFileSync(tokenFile, 'utf8').trim()
@@ -34,7 +47,12 @@ function connectionStatus() {
   const s = settings()
   const a = [!process.env.ASC_KEY_ID && 'Apple Key ID', !process.env.ASC_ISSUER_ID && 'Apple Issuer ID', !(keyPath && existsSync(keyPath)) && 'Apple API 키 파일'].filter(Boolean) as string[]
   const g = [!(googlePath && existsSync(googlePath)) && 'Google 서비스 계정 파일'].filter(Boolean) as string[]
-  return { apple: { configured: a.length === 0, reports: a.length === 0 && !!s.vendor, missing: [...a, ...(!s.vendor ? ['Apple 판매자 번호'] : [])] }, google: { configured: g.length === 0, reports: g.length === 0 && !!s.bucket, missing: [...g, ...(!s.bucket ? ['Google 보고서 버킷 ID'] : [])] }, settings: s }
+  return {
+    apple: { configured: a.length === 0, reports: a.length === 0 && !!s.vendor, missing: [...a, ...(!s.vendor ? ['Apple 판매자 번호'] : [])] },
+    google: { configured: g.length === 0, reports: g.length === 0 && !!s.bucket, missing: [...g, ...(!s.bucket ? ['Google 보고서 버킷 ID'] : [])] },
+    settings: s,
+    connector: { online: true, uptimeMs: Date.now() - startedAt, port: Number(process.env.REVENUE_PORT) || 4001 },
+  }
 }
 function saveSettings(next: Settings) {
   writeFileSync(configFile, JSON.stringify(next), { mode: 0o600 })
@@ -258,36 +276,56 @@ function loadGoogleLocalReports(job: Job, month: string) {
   if (earnings) job.completed.push(`Google 확정 수익 ${earnings}개(로컬·Chrome)`)
   return { sales, earnings }
 }
-function refreshGoogleViaChrome(job: Job, month: string) {
+function refreshGoogleViaChrome(job: Job, month: string): Promise<boolean> {
   const script = resolve(root, 'server/scripts/refreshPlayReports.mjs')
   if (!existsSync(script)) {
     job.errors.push('Google Chrome 동기화 스크립트가 없습니다.')
-    return false
+    return Promise.resolve(false)
   }
   job.progress = `Google ${month} · 로그인된 Chrome으로 보고서 받는 중`
-  const result = spawnSync(process.execPath, [script, month], {
-    cwd: root,
-    encoding: 'utf8',
-    timeout: 120_000,
-    env: { ...process.env, CHROME_CDP_URL: process.env.CHROME_CDP_URL || 'http://127.0.0.1:9222' },
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, [script, month], {
+      cwd: root,
+      env: { ...process.env, CHROME_CDP_URL: process.env.CHROME_CDP_URL || 'http://127.0.0.1:9222' },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    let stdout = ''
+    let stderr = ''
+    const timer = setTimeout(() => {
+      child.kill('SIGTERM')
+      job.errors.push('Google Chrome 동기화: 시간이 초과되었습니다.')
+      resolve(false)
+    }, 120_000)
+    child.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString('utf8') })
+    child.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString('utf8') })
+    child.on('error', (e) => {
+      clearTimeout(timer)
+      job.errors.push(`Google Chrome 동기화 실패: ${message(e)}`)
+      resolve(false)
+    })
+    child.on('close', (code) => {
+      clearTimeout(timer)
+      const line = stdout.trim().split('\n').filter(Boolean).pop() || ''
+      try {
+        const parsed = JSON.parse(line) as { ok?: boolean; error?: string; saved?: unknown[] }
+        if (!parsed.ok) {
+          job.errors.push(`Google Chrome 동기화: ${parsed.error || '실패'}`)
+          resolve(false)
+          return
+        }
+        if (Array.isArray(parsed.saved) && parsed.saved.length) {
+          job.completed.push(`Google Chrome에서 보고서 ${parsed.saved.length}개 갱신`)
+          resolve(true)
+          return
+        }
+        job.errors.push(`Google Chrome 동기화: ${month} 월 보고서를 UI에서 찾지 못했습니다.`)
+        resolve(false)
+      } catch {
+        if (code !== 0) job.errors.push(`Google Chrome 동기화 실패: ${(stderr || stdout || '알 수 없는 오류').slice(0, 240)}`)
+        resolve(false)
+      }
+    })
   })
-  const stdout = (result.stdout || '').trim().split('\n').filter(Boolean).pop() || ''
-  try {
-    const parsed = JSON.parse(stdout) as { ok?: boolean; error?: string; saved?: unknown[] }
-    if (!parsed.ok) {
-      job.errors.push(`Google Chrome 동기화: ${parsed.error || '실패'}`)
-      return false
-    }
-    if (Array.isArray(parsed.saved) && parsed.saved.length) {
-      job.completed.push(`Google Chrome에서 보고서 ${parsed.saved.length}개 갱신`)
-      return true
-    }
-    job.errors.push(`Google Chrome 동기화: ${month} 월 보고서를 UI에서 찾지 못했습니다.`)
-    return false
-  } catch {
-    if (result.status !== 0) job.errors.push(`Google Chrome 동기화 실패: ${(result.stderr || result.stdout || '알 수 없는 오류').slice(0, 240)}`)
-    return false
-  }
 }
 async function googleReports(job: Job, token: string, month: string) {
   const bucket = settings().bucket
@@ -318,8 +356,8 @@ async function googleReports(job: Job, token: string, month: string) {
     }
   }
   if (gcsDenied || gcsDocs === 0) {
-    if (gcsDenied) job.errors.push('Google GCS 서비스 계정 버킷 ACL이 아직 반영되지 않아 Chrome 로그인 세션으로 받았습니다.')
-    refreshGoogleViaChrome(job, month)
+    if (gcsDenied) job.errors.push('Google GCS 서비스 계정 버킷 ACL이 아직 반영되지 않아 Chrome·로컬 캐시로 받았습니다.')
+    await refreshGoogleViaChrome(job, month)
     const local = loadGoogleLocalReports(job, month)
     if (!local.sales && !local.earnings) {
       job.errors.push(...pendingEmpty)
@@ -382,17 +420,23 @@ app.post('/api/app-revenue/sync', (req, res) => {
   const job: Job = { id: randomUUID(), state: 'running', progress: '스토어에 연결 중', apps: [], documents: [], errors: [], completed: [], started: Date.now() }
   jobs.set(job.id, job)
   void (async () => {
-    const s = settings()
-    if (!s.vendor || !s.bucket || !s.packages.length) {
-      job.progress = '연결 정보 자동 감지 중…'
-      try {
-        const discovered = await discoverConnections()
-        job.errors.push(...discovered.notes.filter(n => /실패|찾지|입력|후보|판매자/.test(n)))
-      } catch (e) {
-        job.errors.push(message(e))
+    try {
+      const s = settings()
+      if (!s.vendor || !s.bucket || !s.packages.length) {
+        job.progress = '연결 정보 자동 감지 중…'
+        try {
+          const discovered = await discoverConnections()
+          job.errors.push(...discovered.notes.filter(n => /실패|찾지|입력|후보|판매자/.test(n)))
+        } catch (e) {
+          job.errors.push(message(e))
+        }
       }
+      await run(job, month)
+    } catch (e) {
+      job.errors.push(message(e))
+      job.state = 'done'
+      job.progress = '확인할 항목이 있습니다.'
     }
-    await run(job, month)
   })()
   res.json({ id: job.id })
 })

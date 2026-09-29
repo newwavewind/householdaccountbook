@@ -31,6 +31,17 @@ export default defineConfig({
       },
     },
   },
+  preview: {
+    port: 4180,
+    strictPort: true,
+    proxy: {
+      '/api/app-revenue': revenueProxy(),
+      '/api': {
+        target: 'http://localhost:4000',
+        changeOrigin: true,
+      },
+    },
+  },
   build: {
     rollupOptions: {
       output: {

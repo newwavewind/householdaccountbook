@@ -38,6 +38,14 @@ import type {
   SyncResult,
   TaxClass,
 } from "../revenue/types";
+import {
+  connectorDownMessage,
+  formatSyncToast,
+  markAutoSynced,
+  shouldAutoSync,
+  syncLogStatus,
+  type ConnectorHealth,
+} from "../revenue/syncHelpers";
 import "../revenue/revenue.css";
 
 type Section =
@@ -145,21 +153,68 @@ function PlatformMark({ platform }: { platform: Platform }) {
   );
 }
 async function connector<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`/api/app-revenue${path}`, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
-    signal: AbortSignal.timeout(35000),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`/api/app-revenue${path}`, {
+      ...init,
+      headers: { "Content-Type": "application/json", ...init?.headers },
+      signal: AbortSignal.timeout(45000),
+    });
+  } catch {
+    throw new Error(connectorDownMessage());
+  }
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as {
       error?: string;
     } | null;
     throw new Error(
       body?.error ||
-        "연결 서버가 실행되지 않았습니다. 연결 관리에서 설정을 확인해 주세요.",
+        connectorDownMessage(res.status),
     );
   }
   return res.json() as Promise<T>;
+}
+
+function enrichRowsWithApps(rows: RevenueRow[], apps: AppProduct[]): RevenueRow[] {
+  if (!apps.length) return rows;
+  const byId = new Map(apps.map((a) => [a.id, a]));
+  const byBundle = new Map(apps.map((a) => [a.bundleId, a]));
+  return rows.map((row) => {
+    const direct = byId.get(row.appId);
+    if (direct) return { ...row, appName: direct.name || row.appName };
+    const key = row.appId.includes(":") ? row.appId.slice(row.appId.indexOf(":") + 1) : row.appId;
+    const viaBundle = byBundle.get(key) || byBundle.get(row.appName);
+    if (viaBundle)
+      return {
+        ...row,
+        appId: viaBundle.id,
+        appName: viaBundle.name || row.appName,
+      };
+    return row;
+  });
+}
+
+function platformProceedsLabel(
+  platform: Platform,
+  total: ReturnType<typeof summarize>,
+  rows: RevenueRow[],
+  basis: Basis,
+) {
+  const platformRows = rows.filter((r) => r.platform === platform);
+  if (!platformRows.length) return { value: "—", note: "보고서 없음" };
+  if (
+    total.unknownProceeds &&
+    !platformRows.some((r) => r.proceeds !== null)
+  ) {
+    return {
+      value: "수익 미제공",
+      note: basis === "estimate" ? "예상 매출 · 확정 시 수익 표시" : "확정 수익 보고서 필요",
+    };
+  }
+  return {
+    value: `₩${money(total.proceeds)}`,
+    note: basis === "estimate" ? "추정" : "확정",
+  };
 }
 
 export default function AppRevenuePage() {
@@ -199,7 +254,12 @@ function RevenueWorkspace({ owner }: { owner: string }) {
     [busy, setBusy] = useState(false),
     [progress, setProgress] = useState("");
   const [connection, setConnection] = useState<Connection | null>(null),
-    [connectionError, setConnectionError] = useState("");
+    [connectionError, setConnectionError] = useState(""),
+    [connectorHealth, setConnectorHealth] =
+      useState<ConnectorHealth>("checking"),
+    [lastSyncDetail, setLastSyncDetail] = useState<string[]>([]);
+  const syncInFlight = useRef(false);
+  const autoTried = useRef(false);
   const [importPreview, setImportPreview] = useState<
     { document: StoreDocument; rows: RevenueRow[] }[] | null
   >(null);
@@ -220,18 +280,29 @@ function RevenueWorkspace({ owner }: { owner: string }) {
   }, []);
   useEffect(() => {
     let cancelled = false;
-    connector<Connection>("/status")
-      .then((c) => {
-        if (!cancelled) setConnection(c);
-      })
-      .catch(() => {
-        if (!cancelled)
+    const poll = () => {
+      connector<Connection>("/status")
+        .then((c) => {
+          if (cancelled) return;
+          setConnection(c);
+          setConnectionError("");
+          setConnectorHealth("online");
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setConnection(null);
+          setConnectorHealth("offline");
           setConnectionError(
-            "연결 서버를 실행하면 스토어를 동기화할 수 있습니다.",
+            "로컬 수익 커넥터가 꺼져 있습니다. 터미널에서 npm run revenue:connector 를 실행해 주세요.",
           );
-      });
+        });
+    };
+    setConnectorHealth("checking");
+    poll();
+    const id = window.setInterval(poll, 4000);
     return () => {
       cancelled = true;
+      window.clearInterval(id);
     };
   }, []);
   const appChoices = useMemo(() => {
@@ -313,18 +384,22 @@ function RevenueWorkspace({ owner }: { owner: string }) {
       "샘플 화면입니다. 표시된 금액과 앱 상태는 실제 데이터가 아닙니다.",
     );
   }
-  async function sync() {
+  async function sync(opts: { auto?: boolean } = {}) {
     if (demo) {
-      setToast("실제 데이터로 전환한 뒤 동기화해 주세요.");
+      if (!opts.auto) setToast("실제 데이터로 전환한 뒤 동기화해 주세요.");
       return;
     }
+    if (syncInFlight.current) return;
+    syncInFlight.current = true;
     setBusy(true);
-    setProgress("Apple·Google에 연결 중…");
+    setProgress(opts.auto ? "자동 동기화 · Apple·Google 연결 중…" : "Apple·Google에 연결 중…");
+    setLastSyncDetail([]);
     try {
       const start = await connector<{ id: string }>("/sync", {
         method: "POST",
         body: JSON.stringify({ month }),
       });
+      setConnectorHealth("online");
       let result: SyncResult;
       do {
         await new Promise((resolve) => setTimeout(resolve, 1200));
@@ -336,57 +411,85 @@ function RevenueWorkspace({ owner }: { owner: string }) {
       const errors = [...result.errors];
       for (const document of result.documents) {
         try {
-          parsed.push({ document, rows: await parseReport(document) });
+          parsed.push({
+            document,
+            rows: enrichRowsWithApps(
+              await parseReport(document),
+              result.apps,
+            ),
+          });
         } catch (e) {
           errors.push(
             `${document.name}: ${e instanceof Error ? e.message : "형식 확인 필요"}`,
           );
         }
       }
-      const message = `${result.apps.length}개 앱 · ${parsed.length}개 보고서 반영${errors.length ? ` · ${errors.join(" / ")}` : ""}`;
+      const toast = formatSyncToast({
+        apps: result.apps.length,
+        documents: parsed.map((p) => p.document),
+        errors,
+        completed: result.completed,
+        auto: opts.auto,
+      });
+      const detail = errors.slice(0, 8);
       store.update((prev) => {
         const next = mergeReports(prev, parsed);
         const apps = new Map(next.apps.map((a) => [a.id, a]));
         result.apps.forEach((a) =>
           apps.set(a.id, { ...a, favorite: apps.get(a.id)?.favorite }),
         );
+        const enrichedRows = enrichRowsWithApps(next.rows, [...apps.values()]);
         return {
           ...next,
           apps: [...apps.values()],
+          rows: enrichedRows,
           logs: [
-            log(
-              errors.length
-                ? parsed.length || result.apps.length
-                  ? "partial"
-                  : "error"
-                : "success",
-              message,
-            ),
+            log(syncLogStatus(parsed.length, result.apps.length, errors.length), toast),
             ...next.logs,
           ].slice(0, 50),
         };
       });
-      setToast(message);
+      setToast(toast);
+      setLastSyncDetail(detail);
       if (errors.length) setSection("connections");
+      if (opts.auto) markAutoSynced(owner, localDate());
       const refreshed = await connector<Connection>("/status").catch(
         () => null,
       );
-      if (refreshed) setConnection(refreshed);
+      if (refreshed) {
+        setConnection(refreshed);
+        setConnectorHealth("online");
+      }
     } catch (e) {
       const message = e instanceof Error ? e.message : "동기화 실패";
       setToast(message);
+      setLastSyncDetail([message]);
+      setConnectorHealth("offline");
       store.update((prev) => ({
         ...prev,
         logs: [log("error", message), ...prev.logs].slice(0, 50),
       }));
       setSection("connections");
     } finally {
+      syncInFlight.current = false;
       if (mounted.current) {
         setBusy(false);
         setProgress("");
       }
     }
   }
+  useEffect(() => {
+    if (demo || autoTried.current || connectorHealth !== "online") return;
+    if (!shouldAutoSync(owner, localDate())) {
+      autoTried.current = true;
+      return;
+    }
+    autoTried.current = true;
+    const t = window.setTimeout(() => {
+      void sync({ auto: true });
+    }, 900);
+    return () => window.clearTimeout(t);
+  }, [connectorHealth, demo, owner, month]);
   async function importFiles(files: FileList | null) {
     if (!files?.length) return;
     setBusy(true);
@@ -519,28 +622,80 @@ function RevenueWorkspace({ owner }: { owner: string }) {
             icon="sync"
             primary
             onClick={() => void sync()}
-            disabled={busy || demo}
+            disabled={busy || demo || connectorHealth === "offline"}
           >
             {busy ? "동기화 중…" : "지금 동기화"}
           </Action>
         </div>
       </header>
       <div className="rev-status-strip">
-        <span>
+        <span className="rev-status-left">
           <span
-            className={`rev-status-dot ${connection?.apple.configured || connection?.google.configured ? "ready" : ""}`}
+            className={`rev-status-dot ${
+              connectorHealth === "online"
+                ? "ready"
+                : connectorHealth === "checking"
+                  ? "checking"
+                  : "down"
+            }`}
+            aria-hidden
           />
-          {demo
-            ? "샘플 데이터 · 실제 수익 아님"
-            : data.logs[0]
-              ? `마지막 확인 ${new Date(data.logs[0].at).toLocaleString("ko-KR")}`
-              : "첫 보고서를 연결해 보세요"}
+          <span className="rev-connector-pill" data-state={connectorHealth}>
+            {connectorHealth === "online"
+              ? "커넥터 연결됨"
+              : connectorHealth === "checking"
+                ? "커넥터 확인 중"
+                : "커넥터 끊김"}
+          </span>
+          <span className="rev-status-meta">
+            {demo
+              ? "샘플 데이터 · 실제 수익 아님"
+              : data.logs[0]
+                ? `마지막 확인 ${new Date(data.logs[0].at).toLocaleString("ko-KR")}`
+                : "첫 보고서를 연결해 보세요"}
+          </span>
         </span>
         <button onClick={toggleDemo} disabled={busy}>
           {demo ? "실제 데이터로 돌아가기" : "샘플 둘러보기"}{" "}
           <span aria-hidden>↗</span>
         </button>
       </div>
+      {connectorHealth === "offline" && !demo && (
+        <div className="rev-notice rev-notice-warn" role="status">
+          <span>
+            로컬 수익 커넥터가 꺼져 있어 동기화가 되지 않습니다. 터미널에서{" "}
+            <code>npm run revenue:connector</code> 실행 후 「지금 동기화」를
+            눌러 주세요. 상주가 필요하면{" "}
+            <code>npm run revenue:connector:install</code>
+          </span>
+          <button
+            onClick={() => {
+              setConnectorHealth("checking");
+              void connector<Connection>("/status")
+                .then((c) => {
+                  setConnection(c);
+                  setConnectionError("");
+                  setConnectorHealth("online");
+                })
+                .catch(() => setConnectorHealth("offline"));
+            }}
+          >
+            다시 확인
+          </button>
+        </div>
+      )}
+      {!!lastSyncDetail.length && (
+        <div className="rev-notice rev-notice-detail" role="status">
+          <span>
+            {lastSyncDetail.map((line, i) => (
+              <span key={i} className="rev-detail-line">
+                {line}
+              </span>
+            ))}
+          </span>
+          <button onClick={() => setLastSyncDetail([])}>닫기</button>
+        </div>
+      )}
       {demo && (
         <div className="rev-notice">
           샘플 모드입니다. 모든 금액·빌드·정산 상태는 기능 체험용이며 실제
@@ -676,12 +831,24 @@ function RevenueWorkspace({ owner }: { owner: string }) {
 
       {section === "overview" && (
         <>
-          {!filtered.length && (
+          {!filtered.length ? (
             <div className="rev-notice" role="status">
-              <span>선택한 기간·조건의 매출 보고서가 없습니다. 아래 0원은 실제 무매출이 확인된 금액이 아닙니다.</span>
-              <button onClick={() => setSection("connections")}>보고서 연결하기</button>
+              <span>
+                선택한 기간·조건의 매출 보고서가 없습니다. 아래 금액은 실제
+                무매출이 아니라 데이터 없음입니다.
+              </span>
+              <button onClick={() => setSection("connections")}>
+                보고서 연결하기
+              </button>
             </div>
-          )}
+          ) : filtered.every((r) => r.gross === 0 && r.refunds === 0) ? (
+            <div className="rev-notice" role="status">
+              <span>
+                이 기간 보고서는 있으나 매출·환불이 모두 0원입니다. 실제
+                무매출로 확인된 값입니다.
+              </span>
+            </div>
+          ) : null}
           <section className="rev-hero">
             <div className="rev-hero-main">
               <span className="rev-overline">
@@ -709,27 +876,17 @@ function RevenueWorkspace({ owner }: { owner: string }) {
             </div>
             <div className="rev-hero-platforms">
               {(["apple", "google"] as const).map((p) => {
-                const total = summarize(
-                  filtered.filter((r) => r.platform === p),
-                  data,
-                );
+                const platformRows = filtered.filter((r) => r.platform === p);
+                const total = summarize(platformRows, data);
+                const label = platformProceedsLabel(p, total, filtered, basis);
                 return (
                   <div key={p}>
                     <PlatformMark platform={p} />
                     <div>
                       <span>{platformName[p]}</span>
-                      <strong>
-                        {total.unknownProceeds &&
-                        !filtered.some(
-                          (r) => r.platform === p && r.proceeds !== null,
-                        )
-                          ? "수익 미제공"
-                          : `₩${money(total.proceeds)}`}
-                      </strong>
+                      <strong>{label.value}</strong>
                     </div>
-                    <span className="rev-muted">
-                      {basis === "estimate" ? "추정" : "확정"}
-                    </span>
+                    <span className="rev-muted">{label.note}</span>
                   </div>
                 );
               })}
@@ -792,8 +949,10 @@ function RevenueWorkspace({ owner }: { owner: string }) {
               )}
               {totals.unknownProceeds > 0 && (
                 <span>
-                  Google 예상 매출 {totals.unknownProceeds}건의 수익은 미제공
-                  상태입니다. 확정 수익 보고서가 필요합니다.
+                  Google 예상 매출 {totals.unknownProceeds}건은 결제액만
+                  있고 개발자 수익란이 비어 있습니다. 「확정 보고서」 기준으로
+                  전환하거나 월별 확정 수익(earnings)을 동기화하세요. ₩0과
+                  다릅니다.
                 </span>
               )}
             </div>
@@ -1104,7 +1263,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                 primary
                 icon="sync"
                 onClick={() => void sync()}
-                disabled={busy}
+                disabled={busy || connectorHealth === "offline"}
               >
                 스토어 동기화
               </Action>
@@ -1114,6 +1273,64 @@ function RevenueWorkspace({ owner }: { owner: string }) {
       )}
 
       {section === "transactions" && (
+        <>
+        <div className="rev-ledger-summary" aria-label="매출 합계">
+          <div className="rev-ledger-summary-head">
+            <div>
+              <h2>매출 합계</h2>
+              <p>
+                {monthLabel(month)} ·{" "}
+                {basis === "estimate" ? "추정 매출" : "확정 보고서"} ·{" "}
+                {platform === "all" ? "전체 스토어" : platformName[platform]}
+              </p>
+            </div>
+            {!filtered.length ? (
+              <span className="rev-pill rev-pill-muted">데이터 없음</span>
+            ) : filtered.every((r) => r.gross === 0 && !r.refunds) ? (
+              <span className="rev-pill">실제 무매출</span>
+            ) : (
+              <span className="rev-pill rev-pill-ready">보고서 반영</span>
+            )}
+          </div>
+          <div className="rev-ledger-summary-grid">
+            {[
+              {
+                label: "총 매출",
+                value: !filtered.length ? "—" : `₩${money(totals.gross)}`,
+                note: "고객 결제액",
+              },
+              {
+                label: "환불",
+                value: !filtered.length ? "—" : `₩${money(totals.refunds)}`,
+                note: `순 판매 ${money(totals.units)}건`,
+              },
+              {
+                label: "개발자 수익",
+                value: !filtered.length
+                  ? "—"
+                  : totals.unknownProceeds &&
+                      !filtered.some((r) => r.proceeds !== null)
+                    ? "미제공"
+                    : `₩${money(totals.proceeds)}`,
+                note:
+                  basis === "estimate"
+                    ? "추정 · Google은 확정 시 표시"
+                    : "확정 보고서",
+              },
+              {
+                label: "건수",
+                value: !filtered.length ? "—" : money(ledgerRows.length),
+                note: "현재 필터 기준",
+              },
+            ].map((item) => (
+              <div key={item.label} className="rev-ledger-metric">
+                <span>{item.label}</span>
+                <strong>{item.value}</strong>
+                <small>{item.note}</small>
+              </div>
+            ))}
+          </div>
+        </div>
         <section className="rev-card">
           {sectionHeader(
             "매출 상세 내역",
@@ -1255,6 +1472,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
             </Empty>
           )}
         </section>
+        </>
       )}
 
       {section === "payouts" && (
@@ -1653,7 +1871,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
               <Action
                 icon="sync"
                 primary
-                disabled={busy || demo}
+                disabled={busy || demo || connectorHealth === "offline"}
                 onClick={() => void sync()}
               >
                 지금 동기화
@@ -1815,21 +2033,28 @@ function RevenueWorkspace({ owner }: { owner: string }) {
               </DataForm>
               </>
             ) : (
-              <div className="rev-notice">
-                {connectionError}
+              <div className="rev-notice rev-notice-warn">
+                {connectionError ||
+                  "로컬 수익 커넥터가 응답하지 않습니다."}
                 <p>
-                  개인용 연결 서버: <code>npm run dev:revenue</code> · API 키는
+                  시작: <code>npm run revenue:connector</code> · 상주:{" "}
+                  <code>npm run revenue:connector:install</code> · API 키는
                   서버 설정 파일에만 보관합니다.
                 </p>
                 <Action
-                  onClick={() =>
+                  onClick={() => {
+                    setConnectorHealth("checking");
                     void connector<Connection>("/status")
                       .then((c) => {
                         setConnection(c);
                         setConnectionError("");
+                        setConnectorHealth("online");
                       })
-                      .catch((e) => setToast(e.message))
-                  }
+                      .catch((e) => {
+                        setConnectorHealth("offline");
+                        setToast(e.message);
+                      });
+                  }}
                 >
                   연결 다시 확인
                 </Action>

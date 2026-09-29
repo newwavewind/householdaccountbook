@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev:revenue": "tsx watch src/revenueServer.ts",
+    "start:revenue": "tsx src/revenueServer.ts",
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",

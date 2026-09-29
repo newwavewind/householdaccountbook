@@ -15,6 +15,7 @@ export function revenueProxy() {
     target: "http://127.0.0.1:4001",
     changeOrigin: true,
     headers: { "X-Revenue-Local-Token": readFileSync(file, "utf8").trim() },
-    timeout: 30000,
+    timeout: 120000,
+    proxyTimeout: 120000,
   };
 }
