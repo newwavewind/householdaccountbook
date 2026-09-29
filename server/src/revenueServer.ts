@@ -400,7 +400,7 @@ app.use(async (req, res, next) => {
   res.set('Cache-Control', 'no-store')
   const origin = req.headers.origin
   const allowed = (process.env.REVENUE_ALLOWED_ORIGINS || 'http://127.0.0.1:5174,http://localhost:5174,http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:4180,http://localhost:4180,https://householdaccountbook.vercel.app,https://newwavewind.github.io').split(',').map(s => s.trim()).filter(Boolean)
-  const originAllowed = !origin || allowed.includes('*') || allowed.includes(origin)
+  const originAllowed = !origin || allowed.includes('*') || allowed.includes(origin) || /\.vercel\.app$/i.test(origin || '')
   if (origin && originAllowed) {
     res.set('Access-Control-Allow-Origin', origin)
     res.set('Access-Control-Allow-Credentials', 'true')
