@@ -36,6 +36,10 @@ interface ImportMetaEnv {
    * Kakao Developers → 앱 키 → JavaScript 키. Web 플랫폼에 도메인 등록 필수.
    */
   readonly VITE_KAKAO_JAVASCRIPT_KEY?: string
+  /** 배포 환경에서 앱 수익 클라우드 동기화 사용 */
+  readonly VITE_REVENUE_CLOUD?: string
+  /** 기본 `/api/app-revenue` — 별도 커넥터 호스트가 있을 때만 설정 */
+  readonly VITE_REVENUE_API_BASE?: string
 }
 
 interface ImportMeta {

@@ -39,13 +39,16 @@ import type {
   TaxClass,
 } from "../revenue/types";
 import {
-  connectorDownMessage,
   formatSyncToast,
   markAutoSynced,
   shouldAutoSync,
   syncLogStatus,
   type ConnectorHealth,
 } from "../revenue/syncHelpers";
+import {
+  isRevenueCloudMode,
+  revenueFetch,
+} from "../revenue/connectorClient";
 import "../revenue/revenue.css";
 
 type Section =
@@ -152,28 +155,8 @@ function PlatformMark({ platform }: { platform: Platform }) {
     </span>
   );
 }
-async function connector<T>(path: string, init?: RequestInit): Promise<T> {
-  let res: Response;
-  try {
-    res = await fetch(`/api/app-revenue${path}`, {
-      ...init,
-      headers: { "Content-Type": "application/json", ...init?.headers },
-      signal: AbortSignal.timeout(45000),
-    });
-  } catch {
-    throw new Error(connectorDownMessage());
-  }
-  if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as {
-      error?: string;
-    } | null;
-    throw new Error(
-      body?.error ||
-        connectorDownMessage(res.status),
-    );
-  }
-  return res.json() as Promise<T>;
-}
+const connector = revenueFetch;
+
 
 function enrichRowsWithApps(rows: RevenueRow[], apps: AppProduct[]): RevenueRow[] {
   if (!apps.length) return rows;
@@ -293,7 +276,9 @@ function RevenueWorkspace({ owner }: { owner: string }) {
           setConnection(null);
           setConnectorHealth("offline");
           setConnectionError(
-            "로컬 수익 커넥터가 꺼져 있습니다. 터미널에서 npm run revenue:connector 를 실행해 주세요.",
+            isRevenueCloudMode()
+              ? "클라우드 동기화에 연결되지 않았습니다. 로그인 후 다시 시도해 주세요."
+              : "로컬 수익 커넥터가 꺼져 있습니다. npm run revenue:connector 를 실행하거나, 휴대폰은 배포 사이트에서 로그인하세요.",
           );
         });
     };
@@ -663,10 +648,9 @@ function RevenueWorkspace({ owner }: { owner: string }) {
       {connectorHealth === "offline" && !demo && (
         <div className="rev-notice rev-notice-warn" role="status">
           <span>
-            로컬 수익 커넥터가 꺼져 있어 동기화가 되지 않습니다. 터미널에서{" "}
-            <code>npm run revenue:connector</code> 실행 후 「지금 동기화」를
-            눌러 주세요. 상주가 필요하면{" "}
-            <code>npm run revenue:connector:install</code>
+            {isRevenueCloudMode()
+              ? "클라우드 동기화에 연결되지 않았습니다. 로그인 상태와 네트워크를 확인한 뒤 다시 시도해 주세요."
+              : "로컬 수익 커넥터가 꺼져 있습니다. 터미널에서 npm run revenue:connector 실행 후 동기화하세요. 휴대폰에서는 배포된 웹에 로그인하면 클라우드 동기화를 쓸 수 있습니다."}
           </span>
           <button
             onClick={() => {
@@ -2035,11 +2019,13 @@ function RevenueWorkspace({ owner }: { owner: string }) {
             ) : (
               <div className="rev-notice rev-notice-warn">
                 {connectionError ||
-                  "로컬 수익 커넥터가 응답하지 않습니다."}
+                  (isRevenueCloudMode()
+                    ? "클라우드 동기화에 연결되지 않았습니다."
+                    : "로컬 수익 커넥터가 응답하지 않습니다.")}
                 <p>
-                  시작: <code>npm run revenue:connector</code> · 상주:{" "}
-                  <code>npm run revenue:connector:install</code> · API 키는
-                  서버 설정 파일에만 보관합니다.
+                  {isRevenueCloudMode()
+                    ? "배포 환경에서는 로그인 계정으로 Apple·Google 보고서를 가져옵니다. API 키는 서버 환경 변수에만 보관됩니다."
+                    : "PC: npm run revenue:connector · 휴대폰: 배포 사이트 로그인 후 동기화 · API 키는 서버에만 보관합니다."}
                 </p>
                 <Action
                   onClick={() => {

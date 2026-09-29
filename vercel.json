@@ -1,17 +1,24 @@
 {
   "framework": null,
-  "installCommand": "npm ci --prefix web",
+  "installCommand": "npm install && npm ci --prefix web && npm install --prefix server",
   "buildCommand": "npm run build --prefix web",
   "outputDirectory": "web/dist",
   "build": {
     "env": {
       "VITE_BASE_PATH": "/",
       "VITE_LEDGER_BACKEND": "supabase",
-      "VITE_COMMUNITY_BACKEND": "supabase"
+      "VITE_COMMUNITY_BACKEND": "supabase",
+      "VITE_REVENUE_CLOUD": "true"
     }
   },
-  "routes": [
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/index.html" }
+  "functions": {
+    "api/app-revenue/[[...path]].ts": {
+      "maxDuration": 300,
+      "includeFiles": "server/src/**"
+    }
+  },
+  "rewrites": [
+    { "source": "/api/app-revenue/(.*)", "destination": "/api/app-revenue/$1" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }

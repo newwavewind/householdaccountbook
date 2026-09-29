@@ -13,3 +13,5 @@ server/dist
 migration-export/
 .revenue-local-token
 .revenue-cache/
+node_modules/
+.vercel/

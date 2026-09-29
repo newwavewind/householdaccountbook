@@ -9,6 +9,9 @@ import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
 import { gunzipSync } from 'node:zlib'
 import { unzipSync, strFromU8 } from 'fflate'
+import { authenticateRevenueRequest, type RevenueAuth } from './revenue/auth.js'
+import { getJobStore, persistJobProgress, type RevenueJob } from './revenue/jobs.js'
+import { envPem, googleServiceAccount, isCloudRuntime } from './revenue/credentials.js'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const startedAt = Date.now()
@@ -37,16 +40,16 @@ function settings(): Settings {
   try { saved = JSON.parse(readFileSync(configFile, 'utf8')) } catch { /* first run */ }
   return { vendor: saved.vendor || process.env.ASC_VENDOR_NUMBER || '', bucket: saved.bucket || process.env.GOOGLE_PLAY_BUCKET || '', packages: saved.packages || (process.env.GOOGLE_PLAY_PACKAGES || '').split(',').filter(Boolean) }
 }
-const keyPath = process.env.ASC_KEY_PATH || ''
-const financeKeyPath = process.env.ASC_FINANCE_KEY_PATH || keyPath
+const salesKeyPem = () => envPem('ASC_KEY_PEM', 'ASC_KEY_PATH')
+const financeKeyPem = () => envPem('ASC_FINANCE_KEY_PEM', 'ASC_FINANCE_KEY_PATH') || salesKeyPem()
+const appsKeyPem = () => envPem('ASC_APPS_KEY_PEM', 'ASC_APPS_KEY_PATH') || salesKeyPem()
 const financeKeyId = process.env.ASC_FINANCE_KEY_ID || process.env.ASC_KEY_ID || ''
-const appsKeyPath = process.env.ASC_APPS_KEY_PATH || keyPath
 const appsKeyId = process.env.ASC_APPS_KEY_ID || process.env.ASC_KEY_ID || ''
-const googlePath = process.env.GOOGLE_PLAY_SA_JSON || ''
+const googleSa = () => googleServiceAccount()
 function connectionStatus() {
   const s = settings()
-  const a = [!process.env.ASC_KEY_ID && 'Apple Key ID', !process.env.ASC_ISSUER_ID && 'Apple Issuer ID', !(keyPath && existsSync(keyPath)) && 'Apple API 키 파일'].filter(Boolean) as string[]
-  const g = [!(googlePath && existsSync(googlePath)) && 'Google 서비스 계정 파일'].filter(Boolean) as string[]
+  const a = [!process.env.ASC_KEY_ID && 'Apple Key ID', !process.env.ASC_ISSUER_ID && 'Apple Issuer ID', !salesKeyPem() && 'Apple API 키'].filter(Boolean) as string[]
+  const g = [!googleSa() && 'Google 서비스 계정'].filter(Boolean) as string[]
   return {
     apple: { configured: a.length === 0, reports: a.length === 0 && !!s.vendor, missing: [...a, ...(!s.vendor ? ['Apple 판매자 번호'] : [])] },
     google: { configured: g.length === 0, reports: g.length === 0 && !!s.bucket, missing: [...g, ...(!s.bucket ? ['Google 보고서 버킷 ID'] : [])] },
@@ -63,9 +66,9 @@ async function discoverConnections(): Promise<{ vendor: string; bucket: string; 
   let vendor = settings().vendor
   let bucket = settings().bucket
   let packages = [...settings().packages]
-  if (googlePath && existsSync(googlePath)) {
+  if (googleSa()) {
     try {
-      const key = JSON.parse(readFileSync(googlePath, 'utf8')) as { project_id?: string }
+      const key = googleSa() as { project_id?: string; client_email: string; private_key: string }
       const token = await googleToken([
         'https://www.googleapis.com/auth/devstorage.read_only',
         'https://www.googleapis.com/auth/playdeveloperreporting',
@@ -110,7 +113,7 @@ async function discoverConnections(): Promise<{ vendor: string; bucket: string; 
       notes.push(`Google 자동 감지 실패: ${message(e)}`)
     }
   }
-  if (!vendor && keyPath && existsSync(keyPath) && process.env.ASC_KEY_ID && process.env.ASC_ISSUER_ID) {
+  if (!vendor && salesKeyPem() && process.env.ASC_KEY_ID && process.env.ASC_ISSUER_ID) {
     // ASC API 에는 판매자 번호 목록이 없다. 환경변수만 받고, 없으면 안내한다.
     if (process.env.ASC_VENDOR_NUMBER && /^\d{4,20}$/.test(process.env.ASC_VENDOR_NUMBER)) {
       vendor = process.env.ASC_VENDOR_NUMBER
@@ -132,24 +135,24 @@ async function request(url: string, token: string, init: RequestInit = {}) {
   if (size > 25 * 1024 * 1024) throw new Error('보고서가 25MB를 초과합니다. 기간을 줄여 주세요.')
   return response
 }
-function appleToken(id = process.env.ASC_KEY_ID || '', path = keyPath) {
-  if (!id || !path || !existsSync(path)) throw new Error('Apple API 키 설정이 없습니다.')
-  return jwt.sign({}, readFileSync(path), { algorithm: 'ES256', keyid: id, issuer: process.env.ASC_ISSUER_ID, audience: 'appstoreconnect-v1', expiresIn: '15m' })
+function appleToken(id = process.env.ASC_KEY_ID || '', pem = salesKeyPem()) {
+  if (!id || !pem) throw new Error('Apple API 키 설정이 없습니다.')
+  return jwt.sign({}, pem, { algorithm: 'ES256', keyid: id, issuer: process.env.ASC_ISSUER_ID, audience: 'appstoreconnect-v1', expiresIn: '15m' })
 }
 function appleFinanceToken() {
-  return appleToken(financeKeyId, financeKeyPath)
+  return appleToken(financeKeyId, financeKeyPem())
 }
 async function googleToken(scopes: string[]) {
-  const key = JSON.parse(readFileSync(googlePath, 'utf8')) as { client_email: string; private_key: string }
+  const key = googleSa()
+  if (!key) throw new Error('Google 서비스 계정 설정이 없습니다.')
   const assertion = jwt.sign({ scope: scopes.join(' ') }, key.private_key, { algorithm: 'RS256', issuer: key.client_email, audience: 'https://oauth2.googleapis.com/token', expiresIn: '50m' })
   const res = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion }), signal: AbortSignal.timeout(25000) })
   if (!res.ok) throw new ProviderError(res.status, 'Google 인증 실패')
   return (await res.json() as { access_token: string }).access_token
 }
-type App = { id: string; name: string; platform: 'apple' | 'google'; bundleId: string; version: string; build: string; status: string; updatedAt: string; source: 'api' }
-type Document = { key: string; name: string; text: string; period: string }
-type Job = { id: string; state: 'running' | 'done'; progress: string; apps: App[]; documents: Document[]; errors: string[]; completed: string[]; started: number }
-const jobs = new Map<string, Job>()
+type App = RevenueJob['apps'][number]
+type Document = RevenueJob['documents'][number]
+type Job = RevenueJob
 const message = (e: unknown) => e instanceof Error ? (e instanceof ProviderError ? e.message : e.message.includes('timeout') ? '연결 시간이 초과되었습니다. 다시 시도해 주세요.' : '연결에 실패했습니다. 키 파일과 네트워크 설정을 확인해 주세요.') : '연결 실패'
 async function appleApps(job: Job, token: string) {
   let url: string | undefined = 'https://api.appstoreconnect.apple.com/v1/apps?limit=200'
@@ -201,7 +204,7 @@ async function appleReports(job: Job, token: string, month: string) {
   if (unavailable) job.errors.push(`Apple 일별 보고서 ${unavailable}일 미제공 · 무매출 또는 생성 지연일 수 있습니다.`)
   if (month < today.slice(0, 7)) {
     try {
-      const financeToken = financeKeyId && financeKeyPath && existsSync(financeKeyPath) ? appleFinanceToken() : token
+      const financeToken = financeKeyId && financeKeyPem() ? appleFinanceToken() : token
       const params = new URLSearchParams({ 'filter[reportDate]': month, 'filter[reportType]': 'FINANCIAL', 'filter[regionCode]': 'ZZ', 'filter[vendorNumber]': vendor })
       const response = await request(`https://api.appstoreconnect.apple.com/v1/financeReports?${params}`, financeToken, { headers: { Accept: 'application/a-gzip' } })
       const bytes = Buffer.from(await response.arrayBuffer())
@@ -277,6 +280,10 @@ function loadGoogleLocalReports(job: Job, month: string) {
   return { sales, earnings }
 }
 function refreshGoogleViaChrome(job: Job, month: string): Promise<boolean> {
+  if (isCloudRuntime() || process.env.REVENUE_DISABLE_CHROME === '1') {
+    job.errors.push('클라우드 동기화에서는 Chrome 보조 경로를 쓸 수 없습니다. Play 보고서 GCS ACL(서비스 계정)을 확인해 주세요.')
+    return Promise.resolve(false)
+  }
   const script = resolve(root, 'server/scripts/refreshPlayReports.mjs')
   if (!existsSync(script)) {
     job.errors.push('Google Chrome 동기화 스크립트가 없습니다.')
@@ -372,7 +379,7 @@ async function run(job: Job, month: string) {
   const tasks: Promise<unknown>[] = []
   if (status.apple.configured) tasks.push((async () => {
     const salesToken = appleToken()
-    const appsToken = (appsKeyId && appsKeyPath && existsSync(appsKeyPath)) ? appleToken(appsKeyId, appsKeyPath) : salesToken
+    const appsToken = (appsKeyId && appsKeyPem()) ? appleToken(appsKeyId, appsKeyPem()) : salesToken
     await Promise.allSettled([
       appleApps(job, appsToken).catch(e => job.errors.push(message(e))),
       appleReports(job, salesToken, month).catch(e => job.errors.push(message(e))),
@@ -386,18 +393,24 @@ async function run(job: Job, month: string) {
 }
 const app = express()
 app.disable('x-powered-by')
-app.use((req, res, next) => {
+app.use(async (req, res, next) => {
   res.set('Cache-Control', 'no-store')
   const origin = req.headers.origin
-  const allowed = (process.env.REVENUE_ALLOWED_ORIGINS || 'http://127.0.0.1:5174,http://localhost:5174,http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:4180,http://localhost:4180').split(',')
-  if (origin && !allowed.includes(origin)) return res.status(403).json({ error: '허용되지 않은 요청입니다.' })
-  const supplied = Buffer.from(req.get('X-Revenue-Local-Token') || '')
-  if (supplied.length !== Buffer.byteLength(localToken) || !timingSafeEqual(supplied, Buffer.from(localToken))) return res.status(401).json({ error: '개인용 연결 서버 인증이 필요합니다.' })
+  const allowed = (process.env.REVENUE_ALLOWED_ORIGINS || 'http://127.0.0.1:5174,http://localhost:5174,http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:4180,http://localhost:4180,https://householdaccountbook.vercel.app').split(',').map(s => s.trim()).filter(Boolean)
+  if (origin && allowed.length && !allowed.includes(origin) && !allowed.includes('*')) {
+    return res.status(403).json({ error: '허용되지 않은 요청입니다.' })
+  }
+  const authResult = await authenticateRevenueRequest(req, localToken)
+  if (!authResult.ok) return res.status(authResult.status).json({ error: authResult.error })
+  ;(req as express.Request & { revenueAuth?: RevenueAuth }).revenueAuth = authResult.auth
   next()
 })
 app.use(express.json({ limit: '16kb' }))
+function reqAuth(req: express.Request): RevenueAuth {
+  return (req as express.Request & { revenueAuth: RevenueAuth }).revenueAuth
+}
 app.get('/api/app-revenue/status', (_req, res) => res.json(connectionStatus()))
-app.post('/api/app-revenue/discover', async (_req, res) => {
+app.post('/api/app-revenue/discover', async (req, res) => {
   try {
     const discovered = await discoverConnections()
     res.json({ ...connectionStatus(), discovered })
@@ -407,23 +420,35 @@ app.post('/api/app-revenue/discover', async (_req, res) => {
 })
 app.put('/api/app-revenue/settings', (req, res) => {
   const { vendor, bucket, packages } = req.body || {}
-  if (typeof vendor !== 'string' || (vendor && !/^\d{4,20}$/.test(vendor)) || typeof bucket !== 'string' || (bucket && !/^pubsite_prod_(?:rev_)?[a-zA-Z0-9_-]+$/.test(bucket)) || !Array.isArray(packages) || packages.length > 100 || packages.some(p => typeof p !== 'string' || !/^[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)+$/.test(p))) return res.status(400).json({ error: '판매자 번호·버킷 ID·패키지명 형식을 확인해 주세요.' })
+  if (typeof vendor !== 'string' || (vendor && !/^\d{4,20}$/.test(vendor)) || typeof bucket !== 'string' || (bucket && !/^pubsite_prod_(?:rev_)?[a-zA-Z0-9_-]+$/.test(bucket)) || !Array.isArray(packages) || packages.length > 100 || packages.some((p: unknown) => typeof p !== 'string' || !/^[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)+$/.test(p as string))) return res.status(400).json({ error: '판매자 번호·버킷 ID·패키지명 형식을 확인해 주세요.' })
   saveSettings({ vendor, bucket, packages })
   res.json(connectionStatus())
 })
-app.post('/api/app-revenue/sync', (req, res) => {
+app.post('/api/app-revenue/sync', async (req, res) => {
   const month = req.body?.month
   if (typeof month !== 'string' || !/^20\d{2}-(0[1-9]|1[0-2])$/.test(month) || month > new Date().toISOString().slice(0, 7)) return res.status(400).json({ error: '동기화할 월을 확인해 주세요.' })
-  for (const [id, job] of jobs) if (Date.now() - job.started > 30 * 60 * 1000) jobs.delete(id)
-  const active = [...jobs.values()].find(j => j.state === 'running')
+  const auth = reqAuth(req)
+  const store = getJobStore()
+  const active = await store.findRunning(auth)
   if (active) return res.status(409).json({ error: '이미 동기화 중입니다. 완료 후 다시 시도해 주세요.' })
-  const job: Job = { id: randomUUID(), state: 'running', progress: '스토어에 연결 중', apps: [], documents: [], errors: [], completed: [], started: Date.now() }
-  jobs.set(job.id, job)
-  void (async () => {
+  const job: Job = {
+    id: randomUUID(),
+    state: 'running',
+    progress: '스토어에 연결 중',
+    apps: [],
+    documents: [],
+    errors: [],
+    completed: [],
+    started: Date.now(),
+    userId: auth.mode === 'user' ? auth.user.id : undefined,
+  }
+  await store.set(job, auth)
+  const work = (async () => {
     try {
       const s = settings()
       if (!s.vendor || !s.bucket || !s.packages.length) {
         job.progress = '연결 정보 자동 감지 중…'
+        await persistJobProgress(job, auth)
         try {
           const discovered = await discoverConnections()
           job.errors.push(...discovered.notes.filter(n => /실패|찾지|입력|후보|판매자/.test(n)))
@@ -431,18 +456,38 @@ app.post('/api/app-revenue/sync', (req, res) => {
           job.errors.push(message(e))
         }
       }
-      await run(job, month)
+      const progressTimer = setInterval(() => { void persistJobProgress(job, auth) }, 4000)
+      try {
+        await run(job, month)
+      } finally {
+        clearInterval(progressTimer)
+      }
     } catch (e) {
       job.errors.push(message(e))
       job.state = 'done'
       job.progress = '확인할 항목이 있습니다.'
     }
+    await store.set(job, auth)
   })()
+  try {
+    const { waitUntil } = await import('@vercel/functions')
+    waitUntil(work)
+  } catch {
+    void work
+  }
   res.json({ id: job.id })
 })
-app.get('/api/app-revenue/sync/:id', (req, res) => {
-  const job = jobs.get(req.params.id)
+app.get('/api/app-revenue/sync/:id', async (req, res) => {
+  const auth = reqAuth(req)
+  const job = await getJobStore().get(req.params.id, auth)
   if (!job) return res.status(404).json({ error: '동기화 기록이 만료되었습니다.' })
   res.json(job.state === 'running' ? { ...job, documents: [], apps: [] } : job)
 })
-app.listen(Number(process.env.REVENUE_PORT) || 4001, '127.0.0.1', () => console.log('Private revenue connector ready on 127.0.0.1:4001'))
+
+export { app as revenueApp }
+
+if (!process.env.VERCEL && process.env.REVENUE_EXPORT_ONLY !== '1') {
+  const host = process.env.REVENUE_BIND || '127.0.0.1'
+  const port = Number(process.env.REVENUE_PORT) || 4001
+  app.listen(port, host, () => console.log(`Private revenue connector ready on ${host}:${port}`))
+}
