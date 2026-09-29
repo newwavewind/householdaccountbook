@@ -271,14 +271,15 @@ function RevenueWorkspace({ owner }: { owner: string }) {
           setConnectionError("");
           setConnectorHealth("online");
         })
-        .catch(() => {
+        .catch((e: unknown) => {
           if (cancelled) return;
           setConnection(null);
           setConnectorHealth("offline");
           setConnectionError(
-            isRevenueCloudMode()
-              ? "클라우드 동기화에 연결되지 않았습니다. 로그인 후 다시 시도해 주세요."
-              : "로컬 수익 커넥터가 꺼져 있습니다. npm run revenue:connector 를 실행하거나, 휴대폰은 배포 사이트에서 로그인하세요.",
+            (e instanceof Error && e.message) ||
+              (isRevenueCloudMode()
+                ? "클라우드 동기화에 연결되지 않았습니다. 로그인 후 다시 시도해 주세요."
+                : "로컬 수익 커넥터가 꺼져 있습니다. npm run revenue:connector 를 실행하거나, 휴대폰은 배포 사이트에서 로그인하세요."),
           );
         });
     };
@@ -648,9 +649,10 @@ function RevenueWorkspace({ owner }: { owner: string }) {
       {connectorHealth === "offline" && !demo && (
         <div className="rev-notice rev-notice-warn" role="status">
           <span>
-            {isRevenueCloudMode()
-              ? "클라우드 동기화에 연결되지 않았습니다. 로그인 상태와 네트워크를 확인한 뒤 다시 시도해 주세요."
-              : "로컬 수익 커넥터가 꺼져 있습니다. 터미널에서 npm run revenue:connector 실행 후 동기화하세요. 휴대폰에서는 배포된 웹에 로그인하면 클라우드 동기화를 쓸 수 있습니다."}
+            {connectionError ||
+              (isRevenueCloudMode()
+                ? "클라우드 동기화에 연결되지 않았습니다. 로그인 상태와 네트워크를 확인한 뒤 다시 시도해 주세요."
+                : "로컬 수익 커넥터가 꺼져 있습니다. 터미널에서 npm run revenue:connector 실행 후 동기화하세요.")}
           </span>
           <button
             onClick={() => {

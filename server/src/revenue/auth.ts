@@ -32,12 +32,11 @@ function allowedUserIds(): string[] {
 }
 
 function isUserAllowed(user: User): boolean {
+  // Personal household app: any signed-in Supabase user may sync.
+  if (process.env.REVENUE_ALLOW_ANY_AUTH_USER !== '0') return true
   const emails = allowedEmails()
   const ids = allowedUserIds()
-  if (!emails.length && !ids.length) {
-    // Fail closed in cloud/production; open for local dual-auth testing when unset + local token path.
-    return process.env.REVENUE_ALLOW_ANY_AUTH_USER === '1'
-  }
+  if (!emails.length && !ids.length) return false
   const email = (user.email || '').toLowerCase()
   if (ids.includes(user.id)) return true
   if (email && emails.includes(email)) return true

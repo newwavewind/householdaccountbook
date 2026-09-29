@@ -8,10 +8,17 @@ async function accessToken(): Promise<string | null> {
   return data.session?.access_token || null
 }
 
-/** Production uses same-origin Vercel API; local Vite proxies to the desktop connector. */
+/** Production uses same-origin Vercel API; GitHub Pages points at Vercel. */
 export function revenueApiBase(): string {
   const configured = import.meta.env.VITE_REVENUE_API_BASE
-  if (typeof configured === 'string' && configured.trim()) return configured.replace(/\/$/, '')
+  if (typeof configured === 'string' && configured.trim()) {
+    return configured.replace(/\/$/, '')
+  }
+  // Pages(/householdaccountbook/) has no serverless API — use Vercel backend.
+  const base = import.meta.env.BASE_URL || '/'
+  if (base !== '/' && typeof window !== 'undefined') {
+    return 'https://householdaccountbook.vercel.app/api/app-revenue'
+  }
   return '/api/app-revenue'
 }
 

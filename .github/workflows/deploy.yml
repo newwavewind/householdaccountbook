@@ -69,6 +69,8 @@ jobs:
           VITE_COMMUNITY_BACKEND: supabase
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
           VITE_KAKAO_JAVASCRIPT_KEY: ${{ secrets.VITE_KAKAO_JAVASCRIPT_KEY }}
+          VITE_REVENUE_CLOUD: true
+          VITE_REVENUE_API_BASE: https://householdaccountbook.vercel.app/api/app-revenue
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
