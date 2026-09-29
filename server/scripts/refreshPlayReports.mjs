@@ -9,8 +9,10 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const outDir = resolve(root, '.revenue-cache/imports/google')
 mkdirSync(outDir, { recursive: true, mode: 0o700 })
 
-const month = process.argv[2] || new Date().toISOString().slice(0, 7)
-if (!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month)) {
+const monthArg = process.argv[2] || 'all'
+const allMonths = monthArg === 'all'
+const month = allMonths ? new Date().toISOString().slice(0, 7) : monthArg
+if (!allMonths && !/^20\d{2}-(0[1-9]|1[0-2])$/.test(month)) {
   console.error(JSON.stringify({ ok: false, error: 'invalid month' }))
   process.exit(2)
 }
@@ -83,10 +85,13 @@ async function main() {
       .map((a) => a.href)
       .filter(Boolean),
   )
-  const wanted = hrefs.filter((h) => h.includes(yyyymm) && (h.includes('/sales/') || h.includes('/earnings/')))
-  const extras = [
-    `https://storage.cloud.google.com/${bucket}/sales/salesreport_${yyyymm}.zip?authuser=0`,
-  ]
+  const wanted = hrefs.filter((h) => {
+    if (!(h.includes('/sales/') || h.includes('/earnings/'))) return false
+    return allMonths || h.includes(yyyymm)
+  })
+  const extras = allMonths
+    ? []
+    : [`https://storage.cloud.google.com/${bucket}/sales/salesreport_${yyyymm}.zip?authuser=0`]
   const targets = [...new Set([...wanted, ...extras])]
   const saved = []
   for (const url of targets) {

@@ -39,7 +39,7 @@ type JobStore = {
 
 const memory = new Map<string, RevenueJob>()
 /** Cloud/local sync jobs stuck after a poll/route crash must not block forever. */
-const STALE_MS = 12 * 60 * 1000
+const STALE_MS = 20 * 60 * 1000
 
 function isFreshRunning(job: RevenueJob) {
   return job.state === 'running' && Date.now() - job.started < STALE_MS

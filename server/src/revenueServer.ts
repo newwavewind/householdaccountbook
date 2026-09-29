@@ -179,9 +179,47 @@ async function appleApps(job: Job, token: string) {
   }
   job.completed.push('Apple 앱·빌드 목록')
 }
-async function appleReports(job: Job, token: string, month: string) {
-  const vendor = settings().vendor
-  if (!vendor) { job.errors.push('Apple 매출: 판매자 번호를 연결 설정에 입력해 주세요.'); return }
+
+function historyFromMonth(): string {
+  const raw = (process.env.REVENUE_HISTORY_FROM || '2020-01').trim()
+  return /^20\d{2}-(0[1-9]|1[0-2])$/.test(raw) ? raw : '2020-01'
+}
+function listMonths(fromMonth: string, toMonth: string): string[] {
+  const out: string[] = []
+  let cur = fromMonth
+  while (cur <= toMonth) {
+    out.push(cur)
+    const [y, m] = cur.split('-').map(Number)
+    const d = new Date(Date.UTC(y, m - 1 + 1, 1))
+    cur = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
+  }
+  return out
+}
+function monthFromYyyymm(yyyymm: string): string | null {
+  const m = /^(\d{4})(\d{2})$/.exec(yyyymm)
+  if (!m) return null
+  const month = `${m[1]}-${m[2]}`
+  return /^20\d{2}-(0[1-9]|1[0-2])$/.test(month) ? month : null
+}
+
+async function appleMonthlySales(job: Job, token: string, vendor: string, month: string) {
+  const reportDate = `${month}-01`
+  job.progress = `Apple ${month} 월별 판매 보고서 확인 중`
+  const params = new URLSearchParams({
+    'filter[frequency]': 'MONTHLY',
+    'filter[reportDate]': reportDate,
+    'filter[reportType]': 'SALES',
+    'filter[reportSubType]': 'SUMMARY',
+    'filter[vendorNumber]': vendor,
+    'filter[version]': '1_0',
+  })
+  const response = await request(`https://api.appstoreconnect.apple.com/v1/salesReports?${params}`, token, { headers: { Accept: 'application/a-gzip' } })
+  const bytes = Buffer.from(await response.arrayBuffer())
+  const text = bytes[0] === 0x1f && bytes[1] === 0x8b ? gunzipSync(bytes, { maxOutputLength: 25 * 1024 * 1024 }).toString('utf8') : bytes.toString('utf8')
+  job.documents.push({ key: `apple-sales-month:${month}`, name: `Apple 월별 판매 ${month}`, text, period: month })
+}
+
+async function appleDailySales(job: Job, token: string, vendor: string, month: string) {
   const [year, m] = month.split('-').map(Number)
   const today = new Date().toISOString().slice(0, 10)
   let count = 0, unavailable = 0
@@ -199,22 +237,58 @@ async function appleReports(job: Job, token: string, month: string) {
       if (e instanceof ProviderError && e.code === 404) unavailable++
       else if (e instanceof ProviderError && e.code === 403) {
         job.errors.push('Apple 판매: API 키에 「매출 및 보고서」 권한이 없습니다. App Store Connect → 사용자 및 액세스 → 키 권한을 확인해 주세요.')
-        break
-      } else { job.errors.push(`Apple 판매: ${message(e)}`); break }
+        return { count, unavailable, fatal: true as const }
+      } else { job.errors.push(`Apple 판매: ${message(e)}`); return { count, unavailable, fatal: true as const } }
     }
   }
-  if (count) job.completed.push(`Apple 일별 판매 ${count}개`)
-  if (unavailable) job.errors.push(`Apple 일별 보고서 ${unavailable}일 미제공 · 무매출 또는 생성 지연일 수 있습니다.`)
-  if (month < today.slice(0, 7)) {
+  return { count, unavailable, fatal: false as const }
+}
+
+async function appleFinanceMonth(job: Job, token: string, vendor: string, month: string) {
+  const financeToken = financeKeyId && financeKeyPem() ? appleFinanceToken() : token
+  const params = new URLSearchParams({ 'filter[reportDate]': month, 'filter[reportType]': 'FINANCIAL', 'filter[regionCode]': 'ZZ', 'filter[vendorNumber]': vendor })
+  const response = await request(`https://api.appstoreconnect.apple.com/v1/financeReports?${params}`, financeToken, { headers: { Accept: 'application/a-gzip' } })
+  const bytes = Buffer.from(await response.arrayBuffer())
+  const text = bytes[0] === 0x1f && bytes[1] === 0x8b ? gunzipSync(bytes, { maxOutputLength: 25 * 1024 * 1024 }).toString('utf8') : bytes.toString('utf8')
+  job.documents.push({ key: `apple-finance:${month}`, name: `Apple 확정 재무 ${month} (회계월)`, text, period: month })
+}
+
+async function appleReports(job: Job, token: string, months: string[]) {
+  const vendor = settings().vendor
+  if (!vendor) { job.errors.push('Apple 매출: 판매자 번호를 연결 설정에 입력해 주세요.'); return }
+  const todayMonth = new Date().toISOString().slice(0, 7)
+  let monthlyOk = 0, monthlyMiss = 0, financeOk = 0, financeMiss = 0
+  for (const month of months) {
     try {
-      const financeToken = financeKeyId && financeKeyPem() ? appleFinanceToken() : token
-      const params = new URLSearchParams({ 'filter[reportDate]': month, 'filter[reportType]': 'FINANCIAL', 'filter[regionCode]': 'ZZ', 'filter[vendorNumber]': vendor })
-      const response = await request(`https://api.appstoreconnect.apple.com/v1/financeReports?${params}`, financeToken, { headers: { Accept: 'application/a-gzip' } })
-      const bytes = Buffer.from(await response.arrayBuffer())
-      const text = bytes[0] === 0x1f && bytes[1] === 0x8b ? gunzipSync(bytes, { maxOutputLength: 25 * 1024 * 1024 }).toString('utf8') : bytes.toString('utf8')
-      job.documents.push({ key: `apple-finance:${month}`, name: `Apple 확정 재무 ${month} (회계월)`, text, period: month }); job.completed.push('Apple 확정 재무 보고서')
-    } catch (e) { job.errors.push(`Apple 확정 재무: ${e instanceof ProviderError && e.code === 404 ? '보고서가 아직 제공되지 않습니다.' : message(e)}`) }
+      await appleMonthlySales(job, token, vendor, month)
+      monthlyOk++
+    } catch (e) {
+      if (e instanceof ProviderError && e.code === 404) monthlyMiss++
+      else if (e instanceof ProviderError && e.code === 403) {
+        job.errors.push('Apple 판매: API 키에 「매출 및 보고서」 권한이 없습니다. App Store Connect → 사용자 및 액세스 → 키 권한을 확인해 주세요.')
+        break
+      } else { job.errors.push(`Apple 월별 ${month}: ${message(e)}`); break }
+    }
+    if (month < todayMonth) {
+      try {
+        await appleFinanceMonth(job, token, vendor, month)
+        financeOk++
+      } catch (e) {
+        if (e instanceof ProviderError && e.code === 404) financeMiss++
+        else job.errors.push(`Apple 확정 재무 ${month}: ${message(e)}`)
+      }
+    }
   }
+  // Current month: also pull daily detail for the live dashboard.
+  if (months.includes(todayMonth)) {
+    const daily = await appleDailySales(job, token, vendor, todayMonth)
+    if (daily.count) job.completed.push(`Apple 일별 판매(당월) ${daily.count}개`)
+    if (daily.unavailable) job.errors.push(`Apple 일별 보고서 ${daily.unavailable}일 미제공 · 무매출 또는 생성 지연일 수 있습니다.`)
+  }
+  if (monthlyOk) job.completed.push(`Apple 월별 판매 ${monthlyOk}개월`)
+  if (monthlyMiss) job.errors.push(`Apple 월별 판매 ${monthlyMiss}개월 미제공 · 무매출 또는 생성 지연일 수 있습니다.`)
+  if (financeOk) job.completed.push(`Apple 확정 재무 ${financeOk}개월`)
+  if (financeMiss) job.errors.push(`Apple 확정 재무 ${financeMiss}개월 미제공`)
 }
 async function googleApps(job: Job, token: string) {
   const packages = new Map(settings().packages.map(p => [p, p]))
@@ -257,17 +331,19 @@ function pushGoogleZipDocuments(job: Job, month: string, kind: 'sales' | 'earnin
   }
   return count
 }
-function loadGoogleLocalReports(job: Job, month: string) {
+function loadGoogleLocalReports(job: Job, months: string[]) {
   mkdirSync(googleImportDir, { recursive: true, mode: 0o700 })
   if (!existsSync(googleImportDir)) return { sales: 0, earnings: 0 }
-  const yyyymm = month.replace('-', '')
+  const wanted = new Set(months.map((m) => m.replace('-', '')))
   let sales = 0, earnings = 0
   for (const file of readdirSync(googleImportDir)) {
     if (!file.endsWith('.zip')) continue
-    const isSales = file.startsWith(`salesreport_${yyyymm}`)
-    const isEarnings = file.startsWith(`earnings_${yyyymm}`)
-    if (!isSales && !isEarnings) continue
-    const kind = isSales ? 'sales' as const : 'earnings' as const
+    const match = /^(salesreport|earnings)_(\d{6})/.exec(file)
+    if (!match) continue
+    if (wanted.size && !wanted.has(match[2])) continue
+    const month = monthFromYyyymm(match[2])
+    if (!month) continue
+    const kind = match[1] === 'salesreport' ? 'sales' as const : 'earnings' as const
     try {
       const bytes = new Uint8Array(readFileSync(join(googleImportDir, file)))
       if (!(bytes[0] === 0x50 && bytes[1] === 0x4b)) continue
@@ -282,7 +358,7 @@ function loadGoogleLocalReports(job: Job, month: string) {
   if (earnings) job.completed.push(`Google 확정 수익 ${earnings}개(로컬·Chrome)`)
   return { sales, earnings }
 }
-function refreshGoogleViaChrome(job: Job, month: string): Promise<boolean> {
+function refreshGoogleViaChrome(job: Job, months: string[]): Promise<boolean> {
   if (isCloudRuntime() || process.env.REVENUE_DISABLE_CHROME === '1') {
     job.errors.push('클라우드 동기화에서는 Chrome 보조 경로를 쓸 수 없습니다. Play 보고서 GCS ACL(서비스 계정)을 확인해 주세요.')
     return Promise.resolve(false)
@@ -292,9 +368,10 @@ function refreshGoogleViaChrome(job: Job, month: string): Promise<boolean> {
     job.errors.push('Google Chrome 동기화 스크립트가 없습니다.')
     return Promise.resolve(false)
   }
-  job.progress = `Google ${month} · 로그인된 Chrome으로 보고서 받는 중`
+  const arg = months.length > 1 ? 'all' : (months[0] || 'all')
+  job.progress = `Google ${arg === 'all' ? '전체 기간' : arg} · 로그인된 Chrome으로 보고서 받는 중`
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, [script, month], {
+    const child = spawn(process.execPath, [script, arg], {
       cwd: root,
       env: { ...process.env, CHROME_CDP_URL: process.env.CHROME_CDP_URL || 'http://127.0.0.1:9222' },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -305,7 +382,7 @@ function refreshGoogleViaChrome(job: Job, month: string): Promise<boolean> {
       child.kill('SIGTERM')
       job.errors.push('Google Chrome 동기화: 시간이 초과되었습니다.')
       resolve(false)
-    }, 120_000)
+    }, months.length > 1 ? 280_000 : 120_000)
     child.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString('utf8') })
     child.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString('utf8') })
     child.on('error', (e) => {
@@ -328,7 +405,7 @@ function refreshGoogleViaChrome(job: Job, month: string): Promise<boolean> {
           resolve(true)
           return
         }
-        job.errors.push(`Google Chrome 동기화: ${month} 월 보고서를 UI에서 찾지 못했습니다.`)
+        job.errors.push('Google Chrome 동기화: 재무 보고서를 UI에서 찾지 못했습니다.')
         resolve(false)
       } catch {
         if (code !== 0) job.errors.push(`Google Chrome 동기화 실패: ${(stderr || stdout || '알 수 없는 오류').slice(0, 240)}`)
@@ -337,29 +414,34 @@ function refreshGoogleViaChrome(job: Job, month: string): Promise<boolean> {
     })
   })
 }
-async function googleReports(job: Job, token: string, month: string) {
+async function googleReports(job: Job, token: string, months: string[]) {
   const bucket = settings().bucket
   if (!bucket) { job.errors.push('Google 매출: 재무 보고서 버킷 ID를 연결 설정에 입력해 주세요.'); return }
+  const wanted = new Set(months.map((m) => m.replace('-', '')))
   let gcsDenied = false
   let gcsDocs = 0
-  const pendingEmpty: string[] = []
+  const foundMonths = new Set<string>()
   for (const kind of ['sales', 'earnings'] as const) {
-    const prefix = `${kind}/${kind === 'sales' ? 'salesreport' : 'earnings'}_${month.replace('-', '')}`
+    const prefix = `${kind}/`
     let pageToken = '', count = 0
     try {
       do {
-        const params = new URLSearchParams({ prefix, ...(pageToken ? { pageToken } : {}) })
+        const params = new URLSearchParams({ prefix, maxResults: '1000', ...(pageToken ? { pageToken } : {}) })
         const page = await (await request(`https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(bucket)}/o?${params}`, token)).json() as { items?: { name: string }[]; nextPageToken?: string }
         for (const item of page.items || []) {
           if (!item.name.endsWith('.zip')) continue
+          const match = /(?:salesreport|earnings)_(\d{6})/.exec(item.name)
+          if (!match || !wanted.has(match[1])) continue
+          const month = monthFromYyyymm(match[1])
+          if (!month) continue
           job.progress = `Google ${month} ${kind === 'sales' ? '예상 매출' : '확정 수익'} 확인 중`
           const bytes = new Uint8Array(await (await request(`https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(bucket)}/o/${encodeURIComponent(item.name)}?alt=media`, token)).arrayBuffer())
           count += pushGoogleZipDocuments(job, month, kind, item.name, bytes)
+          foundMonths.add(month)
         }
         pageToken = page.nextPageToken || ''
       } while (pageToken)
       if (count) { job.completed.push(`Google ${kind === 'sales' ? '예상 매출' : '확정 수익'} ${count}개`); gcsDocs += count }
-      else pendingEmpty.push(`Google ${kind === 'sales' ? '예상 매출' : '확정 수익'} ${month}: 제공된 보고서가 없습니다.`)
     } catch (e) {
       if (e instanceof ProviderError && e.code === 403) gcsDenied = true
       else job.errors.push(`Google ${kind}: ${message(e)}`)
@@ -367,32 +449,43 @@ async function googleReports(job: Job, token: string, month: string) {
   }
   if (gcsDenied || gcsDocs === 0) {
     if (gcsDenied) job.errors.push('Google GCS 서비스 계정 버킷 ACL이 아직 반영되지 않아 Chrome·로컬 캐시로 받았습니다.')
-    await refreshGoogleViaChrome(job, month)
-    const local = loadGoogleLocalReports(job, month)
+    await refreshGoogleViaChrome(job, months)
+    const local = loadGoogleLocalReports(job, months)
     if (!local.sales && !local.earnings) {
-      job.errors.push(...pendingEmpty)
+      job.errors.push(`Google 매출: ${months[0]}~${months[months.length - 1]} 기간 보고서가 없습니다.`)
       if (gcsDenied) job.errors.push('Google 매출: Chrome(--remote-debugging-port=9222)에서 Play Console 로그인 후 다시 동기화해 주세요.')
     }
-  } else if (pendingEmpty.length) {
-    job.errors.push(...pendingEmpty)
+  } else {
+    const missing = months.filter((m) => !foundMonths.has(m))
+    if (missing.length) job.errors.push(`Google 보고서 ${missing.length}개월 미제공 · 무매출 또는 생성 지연일 수 있습니다.`)
   }
 }
-async function run(job: Job, month: string) {
+async function run(job: Job, months: string[]) {
   const status = connectionStatus()
   const tasks: Promise<unknown>[] = []
+  job.progress = `전체 ${months.length}개월(${months[0]}~${months[months.length - 1]}) 동기화 중`
   if (status.apple.configured) tasks.push((async () => {
     const salesToken = appleToken()
     const appsToken = (appsKeyId && appsKeyPem()) ? appleToken(appsKeyId, appsKeyPem()) : salesToken
     await Promise.allSettled([
       appleApps(job, appsToken).catch(e => job.errors.push(message(e))),
-      appleReports(job, salesToken, month).catch(e => job.errors.push(message(e))),
+      appleReports(job, salesToken, months).catch(e => job.errors.push(message(e))),
     ])
   })().catch(e => job.errors.push(message(e))))
   else job.errors.push('Apple API 키 설정이 필요합니다.')
-  if (status.google.configured) tasks.push((async () => { const token = await googleToken(['https://www.googleapis.com/auth/androidpublisher', 'https://www.googleapis.com/auth/playdeveloperreporting', 'https://www.googleapis.com/auth/devstorage.read_only']); await Promise.allSettled([googleApps(job, token).catch(e => job.errors.push(message(e))), googleReports(job, token, month).catch(e => job.errors.push(message(e)))]) })().catch(e => job.errors.push(message(e))))
+  if (status.google.configured) tasks.push((async () => {
+    const token = await googleToken(['https://www.googleapis.com/auth/androidpublisher', 'https://www.googleapis.com/auth/playdeveloperreporting', 'https://www.googleapis.com/auth/devstorage.read_only'])
+    await Promise.allSettled([
+      googleApps(job, token).catch(e => job.errors.push(message(e))),
+      googleReports(job, token, months).catch(e => job.errors.push(message(e))),
+    ])
+  })().catch(e => job.errors.push(message(e))))
   else job.errors.push('Google 서비스 계정 설정이 필요합니다.')
   await Promise.allSettled(tasks)
-  job.state = 'done'; job.progress = job.errors.length ? '확인할 항목이 있습니다.' : '동기화 완료'
+  job.state = 'done'
+  job.progress = job.errors.length
+    ? `전체 ${months.length}개월 동기화 · 확인할 항목이 있습니다.`
+    : `전체 ${months.length}개월(${months[0]}~${months[months.length - 1]}) 동기화 완료`
 }
 const app = express()
 app.disable('x-powered-by')
@@ -440,8 +533,24 @@ app.put('/api/app-revenue/settings', (req, res) => {
   res.json(connectionStatus())
 })
 app.post('/api/app-revenue/sync', async (req, res) => {
+  const todayMonth = new Date().toISOString().slice(0, 7)
+  const scope = req.body?.scope === 'month' ? 'month' : 'all'
   const month = req.body?.month
-  if (typeof month !== 'string' || !/^20\d{2}-(0[1-9]|1[0-2])$/.test(month) || month > new Date().toISOString().slice(0, 7)) return res.status(400).json({ error: '동기화할 월을 확인해 주세요.' })
+  const fromRaw = req.body?.from
+  let months: string[]
+  if (scope === 'month') {
+    if (typeof month !== 'string' || !/^20\d{2}-(0[1-9]|1[0-2])$/.test(month) || month > todayMonth) {
+      return res.status(400).json({ error: '동기화할 월을 확인해 주세요.' })
+    }
+    months = [month]
+  } else {
+    const from = typeof fromRaw === 'string' && /^20\d{2}-(0[1-9]|1[0-2])$/.test(fromRaw)
+      ? fromRaw
+      : historyFromMonth()
+    if (from > todayMonth) return res.status(400).json({ error: '동기화 시작 월을 확인해 주세요.' })
+    months = listMonths(from, todayMonth)
+    if (!months.length) return res.status(400).json({ error: '동기화할 기간이 없습니다.' })
+  }
   const auth = reqAuth(req)
   const store = getJobStore()
   const active = await store.findRunning(auth)
@@ -449,7 +558,9 @@ app.post('/api/app-revenue/sync', async (req, res) => {
   const job: Job = {
     id: randomUUID(),
     state: 'running',
-    progress: '스토어에 연결 중',
+    progress: scope === 'all'
+      ? `전체 ${months.length}개월(${months[0]}~${months[months.length - 1]}) 연결 중`
+      : '스토어에 연결 중',
     apps: [],
     documents: [],
     errors: [],
@@ -473,7 +584,7 @@ app.post('/api/app-revenue/sync', async (req, res) => {
       }
       const progressTimer = setInterval(() => { void persistJobProgress(job, auth) }, 4000)
       try {
-        await run(job, month)
+        await run(job, months)
       } finally {
         clearInterval(progressTimer)
       }

@@ -378,12 +378,16 @@ function RevenueWorkspace({ owner }: { owner: string }) {
     if (syncInFlight.current) return;
     syncInFlight.current = true;
     setBusy(true);
-    setProgress(opts.auto ? "자동 동기화 · Apple·Google 연결 중…" : "Apple·Google에 연결 중…");
+    setProgress(
+      opts.auto
+        ? "자동 동기화 · 전체 연도 Apple·Google 받는 중…"
+        : "전체 연도 Apple·Google 동기화 중…",
+    );
     setLastSyncDetail([]);
     try {
       const start = await connector<{ id: string }>("/sync", {
         method: "POST",
-        body: JSON.stringify({ month }),
+        body: JSON.stringify({ scope: "all" }),
       });
       setConnectorHealth("online");
       let result: SyncResult;
@@ -1243,7 +1247,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
           {!data.apps.length && (
             <Empty
               title="내 앱을 연결하세요"
-              text="지금 동기화를 누르면 스토어의 앱·버전·빌드 목록을 가져옵니다."
+              text="지금 동기화를 누르면 스토어의 앱·버전·빌드와 전체 연도 매출 보고서를 가져옵니다."
             >
               <Action
                 primary
