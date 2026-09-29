@@ -13,8 +13,11 @@ import { authenticateRevenueRequest, type RevenueAuth } from './revenue/auth.js'
 import { getJobStore, persistJobProgress, type RevenueJob } from './revenue/jobs.js'
 import { envPem, googleServiceAccount, isCloudRuntime } from './revenue/credentials.js'
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
+const moduleDir = dirname(fileURLToPath(import.meta.url))
+// src/ → repo root is ../.. ; dist/ → repo root is ../..
+const root = resolve(moduleDir, '../..')
 const startedAt = Date.now()
+const cloudFs = Boolean(process.env.VERCEL || process.env.REVENUE_CLOUD === '1')
 config({ path: resolve(root, '.env.revenue.local'), override: true, quiet: true } as Parameters<typeof config>[0])
 for (const key of [
   'ASC_KEY_PATH',
@@ -28,10 +31,10 @@ for (const key of [
     process.env[key] = raw.slice(1, -1)
   }
 }
-const tokenFile = resolve(root, '.revenue-local-token')
+const tokenFile = cloudFs ? '/tmp/revenue-local-token' : resolve(root, '.revenue-local-token')
 if (!existsSync(tokenFile)) writeFileSync(tokenFile, randomBytes(32).toString('hex'), { mode: 0o600, flag: 'wx' })
 const localToken = readFileSync(tokenFile, 'utf8').trim()
-const cacheDir = resolve(root, '.revenue-cache')
+const cacheDir = cloudFs ? '/tmp/revenue-cache' : resolve(root, '.revenue-cache')
 mkdirSync(cacheDir, { recursive: true, mode: 0o700 })
 const configFile = resolve(cacheDir, 'settings.json')
 type Settings = { vendor: string; bucket: string; packages: string[] }
