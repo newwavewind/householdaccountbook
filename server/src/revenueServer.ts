@@ -331,6 +331,50 @@ function pushGoogleZipDocuments(job: Job, month: string, kind: 'sales' | 'earnin
   }
   return count
 }
+
+function loadGoogleBundledReports(job: Job, months: string[]) {
+  const candidates = [
+    (process.env.GOOGLE_PLAY_REPORT_BUNDLE || '').trim(),
+    resolve(root, 'server/data/google-report-bundle.json'),
+    resolve(root, '.revenue-cache/google-report-bundle.json'),
+    resolve(moduleDir, '../data/google-report-bundle.json'),
+  ].filter(Boolean)
+  let bundle: Record<string, string> | null = null
+  for (const raw of candidates) {
+    try {
+      const text = raw.startsWith('{') ? raw : existsSync(raw) ? readFileSync(raw, 'utf8') : ''
+      if (!text) continue
+      bundle = JSON.parse(text) as Record<string, string>
+      if (bundle && Object.keys(bundle).length) break
+    } catch {
+      bundle = null
+    }
+  }
+  if (!bundle || !Object.keys(bundle).length) return { sales: 0, earnings: 0 }
+  const wanted = new Set(months.map((m) => m.replace('-', '')))
+  let sales = 0, earnings = 0
+  for (const [file, b64] of Object.entries(bundle)) {
+    const match = /^(salesreport|earnings)_(\d{6})/.exec(file)
+    if (!match) continue
+    if (wanted.size && !wanted.has(match[2])) continue
+    const month = monthFromYyyymm(match[2])
+    if (!month) continue
+    try {
+      const bytes = new Uint8Array(Buffer.from(b64, 'base64'))
+      if (!(bytes[0] === 0x50 && bytes[1] === 0x4b)) continue
+      const kind = match[1] === 'salesreport' ? 'sales' as const : 'earnings' as const
+      const n = pushGoogleZipDocuments(job, month, kind, `bundle/${file}`, bytes)
+      if (kind === 'sales') sales += n
+      else earnings += n
+    } catch (e) {
+      job.errors.push(`Google 번들 ${file}: ${message(e)}`)
+    }
+  }
+  if (sales) job.completed.push(`Google 예상 매출 ${sales}개(캐시 번들)`)
+  if (earnings) job.completed.push(`Google 확정 수익 ${earnings}개(캐시 번들)`)
+  return { sales, earnings }
+}
+
 function loadGoogleLocalReports(job: Job, months: string[]) {
   mkdirSync(googleImportDir, { recursive: true, mode: 0o700 })
   if (!existsSync(googleImportDir)) return { sales: 0, earnings: 0 }
@@ -448,12 +492,20 @@ async function googleReports(job: Job, token: string, months: string[]) {
     }
   }
   if (gcsDenied || gcsDocs === 0) {
-    if (gcsDenied) job.errors.push('Google GCS 서비스 계정 버킷 ACL이 아직 반영되지 않아 Chrome·로컬 캐시로 받았습니다.')
-    await refreshGoogleViaChrome(job, months)
-    const local = loadGoogleLocalReports(job, months)
-    if (!local.sales && !local.earnings) {
-      job.errors.push(`Google 매출: ${months[0]}~${months[months.length - 1]} 기간 보고서가 없습니다.`)
-      if (gcsDenied) job.errors.push('Google 매출: Chrome(--remote-debugging-port=9222)에서 Play Console 로그인 후 다시 동기화해 주세요.')
+    if (gcsDenied) job.errors.push('Google GCS ACL 미반영 · 캐시·Chrome 보조 경로를 사용합니다.')
+    const bundled = loadGoogleBundledReports(job, months)
+    if (bundled.sales || bundled.earnings) {
+      // Prefer cached Play exports when GCS ACL is not ready.
+      job.errors = job.errors.filter((e) =>
+        !e.includes('GCS') && !e.includes('Chrome') && !e.includes('캐시·Chrome'))
+      job.completed.push('Google Play 보고서(캐시) 적용')
+    } else {
+      await refreshGoogleViaChrome(job, months)
+      const local = loadGoogleLocalReports(job, months)
+      if (!local.sales && !local.earnings) {
+        job.errors.push(`Google 매출: ${months[0]}~${months[months.length - 1]} 기간 보고서가 없습니다.`)
+        if (gcsDenied) job.errors.push('Google 매출: Play Console → 재무 보고서에서 서비스 계정에 버킷 읽기 권한을 주세요.')
+      }
     }
   } else {
     const missing = months.filter((m) => !foundMonths.has(m))

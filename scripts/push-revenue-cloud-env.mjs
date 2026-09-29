@@ -87,6 +87,11 @@ const saJson = revenue.GOOGLE_PLAY_SA_JSON_INLINE?.startsWith('{')
   : readFileSync(revenue.GOOGLE_PLAY_SA_JSON, 'utf8')
 
 const packages = Array.isArray(settings.packages) ? settings.packages.join(',') : revenue.GOOGLE_PLAY_PACKAGES || ''
+const bundlePath = join(root, '.revenue-cache/google-report-bundle.json')
+const reportBundle = existsSync(bundlePath)
+  ? readFileSync(bundlePath, 'utf8')
+  : (revenue.GOOGLE_PLAY_REPORT_BUNDLE || '')
+
 
 console.log('Vercel Production env 업로드 중… (값은 출력하지 않습니다)')
 const pairs = {
@@ -105,6 +110,7 @@ const pairs = {
   GOOGLE_PLAY_SA_JSON: saJson,
   GOOGLE_PLAY_BUCKET: settings.bucket || revenue.GOOGLE_PLAY_BUCKET || '',
   GOOGLE_PLAY_PACKAGES: packages,
+  GOOGLE_PLAY_REPORT_BUNDLE: reportBundle,
   REVENUE_ALLOWED_EMAILS: email,
   REVENUE_DISABLE_CHROME: '1',
   REVENUE_CLOUD: '1',
