@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/revenueServer.ts",
+    "src/revenue/**/*.ts"
+  ],
+  "exclude": ["src/index.ts"]
+}

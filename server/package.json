@@ -8,6 +8,7 @@
     "start:revenue": "tsx src/revenueServer.ts",
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
+    "build:revenue": "tsc -p tsconfig.revenue.json",
     "start": "node dist/index.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
