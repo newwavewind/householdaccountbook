@@ -1,4 +1,4 @@
-import { revenueApp } from '../server/src/revenueServer'
+import { revenueApp } from '../../server/src/revenueServer'
 
 export const config = {
   maxDuration: 300,

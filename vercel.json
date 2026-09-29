@@ -14,11 +14,10 @@
   "functions": {
     "api/app-revenue/[[...path]].ts": {
       "maxDuration": 300,
-      "includeFiles": "server/src/**"
+      "includeFiles": "{server/src/**,server/package.json,node_modules/**}"
     }
   },
   "rewrites": [
-    { "source": "/api/app-revenue/(.*)", "destination": "/api/app-revenue/$1" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
