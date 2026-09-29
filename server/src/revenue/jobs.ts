@@ -38,6 +38,12 @@ type JobStore = {
 }
 
 const memory = new Map<string, RevenueJob>()
+/** Cloud/local sync jobs stuck after a poll/route crash must not block forever. */
+const STALE_MS = 12 * 60 * 1000
+
+function isFreshRunning(job: RevenueJob) {
+  return job.state === 'running' && Date.now() - job.started < STALE_MS
+}
 
 const memoryStore: JobStore = {
   async get(id) {
@@ -51,11 +57,19 @@ const memoryStore: JobStore = {
   },
   async findRunning(auth) {
     const userId = auth.mode === 'user' ? auth.user.id : undefined
-    return (
-      [...memory.values()].find(
-        (j) => j.state === 'running' && (!userId || j.userId === userId),
-      ) || null
+    const hit = [...memory.values()].find(
+      (j) => j.state === 'running' && (!userId || j.userId === userId),
     )
+    if (!hit) return null
+    if (isFreshRunning(hit)) return hit
+    hit.state = 'done'
+    hit.progress = '시간 초과로 종료됨'
+    hit.errors = [
+      ...(hit.errors || []),
+      '이전 동기화가 응답 없이 남아 자동 종료했습니다. 다시 동기화해 주세요.',
+    ]
+    memory.set(hit.id, hit)
+    return null
   },
 }
 
