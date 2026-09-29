@@ -400,7 +400,19 @@ app.use(async (req, res, next) => {
   res.set('Cache-Control', 'no-store')
   const origin = req.headers.origin
   const allowed = (process.env.REVENUE_ALLOWED_ORIGINS || 'http://127.0.0.1:5174,http://localhost:5174,http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:4180,http://localhost:4180,https://householdaccountbook.vercel.app,https://newwavewind.github.io').split(',').map(s => s.trim()).filter(Boolean)
-  if (origin && allowed.length && !allowed.includes(origin) && !allowed.includes('*')) {
+  const originAllowed = !origin || allowed.includes('*') || allowed.includes(origin)
+  if (origin && originAllowed) {
+    res.set('Access-Control-Allow-Origin', origin)
+    res.set('Access-Control-Allow-Credentials', 'true')
+    res.set('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Revenue-Local-Token')
+    res.set('Access-Control-Allow-Methods', 'GET,POST,PUT,OPTIONS')
+    res.set('Vary', 'Origin')
+  }
+  if (req.method === 'OPTIONS') {
+    if (!originAllowed) return res.status(403).json({ error: '허용되지 않은 요청입니다.' })
+    return res.status(204).end()
+  }
+  if (origin && !originAllowed) {
     return res.status(403).json({ error: '허용되지 않은 요청입니다.' })
   }
   const authResult = await authenticateRevenueRequest(req, localToken)
