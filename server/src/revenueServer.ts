@@ -498,6 +498,15 @@ app.get('/api/app-revenue/sync/:id', async (req, res) => {
   if (!job) return res.status(404).json({ error: '동기화 기록이 만료되었습니다.' })
   res.json(job.state === 'running' ? { ...job, documents: [], apps: [] } : job)
 })
+// Vercel catch-all under /api/app-revenue only matches a single segment, so polling uses /job?id=
+app.get('/api/app-revenue/job', async (req, res) => {
+  const auth = reqAuth(req)
+  const id = typeof req.query.id === 'string' ? req.query.id : ''
+  if (!id) return res.status(400).json({ error: '동기화 ID가 필요합니다.' })
+  const job = await getJobStore().get(id, auth)
+  if (!job) return res.status(404).json({ error: '동기화 기록이 만료되었습니다.' })
+  res.json(job.state === 'running' ? { ...job, documents: [], apps: [] } : job)
+})
 
 export { app as revenueApp }
 

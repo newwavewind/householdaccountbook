@@ -61,7 +61,15 @@ export async function revenueFetch<T>(
   }
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as { error?: string } | null
-    throw new Error(body?.error || connectorDownMessage(res.status))
+    if (body?.error) throw new Error(body.error)
+    if (isRevenueCloudMode()) {
+      throw new Error(
+        res.status === 404
+          ? '동기화 API 경로를 찾지 못했습니다. 배포를 새로고침한 뒤 다시 시도해 주세요.'
+          : `클라우드 동기화 요청이 실패했습니다. (${res.status})`,
+      )
+    }
+    throw new Error(connectorDownMessage(res.status))
   }
   return res.json() as Promise<T>
 }

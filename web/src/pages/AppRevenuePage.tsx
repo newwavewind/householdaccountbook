@@ -390,7 +390,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
       do {
         await new Promise((resolve) => setTimeout(resolve, 1200));
         if (!mounted.current) return;
-        result = await connector<SyncResult>(`/sync/${start.id}`);
+        result = await connector<SyncResult>(`/job?id=${encodeURIComponent(start.id)}`);
         setProgress(result.progress);
       } while (result.state === "running");
       const parsed: { document: StoreDocument; rows: RevenueRow[] }[] = [];
