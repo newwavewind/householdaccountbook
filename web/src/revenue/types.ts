@@ -71,6 +71,14 @@ export interface SyncLog {
   at: string;
   status: "success" | "partial" | "error";
   message: string;
+  detail?: {
+    completed?: string[];
+    errors?: string[];
+    apps?: number;
+    documents?: number;
+    appleMonths?: number;
+    googleMonths?: number;
+  };
 }
 export interface RevenueData {
   schema: 1;

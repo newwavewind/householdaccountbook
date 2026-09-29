@@ -134,23 +134,25 @@ export async function parseReport(doc: StoreDocument): Promise<RevenueRow[]> {
           basis: financial ? "settled" : "estimate",
         };
       } else if (google) {
-        const date = reportDate(get("Transaction Date"));
+        const date = reportDate(get("Transaction Date", "Transaction Date & Time"));
         const amount = numeric(get("Amount (Merchant Currency)"));
         const type = get("Transaction Type").toLowerCase();
         const fee = type.includes("fee"),
           tax = type.includes("tax"),
           refund = type.includes("refund") && !fee && !tax;
         const charge = type === "charge" || type === "charge rebill";
+        const packageId = get("Package ID", "Product ID", "SKU ID");
+        const title = (get("Product Title", "Description") || packageId).replace(/\s+/g, " ").trim();
         row = {
           ...base,
           date,
           period: doc.period || date.slice(0, 7),
-          appId: `google:${get("Package ID")}`,
-          appName: get("Package ID") || get("Product Title"),
+          appId: `google:${packageId}`,
+          appName: title,
           platform: "google",
-          country: get("Buyer Country"),
-          currency: get("Merchant Currency"),
-          proceedsCurrency: get("Merchant Currency"),
+          country: get("Buyer Country", "Country of Buyer"),
+          currency: get("Merchant Currency") || get("Currency of Sale") || "KRW",
+          proceedsCurrency: get("Merchant Currency") || get("Currency of Sale") || "KRW",
           gross: charge ? amount : 0,
           refunds: refund ? -amount : 0,
           fee: fee ? -amount : 0,
@@ -161,26 +163,31 @@ export async function parseReport(doc: StoreDocument): Promise<RevenueRow[]> {
         };
       } else if (sales) {
         const date = reportDate(get("Order Charged Date"));
-        const state = get("Financial Status").toLowerCase();
-        if (!["charged", "refunded", "partial refund"].includes(state))
-          throw new Error(`지원하지 않는 주문 상태: ${state}`);
+        const state = get("Financial Status").toLowerCase().trim();
+        if (!["charged", "refund", "refunded", "partial refund"].includes(state))
+          continue; // skip cancelled / pending rows without failing the whole file
         const refund = state.includes("refund"),
           amount = Math.abs(numeric(get("Charged Amount")));
+        const packageId = get("Package ID", "Product ID", "SKU ID");
+        const title = (get("Product Title") || packageId).replace(/\s+/g, " ").trim();
+        const taxCollected = get("Taxes Collected")
+          ? Math.abs(numeric(get("Taxes Collected")))
+          : null;
         row = {
           ...base,
           date,
-          period: date.slice(0, 7),
-          appId: `google:${get("Product ID")}`,
-          appName: get("Product Title"),
+          period: doc.period || date.slice(0, 7),
+          appId: `google:${packageId}`,
+          appName: title,
           platform: "google",
-          country: get("Buyer Country"),
+          country: get("Country of Buyer", "Buyer Country"),
           currency: get("Currency of Sale") || get("Buyer Currency") || "KRW",
           proceedsCurrency:
             (get("Currency of Sale") || get("Buyer Currency") || "KRW").trim(),
           gross: refund ? 0 : amount,
           refunds: refund ? amount : 0,
           fee: null,
-          tax: null,
+          tax: taxCollected,
           proceeds: null,
           units: refund ? -1 : 1,
           basis: "estimate",
@@ -220,7 +227,7 @@ export async function parseReport(doc: StoreDocument): Promise<RevenueRow[]> {
         !row.appName ||
         row.appId.endsWith(":")
       )
-        throw new Error("앱 식별자·이름·기간을 확인해 주세요.");
+        continue;
       const fingerprint = JSON.stringify({
         transaction: get("Description", "Order Number"),
         transactionType: get("Transaction Type"),

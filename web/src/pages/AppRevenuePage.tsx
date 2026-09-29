@@ -6,6 +6,7 @@ import { fieldNumber, fieldText } from "../revenue/formValues";
 import { RevenueChart } from "../revenue/RevenueChart";
 import {
   amounts,
+  appProfit,
   csvString,
   currentMonth,
   download,
@@ -13,12 +14,20 @@ import {
   localDate,
   money,
   monthLabel,
+  neededCurrencies,
   platformName,
   shiftMonth,
   summarize,
   taxLabels,
   taxWorksheet,
+  yearOverYear,
 } from "../revenue/model";
+import { fetchMonthRatesKrw } from "../revenue/fxRates";
+import {
+  preferNewer,
+  pullRevenueSnapshot,
+  pushRevenueSnapshot,
+} from "../revenue/cloudStore";
 import {
   csvTemplate,
   mergeReports,
@@ -189,6 +198,12 @@ function platformProceedsLabel(
     total.unknownProceeds &&
     !platformRows.some((r) => r.proceeds !== null)
   ) {
+    if (basis === "estimate" && total.gross > 0) {
+      return {
+        value: `₩${money(total.gross)}`,
+        note: "예상 매출(결제액) · 확정 시 수익 표시",
+      };
+    }
     return {
       value: "수익 미제공",
       note: basis === "estimate" ? "예상 매출 · 확정 시 수익 표시" : "확정 수익 보고서 필요",
@@ -241,6 +256,9 @@ function RevenueWorkspace({ owner }: { owner: string }) {
     [connectorHealth, setConnectorHealth] =
       useState<ConnectorHealth>("checking"),
     [lastSyncDetail, setLastSyncDetail] = useState<string[]>([]);
+  const [cloudNote, setCloudNote] = useState("");
+  const [dropActive, setDropActive] = useState(false);
+  const cloudPulled = useRef(false);
   const syncInFlight = useRef(false);
   const autoTried = useRef(false);
   const [importPreview, setImportPreview] = useState<
@@ -308,10 +326,20 @@ function RevenueWorkspace({ owner }: { owner: string }) {
     data.rows.filter((r) => r.period === shiftMonth(month, -1) && matches(r)),
     data,
   );
+  const growthBase =
+    previous.unknownProceeds &&
+    !data.rows.some(
+      (r) => r.period === shiftMonth(month, -1) && matches(r) && r.proceeds !== null,
+    )
+      ? previous.gross
+      : previous.proceeds;
+  const currentBase =
+    totals.unknownProceeds && !filtered.some((r) => r.proceeds !== null)
+      ? totals.gross
+      : totals.proceeds;
   const growth =
-    previous.proceeds > 0
-      ? ((totals.proceeds - previous.proceeds) / previous.proceeds) * 100
-      : null;
+    growthBase > 0 ? ((currentBase - growthBase) / growthBase) * 100 : null;
+  const yoy = yearOverYear(data, month, matches);
   const periodExpenses = data.expenses.filter((e) => e.date.startsWith(month));
   const expenses = periodExpenses.reduce((n, e) => n + e.amount, 0);
   const comparable = platform === "all" && appFilter === "all";
@@ -350,11 +378,23 @@ function RevenueWorkspace({ owner }: { owner: string }) {
     .filter((a) => filtered.some((r) => r.appId === a.id))
     .sort((a, b) => b.proceeds - a.proceeds);
   const actualIncome = totals.proceeds - expenses;
-  const log = (status: "success" | "partial" | "error", message: string) => ({
+  const log = (
+    status: "success" | "partial" | "error",
+    message: string,
+    detail?: {
+      completed?: string[];
+      errors?: string[];
+      apps?: number;
+      documents?: number;
+      appleMonths?: number;
+      googleMonths?: number;
+    },
+  ) => ({
     id: crypto.randomUUID(),
     at: new Date().toISOString(),
     status,
     message,
+    detail,
   });
   function toggleDemo() {
     if (!demo) {
@@ -422,6 +462,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
         auto: opts.auto,
       });
       const detail = errors.slice(0, 8);
+      let saved: RevenueData | null = null;
       store.update((prev) => {
         const next = mergeReports(prev, parsed);
         const apps = new Map(next.apps.map((a) => [a.id, a]));
@@ -429,16 +470,35 @@ function RevenueWorkspace({ owner }: { owner: string }) {
           apps.set(a.id, { ...a, favorite: apps.get(a.id)?.favorite }),
         );
         const enrichedRows = enrichRowsWithApps(next.rows, [...apps.values()]);
-        return {
+        const appleMonths = new Set(
+          enrichedRows.filter((r) => r.platform === "apple").map((r) => r.period),
+        ).size;
+        const googleMonths = new Set(
+          enrichedRows.filter((r) => r.platform === "google").map((r) => r.period),
+        ).size;
+        saved = {
           ...next,
           apps: [...apps.values()],
           rows: enrichedRows,
           logs: [
-            log(syncLogStatus(parsed.length, result.apps.length, errors.length), toast),
+            log(
+              syncLogStatus(parsed.length, result.apps.length, errors.length),
+              toast,
+              {
+                completed: result.completed,
+                errors,
+                apps: result.apps.length,
+                documents: parsed.length,
+                appleMonths,
+                googleMonths,
+              },
+            ),
             ...next.logs,
           ].slice(0, 50),
         };
+        return saved;
       });
+      if (saved) void saveCloud(saved);
       setToast(toast);
       setLastSyncDetail(detail);
       if (errors.length) setSection("connections");
@@ -480,16 +540,98 @@ function RevenueWorkspace({ owner }: { owner: string }) {
     }, 900);
     return () => window.clearTimeout(t);
   }, [connectorHealth, demo, owner, month]);
-  async function importFiles(files: FileList | null) {
+
+  useEffect(() => {
+    if (demo || cloudPulled.current || owner === "device") return;
+    cloudPulled.current = true;
+    void (async () => {
+      setCloudNote("클라우드 자료 확인 중…");
+      const remote = await pullRevenueSnapshot(owner);
+      if (remote.error) {
+        setCloudNote(`클라우드: ${remote.error}`);
+        return;
+      }
+      if (!remote.data) {
+        setCloudNote("클라우드 저장본 없음 · 동기화 후 폰에서도 볼 수 있습니다");
+        return;
+      }
+      store.update((local) => preferNewer(local, remote.data));
+      setCloudNote(
+        remote.updatedAt
+          ? `클라우드 동기화됨 · ${new Date(remote.updatedAt).toLocaleString("ko-KR")}`
+          : "클라우드 동기화됨",
+      );
+    })();
+  }, [demo, owner]);
+
+  useEffect(() => {
+    if (demo) return;
+    const missing = neededCurrencies(data.rows, month).filter(
+      (c) => !data.rates[`${month}:${c}`],
+    );
+    if (!missing.length) return;
+    let cancelled = false;
+    void (async () => {
+      const fetched = await fetchMonthRatesKrw(month, missing);
+      if (cancelled || !Object.keys(fetched).length) return;
+      update((d) => ({ ...d, rates: { ...d.rates, ...fetched } }));
+      setToast(`${monthLabel(month)} 환율 ${Object.keys(fetched).length}건 자동 반영`);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [demo, month, data.rows.length]);
+
+  async function saveCloud(next: RevenueData) {
+    if (demo || owner === "device") return;
+    const res = await pushRevenueSnapshot(owner, next);
+    setCloudNote(
+      res.ok
+        ? `클라우드 저장 · ${new Date().toLocaleString("ko-KR")}`
+        : `클라우드 저장 실패: ${res.error || ""}`,
+    );
+  }
+
+  async function importFiles(files: FileList | File[] | null) {
     if (!files?.length) return;
     setBusy(true);
     setProgress("보고서 형식을 확인하고 있습니다…");
+    const list = Array.from(files);
     try {
-      const reports = [];
-      for (const file of Array.from(files))
-        for (const document of await readReportFile(file))
-          reports.push({ document, rows: await parseReport(document) });
-      setImportPreview(reports);
+      const reports: { document: StoreDocument; rows: RevenueRow[] }[] = [];
+      const failures: string[] = [];
+      for (const file of list) {
+        setProgress(`${file.name} 확인 중… (${reports.length}건 준비)`);
+        try {
+          for (const document of await readReportFile(file)) {
+            try {
+              reports.push({
+                document,
+                rows: await parseReport(document),
+              });
+            } catch (e) {
+              failures.push(
+                `${file.name}: ${e instanceof Error ? e.message : "형식 오류"}`,
+              );
+            }
+          }
+        } catch (e) {
+          failures.push(
+            `${file.name}: ${e instanceof Error ? e.message : "읽기 실패"}`,
+          );
+        }
+      }
+      if (reports.length) setImportPreview(reports);
+      if (failures.length) {
+        setLastSyncDetail(failures.slice(0, 12));
+        setToast(
+          reports.length
+            ? `${reports.length}개 준비 · ${failures.length}개 파일 오류`
+            : failures[0],
+        );
+      } else if (!reports.length) {
+        setToast("가져올 보고서가 없습니다.");
+      }
     } catch (e) {
       setToast(e instanceof Error ? e.message : "가져오기 실패");
     } finally {
@@ -847,21 +989,27 @@ function RevenueWorkspace({ owner }: { owner: string }) {
               </span>
               <div className="rev-hero-amount">
                 <span>₩</span>
-                {!filtered.length || (totals.unknownProceeds &&
-                !filtered.some((r) => r.proceeds !== null)
-                )
+                {!filtered.length
                   ? "—"
-                  : money(totals.proceeds)}
+                  : money(currentBase)}
               </div>
               <div className="rev-hero-context">
                 {growth !== null && filtered.length > 0 ? (
                   <span className="rev-growth">
                     {growth >= 0 ? "+" : ""}
-                    {growth.toFixed(1)}% <span>전월 전체 대비</span>
+                    {growth.toFixed(1)}% <span>전월 대비</span>
                   </span>
                 ) : (
                   <span>매출에서 환불·스토어 공제액을 반영한 금액</span>
                 )}
+                {yoy.growth !== null && filtered.length > 0 ? (
+                  <span className="rev-growth rev-growth-yoy">
+                    {yoy.growth >= 0 ? "+" : ""}
+                    {yoy.growth.toFixed(1)}% <span>전년 동월</span>
+                  </span>
+                ) : yoy.hasPrev ? (
+                  <span className="rev-muted">전년 동월 ₩{money(yoy.prevVal)}</span>
+                ) : null}
               </div>
             </div>
             <div className="rev-hero-platforms">
@@ -1200,28 +1348,54 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                     <span>{platformName[app.platform]}</span>
                     <span className="rev-badge">{appStatus(app.status)}</span>
                   </div>
-                  <dl>
-                    <div>
-                      <dt>버전</dt>
-                      <dd>{app.version || "미확인"}</dd>
-                    </div>
-                    <div>
-                      <dt>조회된 빌드</dt>
-                      <dd>{app.build || "미확인"}</dd>
-                    </div>
-                    <div>
-                      <dt>기간 수익</dt>
-                      <dd>
-                        ₩
-                        {money(
-                          summarize(
-                            filtered.filter((r) => r.appId === app.id),
-                            data,
-                          ).proceeds,
-                        )}
-                      </dd>
-                    </div>
-                  </dl>
+                  {(() => {
+                    const appRows = filtered.filter((r) => r.appId === app.id);
+                    const share =
+                      data.apps.length > 0
+                        ? expenses / Math.max(1, data.apps.filter((a) => platform === "all" || a.platform === platform).length)
+                        : 0;
+                    const pnl = appProfit(appRows, data, share);
+                    return (
+                      <>
+                        <dl>
+                          <div>
+                            <dt>버전</dt>
+                            <dd>{app.version || "미확인"}</dd>
+                          </div>
+                          <div>
+                            <dt>조회된 빌드</dt>
+                            <dd>{app.build || "미확인"}</dd>
+                          </div>
+                          <div>
+                            <dt>기간 매출</dt>
+                            <dd>₩{money(pnl.gross)}</dd>
+                          </div>
+                        </dl>
+                        <div className="rev-app-pnl">
+                          <div>
+                            <span>환불</span>
+                            <b>₩{money(pnl.refunds)}</b>
+                          </div>
+                          <div>
+                            <span>수수료·세금</span>
+                            <b>₩{money(pnl.fee + pnl.tax)}</b>
+                          </div>
+                          <div>
+                            <span>수익</span>
+                            <b>₩{money(pnl.displayProceeds)}</b>
+                          </div>
+                          <div>
+                            <span>비용배분</span>
+                            <b>₩{money(pnl.expenseShare)}</b>
+                          </div>
+                          <div className="rev-app-pnl-net">
+                            <span>추정 손익</span>
+                            <b>₩{money(pnl.net)}</b>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
                   <div className="rev-app-card-footer">
                     <small>
                       {app.source === "api"
@@ -2065,11 +2239,37 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                 "파일과 환율",
                 "원본 통화를 보존하고 원화로 비교합니다",
               )}
+              <div
+                className={`rev-dropzone ${dropActive ? "is-active" : ""}`}
+                onDragEnter={(e) => {
+                  e.preventDefault();
+                  setDropActive(true);
+                }}
+                onDragOver={(e) => e.preventDefault()}
+                onDragLeave={() => setDropActive(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDropActive(false);
+                  void importFiles(e.dataTransfer.files);
+                }}
+                onClick={() => fileInput.current?.click()}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") fileInput.current?.click();
+                }}
+              >
+                <Icon name="upload" />
+                <div>
+                  <b>보고서를 끌어다 놓거나 클릭</b>
+                  <small>여러 파일·ZIP 한 번에 · Apple TXT · Google CSV</small>
+                </div>
+              </div>
               <div className="rev-tool-list">
                 <button onClick={() => fileInput.current?.click()}>
                   <Icon name="upload" />
                   <div>
-                    <b>보고서 가져오기</b>
+                    <b>파일 선택</b>
                     <small>Apple TXT · Google CSV · ZIP · GZIP</small>
                   </div>
                   <Icon name="chevron" size={17} />
@@ -2086,11 +2286,39 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                   </div>
                   <Icon name="chevron" size={17} />
                 </button>
-                <button onClick={() => setDialog("rates")}>
+                <button
+                  onClick={() => {
+                    void (async () => {
+                      const codes = neededCurrencies(data.rows, month);
+                      if (!codes.length) {
+                        setDialog("rates");
+                        return;
+                      }
+                      setBusy(true);
+                      setProgress("환율 자동 조회 중…");
+                      try {
+                        const fetched = await fetchMonthRatesKrw(month, codes);
+                        update((d) => ({
+                          ...d,
+                          rates: { ...d.rates, ...fetched },
+                        }));
+                        setToast(
+                          Object.keys(fetched).length
+                            ? `환율 ${Object.keys(fetched).length}건 반영`
+                            : "자동 환율을 받지 못했습니다. 수동 입력으로 전환합니다.",
+                        );
+                      } finally {
+                        setBusy(false);
+                        setProgress("");
+                        setDialog("rates");
+                      }
+                    })();
+                  }}
+                >
                   <Icon name="wallet" />
                   <div>
                     <b>{monthLabel(month)} 환산 기준</b>
-                    <small>통화별 원화 환율·출처 메모 관리</small>
+                    <small>자동 조회 · 통화별 원화 환율</small>
                   </div>
                   <Icon name="chevron" size={17} />
                 </button>
@@ -2138,8 +2366,8 @@ function RevenueWorkspace({ owner }: { owner: string }) {
             )}
             <div className="rev-log-list">
               {data.logs.length ? (
-                data.logs.slice(0, 10).map((l) => (
-                  <article key={l.id}>
+                data.logs.slice(0, 12).map((l) => (
+                  <article key={l.id} className="rev-sync-report">
                     <span
                       className={`rev-badge ${l.status === "success" ? "positive" : "amber"}`}
                     >
@@ -2152,6 +2380,30 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                     <div>
                       <time>{new Date(l.at).toLocaleString("ko-KR")}</time>
                       <p>{l.message}</p>
+                      {l.detail ? (
+                        <ul className="rev-sync-detail">
+                          {l.detail.apps != null ? (
+                            <li>앱 {l.detail.apps}개</li>
+                          ) : null}
+                          {l.detail.documents != null ? (
+                            <li>보고서 {l.detail.documents}개</li>
+                          ) : null}
+                          {l.detail.appleMonths != null ? (
+                            <li>Apple {l.detail.appleMonths}개월</li>
+                          ) : null}
+                          {l.detail.googleMonths != null ? (
+                            <li>Google {l.detail.googleMonths}개월</li>
+                          ) : null}
+                          {(l.detail.completed || []).slice(0, 4).map((c) => (
+                            <li key={c}>✓ {c}</li>
+                          ))}
+                          {(l.detail.errors || []).slice(0, 4).map((e) => (
+                            <li key={e} className="is-error">
+                              ! {e}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
                     </div>
                   </article>
                 ))
@@ -2189,7 +2441,10 @@ function RevenueWorkspace({ owner }: { owner: string }) {
       <footer className="rev-page-footer">
         <span>
           <Icon name="shield" size={14} />{" "}
-          {demo ? "샘플 데이터" : "내 브라우저에 저장"} · 금액 단위 KRW
+          {demo
+            ? "샘플 데이터"
+            : cloudNote || "브라우저 저장 · 로그인 시 클라우드 공유"}{" "}
+          · 금액 단위 KRW
         </span>
         <span>원본 보고서와 함께 확인하세요.</span>
       </footer>
@@ -2282,7 +2537,12 @@ function RevenueWorkspace({ owner }: { owner: string }) {
               <Action
                 primary
                 onClick={() => {
-                  update((d) => mergeReports(d, importPreview));
+                  let next: RevenueData | null = null;
+                  update((d) => {
+                    next = mergeReports(d, importPreview);
+                    return next;
+                  });
+                  if (next) void saveCloud(next);
                   const row = importPreview[0]?.rows[0];
                   if (row) {
                     setMonth(row.period);
@@ -2290,7 +2550,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                   }
                   setImportPreview(null);
                   setSection("transactions");
-                  setToast("보고서를 반영했습니다.");
+                  setToast("보고서를 반영했습니다. 클라우드에도 저장을 시도합니다.");
                 }}
               >
                 보고서 반영

@@ -223,3 +223,60 @@ export function exportRows(rows: RevenueRow[], data: RevenueData) {
     ]),
   ]);
 }
+
+export function appProfit(
+  rows: RevenueRow[],
+  data: RevenueData,
+  expenses: number,
+) {
+  const totals = summarize(rows, data);
+  const displayProceeds =
+    totals.unknownProceeds && !rows.some((r) => r.proceeds !== null)
+      ? totals.gross
+      : totals.proceeds;
+  return {
+    ...totals,
+    displayProceeds,
+    net: displayProceeds - expenses,
+    expenseShare: expenses,
+  };
+}
+
+export function yearOverYear(
+  data: RevenueData,
+  month: string,
+  match: (row: RevenueRow) => boolean,
+) {
+  const thisRows = data.rows.filter((r) => r.period === month && match(r));
+  const prevYear = `${Number(month.slice(0, 4)) - 1}-${month.slice(5)}`;
+  const prevRows = data.rows.filter((r) => r.period === prevYear && match(r));
+  const cur = summarize(thisRows, data);
+  const prev = summarize(prevRows, data);
+  const curVal =
+    cur.unknownProceeds && !thisRows.some((r) => r.proceeds !== null)
+      ? cur.gross
+      : cur.proceeds;
+  const prevVal =
+    prev.unknownProceeds && !prevRows.some((r) => r.proceeds !== null)
+      ? prev.gross
+      : prev.proceeds;
+  if (!prevRows.length || prevVal === 0) {
+    return { prevYear, curVal, prevVal, growth: null as number | null, hasPrev: prevRows.length > 0 };
+  }
+  return {
+    prevYear,
+    curVal,
+    prevVal,
+    growth: ((curVal - prevVal) / Math.abs(prevVal)) * 100,
+    hasPrev: true,
+  };
+}
+
+export function neededCurrencies(rows: RevenueRow[], month: string) {
+  const set = new Set<string>();
+  for (const r of rows.filter((x) => x.period === month)) {
+    if (r.currency !== "KRW") set.add(r.currency);
+    if (r.proceedsCurrency !== "KRW") set.add(r.proceedsCurrency);
+  }
+  return [...set].sort();
+}

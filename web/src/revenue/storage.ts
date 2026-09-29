@@ -109,7 +109,11 @@ export function validateBackup(value: unknown): RevenueData {
   for (const l of d.logs)
     if (
       ![l.id, l.at, l.message].every(str) ||
-      !["success", "partial", "error"].includes(l.status)
+      !["success", "partial", "error"].includes(l.status) ||
+      (l.detail !== undefined &&
+        (typeof l.detail !== "object" ||
+          (l.detail.completed !== undefined && !Array.isArray(l.detail.completed)) ||
+          (l.detail.errors !== undefined && !Array.isArray(l.detail.errors))))
     )
       throw new Error("백업 동기화 기록 오류");
   if (new Set(d.rows.map((r) => r.id)).size !== d.rows.length)
