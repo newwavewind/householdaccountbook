@@ -1,4 +1,7 @@
 import { useCallback, useState } from "react";
+import { normalizeAppGroups } from "./appGroups";
+import { fillGoogleEstimatedShares } from "./googleFee";
+import { withResolvedAppNames } from "./appDisplayNames";
 import { emptyData, validDate } from "./model";
 import type { RevenueData } from "./types";
 
@@ -118,7 +121,18 @@ export function validateBackup(value: unknown): RevenueData {
       throw new Error("백업 동기화 기록 오류");
   if (new Set(d.rows.map((r) => r.id)).size !== d.rows.length)
     throw new Error("백업에 중복 거래가 있습니다.");
-  return d;
+  if (d.appGroups !== undefined) {
+    if (!Array.isArray(d.appGroups)) throw new Error("백업 앱 그룹 형식 오류");
+    for (const g of d.appGroups) {
+      if (!str(g.id) || !str(g.name) || !Array.isArray(g.appleAppIds) || !Array.isArray(g.googlePackages))
+        throw new Error("백업 앱 그룹 형식 오류");
+    }
+  }
+  const normalized = normalizeAppGroups(d);
+  const apps = withResolvedAppNames(normalized.apps);
+  const rows = fillGoogleEstimatedShares(normalized.rows);
+  if (apps === normalized.apps && rows === normalized.rows) return normalized;
+  return { ...normalized, apps, rows };
 }
 export function useRevenueData(owner: string) {
   const key = `mj-app-revenue-v1:${owner}`;
@@ -126,6 +140,8 @@ export function useRevenueData(owner: string) {
     try {
       const saved = localStorage.getItem(key);
       const parsed = saved ? JSON.parse(saved) : emptyData();
+      if (!parsed.appGroups) parsed.appGroups = [];
+      if (!parsed.meta) parsed.meta = {};
       if (parsed.business?.prepaid === 0) parsed.business.prepaid = {};
       return { data: validateBackup(parsed), error: "" };
     } catch {

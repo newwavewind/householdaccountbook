@@ -15,9 +15,17 @@
     "api/app-revenue/[[...path]].ts": {
       "maxDuration": 300,
       "includeFiles": "server/dist/**;server/data/**"
+    },
+    "api/app-revenue/index.ts": {
+      "maxDuration": 300,
+      "includeFiles": "server/dist/**;server/data/**"
     }
   },
   "rewrites": [
+    {
+      "source": "/api/app-revenue",
+      "destination": "/api/app-revenue/status"
+    },
     {
       "source": "/((?!api/).*)",
       "destination": "/index.html"

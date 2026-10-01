@@ -2,6 +2,12 @@ export type Platform = "apple" | "google";
 export type Basis = "estimate" | "settled";
 export type TaxClass =
   "unreviewed" | "taxable" | "zero" | "exempt" | "excluded";
+export interface AppGroup {
+  id: string;
+  name: string;
+  appleAppIds: string[];
+  googlePackages: string[];
+}
 export interface AppProduct {
   id: string;
   name: string;
@@ -98,6 +104,12 @@ export interface RevenueData {
     prepaid: Record<string, number>;
   };
   checklist: Record<string, boolean>;
+  appGroups?: AppGroup[];
+  meta?: {
+    lastCloudAt?: string;
+    dismissedAlerts?: string[];
+    googleSaEmail?: string;
+  };
 }
 export interface StoreDocument {
   key: string;

@@ -1,6 +1,8 @@
 import { gunzipSync, unzipSync, strFromU8 } from "fflate";
 import { validDate } from "./model";
 import type { RevenueData, RevenueRow, StoreDocument } from "./types";
+import { estimateGoogleDeveloperShare } from "./googleFee";
+import { resolveAppleReportAppKey } from "./appMatch";
 
 export function parseDelimited(text: string): string[][] {
   const source = text.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n");
@@ -117,7 +119,7 @@ export async function parseReport(doc: StoreDocument): Promise<RevenueRow[]> {
           date,
           endDate: get("End Date") ? reportDate(get("End Date")) : date,
           period: doc.period || date.slice(0, 7),
-          appId: `apple:${get("Parent Identifier", "Apple Identifier", "Apple ID", "SKU")}`,
+          appId: `apple:${resolveAppleReportAppKey(get)}`,
           appName: get("Title"),
           platform: "apple",
           country: get("Country of Sale", "Country Code"),
@@ -173,6 +175,23 @@ export async function parseReport(doc: StoreDocument): Promise<RevenueRow[]> {
         const taxCollected = get("Taxes Collected")
           ? Math.abs(numeric(get("Taxes Collected")))
           : null;
+        const country = get("Country of Buyer", "Buyer Country");
+        const currency =
+          get("Currency of Sale") || get("Buyer Currency") || "KRW";
+        const gross = refund ? 0 : amount;
+        const refunds = refund ? amount : 0;
+        const share = estimateGoogleDeveloperShare({
+          gross,
+          refunds,
+          tax:
+            taxCollected === null
+              ? null
+              : refund
+                ? -taxCollected
+                : taxCollected,
+          country,
+          currency,
+        });
         row = {
           ...base,
           date,
@@ -180,15 +199,14 @@ export async function parseReport(doc: StoreDocument): Promise<RevenueRow[]> {
           appId: `google:${packageId}`,
           appName: title,
           platform: "google",
-          country: get("Country of Buyer", "Buyer Country"),
-          currency: get("Currency of Sale") || get("Buyer Currency") || "KRW",
-          proceedsCurrency:
-            (get("Currency of Sale") || get("Buyer Currency") || "KRW").trim(),
-          gross: refund ? 0 : amount,
-          refunds: refund ? amount : 0,
-          fee: null,
-          tax: taxCollected,
-          proceeds: null,
+          country,
+          currency,
+          proceedsCurrency: currency.trim(),
+          gross,
+          refunds,
+          fee: share.fee,
+          tax: share.tax,
+          proceeds: share.proceeds,
           units: refund ? -1 : 1,
           basis: "estimate",
         };

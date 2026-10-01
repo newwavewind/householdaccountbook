@@ -115,7 +115,7 @@ const pairs = {
   REVENUE_DISABLE_CHROME: '1',
   REVENUE_CLOUD: '1',
   REVENUE_ALLOWED_ORIGINS:
-    'https://householdaccountbook.vercel.app,http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:5174,http://localhost:5174',
+    'https://householdaccountbook.vercel.app,https://newwavewind.github.io,http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:5174,http://localhost:5174',
 }
 
 for (const [k, v] of Object.entries(pairs)) {

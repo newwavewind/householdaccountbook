@@ -13,6 +13,55 @@ import { authenticateRevenueRequest, type RevenueAuth } from './revenue/auth.js'
 import { getJobStore, persistJobProgress, type RevenueJob } from './revenue/jobs.js'
 import { envPem, googleServiceAccount, isCloudRuntime } from './revenue/credentials.js'
 
+function rebuildGoogleReportBundleFromCache(): { files: number; sales: number; earnings: number } {
+  mkdirSync(googleImportDir, { recursive: true, mode: 0o700 })
+  const bundle: Record<string, string> = {}
+  let sales = 0
+  let earnings = 0
+  for (const name of readdirSync(googleImportDir)) {
+    if (!name.endsWith('.zip')) continue
+    const buf = readFileSync(join(googleImportDir, name))
+    if (!(buf[0] === 0x50 && buf[1] === 0x4b)) continue
+    bundle[name] = buf.toString('base64')
+    if (/sales/i.test(name)) sales++
+    else if (/earning/i.test(name)) earnings++
+  }
+  const json = JSON.stringify(bundle)
+  for (const p of [
+    resolve(root, '.revenue-cache/google-report-bundle.json'),
+    resolve(root, 'server/data/google-report-bundle.json'),
+  ]) {
+    mkdirSync(dirname(p), { recursive: true })
+    writeFileSync(p, json, { mode: 0o600 })
+  }
+  return { files: Object.keys(bundle).length, sales, earnings }
+}
+
+function runNodeScript(scriptPath: string): Promise<{ ok: boolean; saved?: number; error?: string }> {
+  return new Promise((resolvePromise, reject) => {
+    const child = spawn(process.execPath, [scriptPath], {
+      cwd: root,
+      env: { ...process.env, CHROME_CDP_URL: process.env.CHROME_CDP_URL || 'http://127.0.0.1:9222' },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    let out = ''
+    let err = ''
+    child.stdout?.on('data', (c) => { out += String(c) })
+    child.stderr?.on('data', (c) => { err += String(c) })
+    child.on('error', reject)
+    child.on('close', (code) => {
+      const line = out.trim().split('\n').filter(Boolean).pop() || ''
+      try {
+        const parsed = JSON.parse(line) as { ok: boolean; saved?: number; error?: string }
+        if (code === 0 && parsed.ok) resolvePromise(parsed)
+        else reject(new Error(parsed.error || err.trim() || `스크립트 종료 코드 ${code}`))
+      } catch {
+        reject(new Error(err.trim() || out.trim() || `스크립트 종료 코드 ${code}`))
+      }
+    })
+  })
+}
+
 const moduleDir = dirname(fileURLToPath(import.meta.url))
 // src/ → repo root is ../.. ; dist/ → repo root is ../..
 const root = resolve(moduleDir, '../..')
@@ -290,13 +339,28 @@ async function appleReports(job: Job, token: string, months: string[]) {
   if (financeOk) job.completed.push(`Apple 확정 재무 ${financeOk}개월`)
   if (financeMiss) job.errors.push(`Apple 확정 재무 ${financeMiss}개월 미제공`)
 }
+const GOOGLE_PACKAGE_LABELS: Record<string, string> = {
+  'com.sanghyun.civillaw': '봄기출 공인중개사',
+  'com.sanghyun.english': '봄기출 공무원영어',
+  'com.sanghyun.gugeo': '봄기출 공무원국어',
+  'com.sanghyun.publicofficial': '봄기출 공무원',
+  'com.sanghyun.police': '봄기출 경찰공무원',
+  'com.sanghyun.firefighter': '봄기출 소방공무원',
+  'com.sanghyun.housing': '봄기출 주택관리사',
+  'com.sanghyun.socialworker': '봄기출 사회복지사1급',
+  'com.sanghyun.haengjung': '봄기출 행정사',
+  'com.sanghyun.semusa': '봄기출 세무사',
+  'com.sanghyun.nomusa': '봄기출 공인노무사',
+  'com.sanghyun.sonhae': '봄기출 손해평가사',
+  'com.sanghyun.tax': '봄기출 세무',
+}
 async function googleApps(job: Job, token: string) {
-  const packages = new Map(settings().packages.map(p => [p, p]))
+  const packages = new Map(settings().packages.map(p => [p, GOOGLE_PACKAGE_LABELS[p] || p]))
   try {
     let pageToken = ''
     do {
       const page = await (await request(`https://playdeveloperreporting.googleapis.com/v1beta1/apps:search?pageSize=100${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`, token)).json() as { apps?: { packageName: string; displayName: string }[]; nextPageToken?: string }
-      for (const app of page.apps || []) packages.set(app.packageName, app.displayName)
+      for (const app of page.apps || []) packages.set(app.packageName, (app.displayName && app.displayName !== app.packageName ? app.displayName : GOOGLE_PACKAGE_LABELS[app.packageName]) || app.displayName || GOOGLE_PACKAGE_LABELS[app.packageName] || app.packageName)
       pageToken = page.nextPageToken || ''
     } while (pageToken)
   } catch (e) { job.errors.push(`Google 앱 검색: ${message(e)}${packages.size ? ' · 등록된 패키지를 조회합니다.' : ' 연결 설정에 패키지명을 입력할 수 있습니다.'}`) }
@@ -669,6 +733,58 @@ app.get('/api/app-revenue/job', async (req, res) => {
   const job = await getJobStore().get(id, auth)
   if (!job) return res.status(404).json({ error: '동기화 기록이 만료되었습니다.' })
   res.json(job.state === 'running' ? { ...job, documents: [], apps: [] } : job)
+})
+app.get('/api/app-revenue/google-setup', (_req, res) => {
+  const sa = googleSa()
+  const s = settings()
+  const status = connectionStatus()
+  const missing = status.google.missing ?? []
+  res.json({
+    saEmail: sa?.client_email || '',
+    bucket: s.bucket,
+    google: status.google,
+    steps: [
+      {
+        id: 'api',
+        title: 'Play Developer Reporting API',
+        body: 'Cloud에서 API를 사용 설정합니다.',
+        done: !missing.some((m) => /Reporting API|SERVICE_DISABLED/i.test(m)),
+        link: 'https://console.cloud.google.com/apis/library/playdeveloperreporting.googleapis.com',
+      },
+      {
+        id: 'sa',
+        title: '서비스 계정 Play Console 권한',
+        body: sa?.client_email ? `${sa.client_email} 에 재무·앱 조회 권한` : '서비스 계정 이메일 확인',
+        done: Boolean(status.google.configured),
+      },
+      {
+        id: 'bucket',
+        title: 'GCS 버킷 ACL',
+        body: s.bucket ? `${s.bucket} 읽기 권한` : '버킷 ID 입력',
+        done: Boolean(status.google.reports && !missing.some((m) => /GCS|403|ACL/.test(m))),
+      },
+      {
+        id: 'bundle',
+        title: 'PC Chrome 번들(임시)',
+        body: 'GCS 불가 시 PC에서 zip 갱신 후 배포',
+        done: Boolean(status.google.reports),
+      },
+    ],
+  })
+})
+app.post('/api/app-revenue/refresh-play-bundle', async (_req, res) => {
+  if (isCloudRuntime()) {
+    return res.status(403).json({ error: 'PC Chrome 번들 갱신은 로컬 커넥터에서만 실행할 수 있습니다.' })
+  }
+  try {
+    const script = resolve(root, 'server/scripts/fetchPlayReportsCdp.mjs')
+    if (!existsSync(script)) return res.status(500).json({ error: 'Play fetch 스크립트를 찾지 못했습니다.' })
+    await runNodeScript(script)
+    const rebuilt = rebuildGoogleReportBundleFromCache()
+    res.json({ ok: true, ...rebuilt })
+  } catch (e) {
+    res.status(500).json({ error: message(e) })
+  }
 })
 
 export { app as revenueApp }

@@ -1,3 +1,4 @@
+import { estimateGoogleDeveloperShare, isGoogleEstimatedShare, needsGoogleEstimatedShare } from "./googleFee";
 import type { RevenueData, RevenueRow, TaxClass } from "./types";
 
 export const platformName = { apple: "App Store", google: "Google Play" };
@@ -31,6 +32,8 @@ export const emptyData = (): RevenueData => ({
   goal: 0,
   business: { name: "", number: "", kind: "general", prepaid: {} },
   checklist: {},
+  appGroups: [],
+  meta: {},
 });
 export function validDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -46,11 +49,27 @@ export function amounts(row: RevenueRow, data: RevenueData) {
   const rate = rateFor(data, row.currency, row.period);
   const proceedsRate = rateFor(data, row.proceedsCurrency, row.period);
   if (!rate || !proceedsRate) return null;
+  let feeRaw = row.fee;
+  let taxRaw = row.tax;
+  let proceedsRaw = row.proceeds;
+  // Google 예상 매출: 수익 미기입 또는 요율 변경 시 수수료 추정
+  if (needsGoogleEstimatedShare(row) || isGoogleEstimatedShare(row)) {
+    const share = estimateGoogleDeveloperShare({
+      gross: row.gross,
+      refunds: row.refunds,
+      tax: row.tax,
+      country: row.country,
+      currency: row.currency,
+    });
+    feeRaw = share.fee;
+    taxRaw = share.tax;
+    proceedsRaw = share.proceeds;
+  }
   const gross = row.gross * rate,
     refunds = row.refunds * rate;
-  const fee = (row.fee ?? 0) * rate,
-    tax = (row.tax ?? 0) * rate;
-  const proceeds = (row.proceeds ?? 0) * proceedsRate;
+  const fee = (feeRaw ?? 0) * rate,
+    tax = (taxRaw ?? 0) * rate;
+  const proceeds = (proceedsRaw ?? 0) * proceedsRate;
   return {
     gross,
     refunds,
@@ -58,7 +77,7 @@ export function amounts(row: RevenueRow, data: RevenueData) {
     tax,
     proceeds,
     unallocated:
-      row.proceeds === null ? 0 : gross - refunds - fee - tax - proceeds,
+      proceedsRaw === null ? 0 : gross - refunds - fee - tax - proceeds,
   };
 }
 export function summarize(rows: RevenueRow[], data: RevenueData) {
@@ -90,8 +109,9 @@ export function summarize(rows: RevenueRow[], data: RevenueData) {
     ] as const)
       result[key] += value[key];
     result.units += row.units;
-    if (row.fee === null || row.tax === null) result.unseparated++;
-    if (row.proceeds === null) result.unknownProceeds++;
+    const estimated = isGoogleEstimatedShare(row);
+    if (!estimated && (row.fee === null || row.tax === null)) result.unseparated++;
+    if (row.proceeds === null && !estimated) result.unknownProceeds++;
   }
   return result;
 }
@@ -222,6 +242,47 @@ export function exportRows(rows: RevenueRow[], data: RevenueData) {
       r.evidence,
     ]),
   ]);
+}
+
+/** 유료 판매만 집계. Apple Units의 무료 다운로드는 제외. */
+export function countPaidSales(rows: RevenueRow[]) {
+  let sold = 0;
+  let refunded = 0;
+  let soldTx = 0;
+  let refundTx = 0;
+  for (const r of rows) {
+    if (r.gross > 0 && r.refunds === 0) {
+      soldTx += 1;
+      sold += r.units > 0 ? r.units : 1;
+    } else if (r.refunds > 0) {
+      refundTx += 1;
+      refunded += r.units < 0 ? -r.units : r.units > 0 ? r.units : 1;
+    }
+  }
+  return {
+    sold,
+    refunded,
+    net: sold - refunded,
+    soldTx,
+    refundTx,
+  };
+}
+
+/** 총매출 − 환불 − 개발자수익 에 해당하는 스토어 공제(수수료·세금·미분리). */
+export function storeTake(totals: ReturnType<typeof summarize>) {
+  const explicit = totals.fee + totals.tax + totals.unallocated;
+  // Apple은 fee가 null이라 미분리(unallocated)에 수수료가 들어감.
+  // 화면 공제액은 항상 총매출−환불−개발자수익 잔차로 맞춰 식이 성립하게 한다.
+  const residual = Math.max(0, Math.round(totals.gross - totals.refunds - totals.proceeds));
+  const total =
+    totals.unknownProceeds > 0 && totals.proceeds === 0 ? explicit : residual || explicit;
+  return {
+    fee: totals.fee,
+    tax: totals.tax,
+    unallocated: totals.unallocated,
+    total,
+    explicit,
+  };
 }
 
 export function appProfit(

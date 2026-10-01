@@ -15,6 +15,7 @@ import {
   parseReport,
   reportDate,
 } from "./imports";
+import { estimateGoogleDeveloperShare } from "./googleFee";
 import { validateBackup } from "./storage";
 import type { RevenueRow, StoreDocument } from "./types";
 const doc = (text: string, key = "test"): StoreDocument => ({
@@ -296,4 +297,53 @@ describe("official report import", () => {
       "중복",
     );
   });
+  it("estimates Google Play 30% fee on sales reports", async () => {
+    const header =
+      "Order Number,Order Charged Date,Financial Status,Package ID,Product Title,Currency of Sale,Charged Amount,Taxes Collected,Country of Buyer\n";
+    const body =
+      'GPA.1,2026-09-01,Charged,com.app,앱,KRW,11000,1000,KR';
+    const [r] = await parseReport(doc(header + body, "sales-kr"));
+    expect(r).toMatchObject({
+      platform: "google",
+      basis: "estimate",
+      gross: 11000,
+      tax: 1000,
+      fee: 3000,
+      proceeds: 7000,
+    });
+    expect(summarize([r], emptyData()).proceeds).toBe(7000);
+  });
+  it("estimates Google share for legacy null-proceeds rows in amounts()", () => {
+    const r = row({
+      platform: "google",
+      basis: "estimate",
+      gross: 11000,
+      refunds: 0,
+      fee: null,
+      tax: 1000,
+      proceeds: null,
+      currency: "KRW",
+      proceedsCurrency: "KRW",
+      country: "KR",
+    });
+    expect(amounts(r, emptyData())).toMatchObject({
+      fee: 3000,
+      tax: 1000,
+      proceeds: 7000,
+    });
+    expect(summarize([r], emptyData()).unknownProceeds).toBe(0);
+  });
+  it("estimateGoogleDeveloperShare assumes 10% VAT for KR when tax missing", () => {
+    const share = estimateGoogleDeveloperShare({
+      gross: 11000,
+      refunds: 0,
+      tax: null,
+      country: "KR",
+      currency: "KRW",
+    });
+    expect(share.tax).toBe(1000);
+    expect(share.fee).toBe(3000);
+    expect(share.proceeds).toBe(7000);
+  });
+
 });

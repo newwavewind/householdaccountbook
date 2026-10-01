@@ -1,6 +1,7 @@
 ﻿import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
+import { cardBrandLabel } from '../constants/cardBrands'
 import type { BulkDraftRow, BulkRowsUpdater } from './draftRow'
 import { BulkInputDraftRow } from './BulkInputDraftRow'
 import { BulkInputHistoryRow } from './BulkInputHistoryRow'
@@ -28,6 +29,33 @@ const BULK_LIST_PAGE_SIZE_OPTIONS: { value: BulkListPageSize; label: string }[] 
   { value: 30, label: '30개씩 보기' },
   { value: 'all', label: '전체 보기' },
 ]
+
+/** 확인된 내역 조회용 — 빈 문자열은 전체 */
+const LIST_FILTER_CASH = '__cash__'
+const LIST_FILTER_IEUM = '__ieum__'
+const LIST_FILTER_CARD_BLANK = '__card_blank__'
+
+function matchesListCardFilter(row: BulkDraftRow, filter: string): boolean {
+  if (!filter) return true
+  if (filter === LIST_FILTER_CASH) {
+    return row.kind === 'expense' && row.paymentMethod === 'cash'
+  }
+  if (filter === LIST_FILTER_IEUM) {
+    return row.kind === 'expense' && row.paymentMethod === 'ieum'
+  }
+  if (filter === LIST_FILTER_CARD_BLANK) {
+    return (
+      row.kind === 'expense' &&
+      row.paymentMethod === 'card' &&
+      !row.cardBrand.trim()
+    )
+  }
+  return (
+    row.kind === 'expense' &&
+    row.paymentMethod === 'card' &&
+    row.cardBrand === filter
+  )
+}
 
 function bulkListPageCount(rowCount: number, pageSize: BulkListPageSize): number {
   if (pageSize === 'all' || rowCount === 0) return 1
@@ -146,13 +174,71 @@ export function MonthInputSection({
   const [bulkRowDeleteKey, setBulkRowDeleteKey] = useState<string | null>(null)
   const [listPageSize, setListPageSize] = useState<BulkListPageSize>(10)
   const [listPage, setListPage] = useState(1)
+  const [listCardFilter, setListCardFilter] = useState('')
   const confirmFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const workingRow = rows[0] ?? emptyDraftRow()
   const historyRows = rows.length > 1 ? rows.slice(1) : []
 
+  const listCardFilterOptions = useMemo(() => {
+    let cash = 0
+    let ieum = 0
+    let blankCard = 0
+    const brandMap = new Map<string, number>()
+    for (const row of historyRows) {
+      if (row.kind !== 'expense') continue
+      if (row.paymentMethod === 'cash') {
+        cash += 1
+        continue
+      }
+      if (row.paymentMethod === 'ieum') {
+        ieum += 1
+        continue
+      }
+      if (row.paymentMethod === 'card') {
+        const id = row.cardBrand.trim()
+        if (!id) {
+          blankCard += 1
+          continue
+        }
+        brandMap.set(id, (brandMap.get(id) ?? 0) + 1)
+      }
+    }
+    const brands = [...brandMap.entries()]
+      .map(([id, count]) => ({
+        value: id,
+        label: `${cardBrandLabel(id) ?? id} (${count})`,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'ko'))
+    const extras: { value: string; label: string }[] = []
+    if (cash > 0) extras.push({ value: LIST_FILTER_CASH, label: `현금 (${cash})` })
+    if (ieum > 0) extras.push({ value: LIST_FILTER_IEUM, label: `이음카드 (${ieum})` })
+    if (blankCard > 0) {
+      extras.push({
+        value: LIST_FILTER_CARD_BLANK,
+        label: `카드(미선택) (${blankCard})`,
+      })
+    }
+    return [...brands, ...extras]
+  }, [historyRows])
+
+  const filteredHistoryRows = useMemo(
+    () => historyRows.filter((row) => matchesListCardFilter(row, listCardFilter)),
+    [historyRows, listCardFilter],
+  )
+
+  const filteredHistoryExpenseSum = useMemo(() => {
+    let sum = 0
+    for (const row of filteredHistoryRows) {
+      if (row.kind !== 'expense') continue
+      const n = Number(row.amount.replace(/\D/g, ''))
+      if (Number.isFinite(n)) sum += n
+    }
+    return sum
+  }, [filteredHistoryRows])
+
   const listPageCount = useMemo(
-    () => bulkListPageCount(historyRows.length, listPageSize),
-    [historyRows.length, listPageSize],
+    () => bulkListPageCount(filteredHistoryRows.length, listPageSize),
+    [filteredHistoryRows.length, listPageSize],
   )
 
   const historySliceStart = useMemo(() => {
@@ -161,12 +247,12 @@ export function MonthInputSection({
   }, [listPage, listPageSize])
 
   const visibleHistoryRows = useMemo(() => {
-    if (listPageSize === 'all') return historyRows
-    return historyRows.slice(
+    if (listPageSize === 'all') return filteredHistoryRows
+    return filteredHistoryRows.slice(
       historySliceStart,
       historySliceStart + listPageSize,
     )
-  }, [historyRows, listPageSize, historySliceStart])
+  }, [filteredHistoryRows, listPageSize, historySliceStart])
 
   useEffect(() => {
     setListPage((p) => Math.min(Math.max(1, p), listPageCount))
@@ -174,10 +260,21 @@ export function MonthInputSection({
 
   useEffect(() => {
     setListPage(1)
+    setListCardFilter('')
     setEditingHistoryKey(null)
     setHistoryRowMenuKey(null)
     editingSnapshotRef.current = null
   }, [year, monthIndex])
+
+  useEffect(() => {
+    if (!listCardFilter) return
+    if (listCardFilterOptions.some((opt) => opt.value === listCardFilter)) return
+    setListCardFilter('')
+  }, [listCardFilter, listCardFilterOptions])
+
+  useEffect(() => {
+    setListPage(1)
+  }, [listCardFilter])
 
   useEffect(() => {
     if (rows.length <= 1) return
@@ -391,7 +488,34 @@ export function MonthInputSection({
           </section>
 
           <section aria-label="확인된 내역">
-            <div className="flex flex-col gap-1.5 border-b border-border-muted bg-neutral-cool/20 px-2.5 py-1.5 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
+            <div className="flex flex-col gap-1.5 border-b border-border-muted bg-neutral-cool/20 px-2.5 py-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                  <label className="flex items-center gap-1.5 text-[0.6875rem] text-text-soft">
+                    <span className="font-medium text-text-muted">카드</span>
+                    <select
+                      aria-label="확인된 내역 카드별 조회"
+                      value={listCardFilter}
+                      onChange={(e) => setListCardFilter(e.target.value)}
+                      className="h-7 max-w-[12rem] rounded-md border border-border-subtle bg-surface-raised px-1.5 text-[0.6875rem] font-semibold text-text-secondary outline-none focus:border-green-accent"
+                    >
+                      <option value="">전체 ({historyRows.length})</option>
+                      {listCardFilterOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {listCardFilter ? (
+                    <span className="text-[0.6875rem] tabular-nums text-text-muted">
+                      {filteredHistoryRows.length}건
+                      {filteredHistoryExpenseSum > 0
+                        ? ` · 지출 ${won(filteredHistoryExpenseSum)}`
+                        : ''}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 sm:justify-end">
                 <label className="flex items-center gap-1.5 text-[0.6875rem] text-text-soft">
                   <span className="font-medium text-text-muted">목록 개수</span>
                   <select
@@ -413,7 +537,7 @@ export function MonthInputSection({
                     ))}
                   </select>
                 </label>
-                {listPageSize !== 'all' && historyRows.length > 0 ? (
+                {listPageSize !== 'all' && filteredHistoryRows.length > 0 ? (
                   <nav
                     className="flex items-center justify-center gap-1.5"
                     aria-label="확인된 내역 페이지"
@@ -443,6 +567,7 @@ export function MonthInputSection({
                     </button>
                   </nav>
                 ) : null}
+                </div>
             </div>
             <table className={BULK_TABLE_CLASS}>
               <BulkInputTableHead
@@ -456,7 +581,9 @@ export function MonthInputSection({
                     colSpan={(members.length > 0 ? 8 : 7) + 1}
                     className="bg-surface-raised py-8 text-center text-xs text-text-soft"
                   >
-                    아직 확인된 내역이 없습니다.
+                    {historyRows.length === 0
+                      ? '아직 확인된 내역이 없습니다.'
+                      : '선택한 카드에 해당하는 내역이 없습니다.'}
                   </td>
                 </tr>
               ) : (
