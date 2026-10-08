@@ -31,9 +31,10 @@ function allowedUserIds(): string[] {
     .filter(Boolean)
 }
 
-function isUserAllowed(user: User): boolean {
-  // Personal household app: any signed-in Supabase user may sync.
-  if (process.env.REVENUE_ALLOW_ANY_AUTH_USER !== '0') return true
+export function isUserAllowed(user: Pick<User, 'id' | 'email'>): boolean {
+  // Store credentials belong to the configured account, not every app member.
+  // Sharing them with all authenticated users must be an explicit opt-in.
+  if (process.env.REVENUE_ALLOW_ANY_AUTH_USER === '1') return true
   const emails = allowedEmails()
   const ids = allowedUserIds()
   if (!emails.length && !ids.length) return false

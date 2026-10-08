@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { money, summarize } from "./model";
+import { summarizePeriodCoverage } from "./completeness";
 import type { RevenueData, RevenueRow } from "./types";
 
 export function RevenueChart({
@@ -7,13 +8,18 @@ export function RevenueChart({
   data,
   month,
   mode,
+  coverageRows = data.rows,
 }: {
   rows: RevenueRow[];
   data: RevenueData;
   month: string;
   mode: "day" | "month";
+  coverageRows?: RevenueRow[];
 }) {
   const [selected, setSelected] = useState<number | null>(null);
+  const bases = new Set(rows.map((row) => row.basis));
+  const mixedBasis = bases.size > 1;
+  const basis = bases.size === 1 ? rows[0].basis : null;
   const [y, m] = month.split("-").map(Number);
   const count = mode === "day" ? new Date(y, m, 0).getDate() : 12;
   const points = Array.from({ length: count }, (_, i) => {
@@ -26,14 +32,26 @@ export function RevenueChart({
         ? r.date === date && (!r.endDate || r.endDate === r.date)
         : r.period === date,
     );
+    const coverage = summarizePeriodCoverage(data, date.slice(0, 7), coverageRows);
+    const totals = summarize(mixedBasis ? [] : values, data);
+    const monthComplete = basis === "estimate" ? coverage.completeSales
+      : basis === "settled" ? coverage.completeSettled : false;
+    // Monthly Apple reports have no daily allocation. A day with only Google
+    // detail must not become the entire business's daily income.
+    const dayComplete = mode !== "day" || coverage.expectedPlatforms.every((platform) =>
+      values.some((row) => row.platform === platform),
+    );
+    const sourceComplete = !mixedBasis && values.length > 0 && monthComplete && dayComplete;
     return {
-      ...summarize(values, data),
+      ...totals,
+      salesKnown: sourceComplete && totals.missingGrossFx === 0,
+      proceedsKnown: sourceComplete && totals.completeProceeds,
       label: `${i + 1}${mode === "day" ? "일" : "월"}`,
       count: values.length,
     };
   });
   const max = Math.max(
-    ...points.flatMap((p) => [p.gross, Math.abs(p.proceeds)]),
+    ...points.flatMap((p) => [p.salesKnown ? p.gross : 0, p.proceedsKnown ? Math.abs(p.proceeds) : 0]),
     1,
   );
   const active = selected === null ? null : points[selected];
@@ -43,15 +61,15 @@ export function RevenueChart({
         {active ? (
           <>
             <b>{active.label}</b>
-            <span>매출 ₩{money(active.gross)}</span>
+            <span>매출 {active.salesKnown ? `₩${money(active.gross)}` : "미집계"}</span>
             <span>
               수익{" "}
-              {active.unknownProceeds ? "미제공" : `₩${money(active.proceeds)}`}
+              {!active.proceedsKnown ? "미집계" : `₩${money(active.proceeds)}`}
             </span>
             <small>{active.count ? `${active.count}건` : "보고서 없음"}</small>
           </>
         ) : (
-          <span>막대를 선택하면 금액을 확인할 수 있어요.</span>
+          <span>{mixedBasis ? "예상·확정 자료가 섞여 있습니다. 하나의 보고서 기준을 선택해 주세요." : "막대를 선택하면 금액을 확인할 수 있어요. 누락 자료가 있는 기간은 미집계로 표시합니다."}</span>
         )}
       </div>
       <div
@@ -70,17 +88,17 @@ export function RevenueChart({
               key={i}
               type="button"
               className={`rev-chart-column ${selected === i ? "is-selected" : ""}`}
-              aria-label={`${p.label}, ${p.count ? `매출 ${money(p.gross)}원, 수익 ${p.unknownProceeds ? "미제공" : money(p.proceeds) + "원"}` : "보고서 없음"}`}
+              aria-label={`${p.label}, ${mixedBasis ? "보고서 기준 혼합 · 미집계" : p.count ? `매출 ${p.salesKnown ? money(p.gross) + "원" : "미집계"}, 수익 ${p.proceedsKnown ? money(p.proceeds) + "원" : "미집계"}` : "보고서 없음"}`}
               onClick={() => setSelected(i)}
             >
               <div className="rev-bar-pair">
                 <span
                   className="rev-bar-sales"
-                  style={{ height: `${(Math.max(0, p.gross) / max) * 100}%` }}
+                  style={{ height: `${(p.salesKnown ? Math.max(0, p.gross) / max : 0) * 100}%` }}
                 />
                 <span
-                  className={`rev-bar-net ${p.proceeds < 0 ? "is-negative" : ""}`}
-                  style={{ height: `${(Math.abs(p.proceeds) / max) * 100}%` }}
+                  className={`rev-bar-net ${p.proceedsKnown && p.proceeds < 0 ? "is-negative" : ""}`}
+                  style={{ height: `${(p.proceedsKnown ? Math.abs(p.proceeds) / max : 0) * 100}%` }}
                 />
               </div>
               <span className="rev-bar-label">
@@ -96,7 +114,7 @@ export function RevenueChart({
         {mode === "day"
           ? "보고서에 기록된 거래일 기준 · 월 단위 Apple 확정 자료는 월별에서 확인"
           : "Apple 확정 보고서는 Apple 회계월 기준"}{" "}
-        · 음수 수익은 붉은 막대로 표시
+        · 자료가 없는 스토어·기간은 합계를 표시하지 않습니다. 보고서 수익과 실제 입금은 별도입니다. 음수 수익은 붉은 막대로 표시
       </p>
     </>
   );

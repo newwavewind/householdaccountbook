@@ -17,6 +17,11 @@ export type RevenueDocument = {
   name: string
   text: string
   period: string
+  source?: 'api' | 'cache'
+  fetchedAt?: string
+  sourceUpdatedAt?: string
+  periodKind?: 'calendar' | 'fiscal'
+  googleOrderProceeds?: Array<{ rowIndex: number; proceeds: number; currency: string; fetchedAt: string }>
 }
 
 export type RevenueJob = {
@@ -45,9 +50,14 @@ function isFreshRunning(job: RevenueJob) {
   return job.state === 'running' && Date.now() - job.started < STALE_MS
 }
 
+function ownsJob(job: RevenueJob, auth: RevenueAuth): boolean {
+  return auth.mode === 'user' ? job.userId === auth.user.id : !job.userId
+}
+
 const memoryStore: JobStore = {
-  async get(id) {
-    return memory.get(id) || null
+  async get(id, auth) {
+    const job = memory.get(id)
+    return job && ownsJob(job, auth) ? job : null
   },
   async set(job) {
     memory.set(job.id, job)
@@ -56,9 +66,8 @@ const memoryStore: JobStore = {
     }
   },
   async findRunning(auth) {
-    const userId = auth.mode === 'user' ? auth.user.id : undefined
     const hit = [...memory.values()].find(
-      (j) => j.state === 'running' && (!userId || j.userId === userId),
+      (j) => j.state === 'running' && ownsJob(j, auth),
     )
     if (!hit) return null
     if (isFreshRunning(hit)) return hit
@@ -86,7 +95,7 @@ const supabaseStore: JobStore = {
   async get(id, auth) {
     if (auth.mode !== 'user') return memoryStore.get(id, auth)
     const mem = memory.get(id)
-    if (mem) return mem
+    if (mem) return ownsJob(mem, auth) ? mem : null
     const sb = userSupabase(auth.accessToken)
     const { data, error } = await sb
       .from('app_revenue_jobs')

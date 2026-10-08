@@ -46,7 +46,9 @@ export function validateBackup(value: unknown): RevenueData {
       (r.supplyAmount !== undefined && !finite(r.supplyAmount)) ||
       (r.outputVat !== undefined && !finite(r.outputVat)) ||
       (r.evidence !== undefined && !str(r.evidence)) ||
-      (r.taxDate !== undefined && !validDate(r.taxDate))
+      (r.taxDate !== undefined && !validDate(r.taxDate)) ||
+      (r.proceedsSource !== undefined && (r.proceedsSource !== "google-orders" || r.platform !== "google" || r.basis !== "estimate" || r.source !== "google-sales" || !finite(r.proceeds) || !str(r.proceedsFetchedAt) || !Number.isFinite(Date.parse(r.proceedsFetchedAt!)))) ||
+      (r.proceedsFetchedAt !== undefined && (!str(r.proceedsFetchedAt) || !Number.isFinite(Date.parse(r.proceedsFetchedAt))))
     )
       throw new Error("백업에 잘못된 거래 데이터가 있습니다.");
   }
@@ -134,44 +136,98 @@ export function validateBackup(value: unknown): RevenueData {
   if (apps === normalized.apps && rows === normalized.rows) return normalized;
   return { ...normalized, apps, rows };
 }
-export function useRevenueData(owner: string) {
+type RevenueStorage = Pick<Storage, "getItem" | "setItem">;
+type RevenueUpdate = RevenueData | ((previous: RevenueData) => RevenueData);
+type UpdateOptions = { touch?: boolean };
+const READ_ERROR =
+  "저장된 앱 수익 자료를 읽지 못해 자동 저장을 중단했습니다. 원본은 보존되어 있으며 백업 복원 후 다시 저장할 수 있습니다.";
+const WRITE_ERROR =
+  "저장 공간이 부족하거나 저장 권한이 없어 변경 내용을 보관하지 못했습니다. 기존 자료는 유지됩니다.";
+
+/** All writes share this guard, including automatic sync and cloud hydration. */
+export function createRevenueStorage(
+  owner: string,
+  storage?: RevenueStorage,
+) {
   const key = `mj-app-revenue-v1:${owner}`;
-  const [initial] = useState(() => {
-    try {
-      const saved = localStorage.getItem(key);
-      const parsed = saved ? JSON.parse(saved) : emptyData();
-      if (!parsed.appGroups) parsed.appGroups = [];
-      if (!parsed.meta) parsed.meta = {};
-      if (parsed.business?.prepaid === 0) parsed.business.prepaid = {};
-      return { data: validateBackup(parsed), error: "" };
-    } catch {
-      return {
-        data: emptyData(),
-        error:
-          "저장된 앱 수익 자료를 읽지 못했습니다. 원본은 보존되어 있습니다. 백업으로 복원하기 전 새 자료를 저장하지 마세요.",
-      };
-    }
+  let data = emptyData();
+  let error = "";
+  let blocked = false;
+  try {
+    storage ??= localStorage;
+    const saved = storage.getItem(key);
+    const parsed = saved !== null ? JSON.parse(saved) : emptyData();
+    if (parsed.business?.prepaid === 0) parsed.business.prepaid = {};
+    data = validateBackup(parsed);
+  } catch {
+    blocked = true;
+    error = READ_ERROR;
+  }
+  const snapshot = () => ({ data, error, blocked });
+  const stamp = (value: RevenueData): RevenueData => ({
+    ...value,
+    meta: { ...value.meta, updatedAt: new Date().toISOString() },
   });
-  const [error, setError] = useState(initial.error);
-  const [data, setData] = useState<RevenueData>(initial.data);
-  const update = useCallback(
-    (next: RevenueData | ((prev: RevenueData) => RevenueData)) => {
-      setData((previous) => {
-        const value = typeof next === "function" ? next(previous) : next;
-        try {
-          localStorage.setItem(key, JSON.stringify(value));
-        } catch {
-          queueMicrotask(() =>
-            setError(
-              "저장 공간이 부족해 변경 내용을 보관하지 못했습니다. 백업을 내려받아 주세요.",
-            ),
-          );
-          return previous;
-        }
-        return value;
-      });
+  return {
+    snapshot,
+    getData: () => data,
+    update(next: RevenueUpdate, options: UpdateOptions = {}): boolean {
+      if (blocked) return false;
+      try {
+        const candidate = typeof next === "function" ? next(data) : next;
+        if (candidate === data) return true;
+        const valid = validateBackup(candidate);
+        const value = options.touch === false ? valid : stamp(valid);
+        storage!.setItem(key, JSON.stringify(value));
+        data = value;
+        error = "";
+        return true;
+      } catch {
+        error = WRITE_ERROR;
+        return false;
+      }
     },
-    [key],
-  );
-  return { data, update, error };
+    restore(candidate: unknown): boolean {
+      let value: RevenueData;
+      try {
+        value = stamp(validateBackup(candidate));
+      } catch {
+        error = "복원 파일 형식이 올바르지 않습니다. 기존 자료는 유지됩니다.";
+        return false;
+      }
+      try {
+        const original = storage!.getItem(key);
+        if (original !== null) {
+          // Never overwrite the only copy, even when the original is unreadable.
+          const recoveryKey = `${key}:recovery:${crypto.randomUUID()}`;
+          storage!.setItem(recoveryKey, original);
+        }
+        storage!.setItem(key, JSON.stringify(value));
+        data = value;
+        error = "";
+        blocked = false;
+        return true;
+      } catch {
+        error = "원본 보존 또는 백업 복원에 실패했습니다. 저장 공간과 권한을 확인해 주세요. 기존 자료는 유지됩니다.";
+        return false;
+      }
+    },
+  };
+}
+
+export function useRevenueData(owner: string) {
+  // AppRevenuePage is keyed by owner, so each account gets its own store.
+  const [store] = useState(() => createRevenueStorage(owner));
+  const [state, setState] = useState(store.snapshot);
+  const update = useCallback((next: RevenueUpdate, options?: UpdateOptions) => {
+    const success = store.update(next, options);
+    setState(store.snapshot());
+    return success;
+  }, [store]);
+  const restore = useCallback((value: unknown) => {
+    const success = store.restore(value);
+    setState(store.snapshot());
+    return success;
+  }, [store]);
+  return { ...state, update, restore, getData: store.getData };
 }

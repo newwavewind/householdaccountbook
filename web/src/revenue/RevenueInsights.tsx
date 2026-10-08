@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { money, monthLabel, platformName } from "./model";
 import { detectAnomalies, type Anomaly } from "./anomalies";
 import {
@@ -36,8 +37,13 @@ export function RevenueInsights({
     data.logs[0],
   );
   const close = monthCloseProgress(closeItems);
-  const from = new Date().toISOString().slice(0, 10);
-  const to = new Date(Date.now() + 45 * 86400000).toISOString().slice(0, 10);
+  const [{ from, to }] = useState(() => {
+    const now = Date.now();
+    return {
+      from: new Date(now).toISOString().slice(0, 10),
+      to: new Date(now + 45 * 86400000).toISOString().slice(0, 10),
+    };
+  });
   const cal = buildPayoutCalendar(data, from, to);
   const upcoming = upcomingInDays(cal, 14);
 
@@ -93,17 +99,18 @@ export function RevenueInsights({
       </section>
       {!compact && upcoming.length ? (
         <section className="rev-card rev-insights-cal">
-          <h3>입금 캘린더 · 14일</h3>
+          <h3>입금 기록·참고 일정 · 14일</h3>
           <ul>
             {upcoming.map((e) => (
               <li key={e.id}>
                 <time>{e.date}</time>
                 <span>{platformName[e.platform]}</span>
-                <b>{e.title}</b>
-                <strong>₩{money(e.amount)}</strong>
+                <b title={e.note}>{e.title}</b>
+                <strong>{e.amount === null ? "미집계" : `₩${money(e.amount)}`}</strong>
               </li>
             ))}
           </ul>
+          <p className="rev-caption">자동 참고 일정은 확정 보고서 기준입니다. 실제 입금은 지급 안내 및 입금 기록으로 확인하세요.</p>
         </section>
       ) : null}
     </div>

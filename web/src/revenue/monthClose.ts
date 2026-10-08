@@ -1,3 +1,5 @@
+import { platformName } from "./model";
+import { summarizePeriodCoverage } from "./completeness";
 import type { ConnectorStatus, RevenueData, SyncLog } from "./types";
 
 export type MonthCloseItem = {
@@ -14,44 +16,38 @@ export function buildMonthCloseChecklist(
   connection: ConnectorStatus | null,
   lastLog: SyncLog | undefined,
 ): MonthCloseItem[] {
-  const rows = data.rows.filter((r) => r.period === month);
-  const hasApple = rows.some((r) => r.platform === "apple");
-  const hasGoogle = rows.some((r) => r.platform === "google");
-  const fxOk = rows.every((r) => {
-    if (r.currency === "KRW" && r.proceedsCurrency === "KRW") return true;
-    return (
-      (r.currency === "KRW" || data.rates[`${month}:${r.currency}`]) &&
-      (r.proceedsCurrency === "KRW" || data.rates[`${month}:${r.proceedsCurrency}`])
-    );
-  });
-  const syncedRecently =
-    lastLog &&
-    Date.now() - Date.parse(lastLog.at) < 7 * 86400000 &&
-    (lastLog.status === "success" || lastLog.status === "partial");
+  const coverage = summarizePeriodCoverage(data, month);
+  const hasAllReports = coverage.expectedPlatforms.length > 0 && coverage.missingSettledPlatforms.length === 0;
+  const missingStores = coverage.missingSettledPlatforms.map((platform) => platformName[platform]);
   const manual = data.checklist;
 
   return [
     {
       id: "sync",
-      label: "스토어 동기화(또는 파일) 완료",
-      done: Boolean(syncedRecently || rows.length),
+      label: "선택한 달의 확정 보고서 반영",
+      done: hasAllReports,
       auto: true,
-      hint: lastLog ? new Date(lastLog.at).toLocaleString("ko-KR") : undefined,
+      hint: missingStores.length ? `${missingStores.join(" · ")} 확정 보고서 없음` :
+        lastLog ? new Date(lastLog.at).toLocaleString("ko-KR") : undefined,
     },
-    { id: "apple-sales", label: "Apple 매출 반영", done: hasApple, auto: true },
-    { id: "google-sales", label: "Google Play 매출 반영", done: hasGoogle, auto: true },
+    ...coverage.expectedPlatforms.map((platform) => ({
+      id: `${platform}-sales`,
+      label: platform === "apple" ? "Apple 확정 재무 확인" : "Google Play 확정 수익 확인",
+      done: coverage.perPlatform[platform].hasSettled,
+      auto: true,
+    })),
     {
       id: "fx",
-      label: "외화 환율 확정",
-      done: fxOk || !rows.some((r) => r.currency !== "KRW"),
+      label: "확정 수익의 원화 환산 확인",
+      done: coverage.completeSettled,
       auto: true,
     },
-    {
+    ...(coverage.expectedPlatforms.includes("google") ? [{
       id: "google-gcs",
-      label: "Google GCS 또는 PC 번들",
+      label: "Google 보고서 연결 설정",
       done: Boolean(connection?.google.reports && !connection?.google.missing?.length),
       auto: true,
-    },
+    }] : []),
     {
       id: "tax-review",
       label: "부가세 분류·증빙 검토",

@@ -29,7 +29,6 @@ export function resolveAppleReportAppKey(get: (...keys: string[]) => string): st
   if (/^\d{6,}$/.test(parent)) return parent;
   // IAP 행에서 Parent가 앱 ID인 경우
   if (/^\d{6,}$/.test(appleId) && !sku) return appleId;
-  if (/^\d{6,}$/.test(parent)) return parent;
   // Parent가 비면 SKU로 두고 enrich 단계에서 앱에 연결
   return parent || appleId || sku;
 }
@@ -53,14 +52,10 @@ export function findAppForRowKey(
   // bomgichul-police → police, bomgichul001 already mapped
   const slug = key.replace(/^bomgichul[-_]?/, "");
   if (slug && slug !== key) {
-    const hit = list.find(
-      (a) =>
-        a.platform === "apple" &&
-        (a.bundleId.toLowerCase().endsWith(`.${slug}`) ||
-          a.bundleId.toLowerCase().includes(slug) ||
-          a.name.toLowerCase().includes(slug)),
+    const hits = list.filter(
+      (a) => a.platform === "apple" && a.bundleId.toLowerCase().endsWith(`.${slug}`),
     );
-    if (hit) return hit;
+    if (hits.length === 1) return hits[0];
   }
   return undefined;
 }

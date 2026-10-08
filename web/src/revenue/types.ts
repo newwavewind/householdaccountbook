@@ -23,6 +23,9 @@ export interface AppProduct {
 export interface RevenueRow {
   id: string;
   reportKey: string;
+  source?: "apple-sales" | "apple-finance" | "google-sales" | "google-earnings" | "standard";
+  reportScope?: string;
+  periodKind?: "calendar" | "fiscal";
   date: string;
   endDate?: string;
   period: string;
@@ -37,6 +40,9 @@ export interface RevenueRow {
   fee: number | null;
   tax: number | null;
   proceeds: number | null;
+  /** Explicit Google Orders API provenance, never an assumed commission. */
+  proceedsSource?: "google-orders";
+  proceedsFetchedAt?: string;
   units: number;
   basis: Basis;
   // Store deductions are not the business's Korean output VAT.
@@ -70,6 +76,10 @@ export interface ImportRecord {
   key: string;
   name: string;
   importedAt: string;
+  period?: string;
+  source?: "api" | "cache";
+  fetchedAt?: string;
+  sourceUpdatedAt?: string;
   rows: number;
 }
 export interface SyncLog {
@@ -107,20 +117,34 @@ export interface RevenueData {
   appGroups?: AppGroup[];
   meta?: {
     lastCloudAt?: string;
+    updatedAt?: string;
     dismissedAlerts?: string[];
     googleSaEmail?: string;
   };
 }
+export interface GoogleOrderProceeds {
+  /** Zero-based index into the original CSV data rows (excluding its header). */
+  rowIndex: number;
+  proceeds: number;
+  currency: string;
+  fetchedAt: string;
+}
 export interface StoreDocument {
+  googleOrderProceeds?: GoogleOrderProceeds[];
+  source?: "api" | "cache";
+  fetchedAt?: string;
+  sourceUpdatedAt?: string;
+  periodKind?: "calendar" | "fiscal";
   key: string;
   name: string;
   text: string;
   period: string;
 }
 export interface ConnectorStatus {
+  apiVersion?: number;
   apple: { configured: boolean; reports: boolean; missing: string[] };
   google: { configured: boolean; reports: boolean; missing: string[] };
-  connector?: { online: boolean; uptimeMs: number; port: number };
+  connector?: { online: boolean; uptimeMs: number; port: number; apiVersion?: number; syncScopes?: string[]; currentMonth?: string };
 }
 export interface SyncResult {
   id: string;

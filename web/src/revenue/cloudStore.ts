@@ -1,5 +1,4 @@
 import { getSupabase, isCloudSyncEnabled } from "../lib/supabaseClient";
-import { emptyData } from "./model";
 import { validateBackup } from "./storage";
 import type { RevenueData } from "./types";
 
@@ -60,21 +59,33 @@ export async function pushRevenueSnapshot(
   return { ok: true };
 }
 
+function snapshotTimestamp(data: RevenueData): number | null {
+  const value = data.meta?.updatedAt;
+  if (!value) return null;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function isPristine(data: RevenueData): boolean {
+  return !data.rows.length && !data.apps.length && !data.expenses.length &&
+    !data.payouts.length && !data.imports.length && !data.logs.length &&
+    !Object.keys(data.rates).length && !data.goal && !data.business.name &&
+    !data.business.number && data.business.kind === "general" &&
+    !Object.keys(data.business.prepaid).length && !Object.keys(data.checklist).length &&
+    !data.appGroups?.length && !Object.keys(data.meta ?? {}).length;
+}
+
 export function preferNewer(
   local: RevenueData,
   remote: RevenueData | null,
 ): RevenueData {
   if (!remote) return local;
-  const localStamp = local.logs[0]?.at || "";
-  const remoteStamp = remote.logs[0]?.at || "";
-  if (!local.rows.length && remote.rows.length) return remote;
-  if (remote.rows.length > local.rows.length * 1.05) return remote;
-  if (
-    remoteStamp &&
-    localStamp &&
-    remoteStamp > localStamp &&
-    remote.rows.length >= local.rows.length
-  )
+  if (isPristine(local)) return remote;
+  const localStamp = snapshotTimestamp(local);
+  const remoteStamp = snapshotTimestamp(remote);
+  // Row counts and sync logs cannot prove freshness: deletion, tax edits,
+  // expenses and payout edits can all change a snapshot without adding rows.
+  if (localStamp !== null && remoteStamp !== null && remoteStamp > localStamp)
     return remote;
-  return local.rows.length ? local : remote || emptyData();
+  return local;
 }

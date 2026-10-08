@@ -8,7 +8,7 @@
     "start:revenue": "tsx src/revenueServer.ts",
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "build:revenue": "tsc -p tsconfig.revenue.json && mkdir -p dist/data && cp -f data/google-report-bundle.json dist/data/google-report-bundle.json 2>/dev/null || true",
+    "build:revenue": "tsc -p tsconfig.revenue.json && mkdir -p dist/data && (cp -f data/google-report-bundle.json dist/data/google-report-bundle.json 2>/dev/null || true)",
     "start": "node dist/index.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",

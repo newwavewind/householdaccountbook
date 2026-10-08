@@ -1,7 +1,7 @@
 import { gunzipSync, unzipSync, strFromU8 } from "fflate";
 import { validDate } from "./model";
-import type { RevenueData, RevenueRow, StoreDocument } from "./types";
-import { estimateGoogleDeveloperShare } from "./googleFee";
+import type { GoogleOrderProceeds, RevenueData, RevenueRow, StoreDocument } from "./types";
+import { compareGoogleOrderProceeds, reportScopeFromKey, reportSource } from "./reportSelection";
 import { resolveAppleReportAppKey } from "./appMatch";
 
 export function parseDelimited(text: string): string[][] {
@@ -67,30 +67,62 @@ async function digest(text: string) {
 export async function parseReport(doc: StoreDocument): Promise<RevenueRow[]> {
   const table = parseDelimited(doc.text);
   if (table.length < 2) throw new Error("보고서에 데이터가 없습니다.");
-  const header = table[0];
-  const financial = header.includes("Partner Share");
-  const apple = financial || header.includes("Developer Proceeds");
+  const header = table[0].map((cell) => cell.trim());
+  const has = (name: string) => header.some((cell) => cell.toLowerCase() === name.toLowerCase());
+  const financial = has("Partner Share");
+  const apple = financial || has("Developer Proceeds");
   const google =
-    header.includes("Transaction Type") &&
-    header.includes("Amount (Merchant Currency)");
+    has("Transaction Type") &&
+    has("Amount (Merchant Currency)");
   const sales =
-    header.includes("Order Number") && header.includes("Charged Amount");
-  const canonical = header.includes("date") && header.includes("proceeds");
+    has("Order Number") && has("Charged Amount");
+  const canonical = has("date") && has("proceeds");
   if (!apple && !google && !sales && !canonical)
     throw new Error(
       "지원 형식: Apple 판매·재무 TXT, Google 예상 매출·수익 CSV, 표준 CSV 양식",
     );
+  const source: NonNullable<RevenueRow["source"]> = financial ? "apple-finance" :
+    apple ? "apple-sales" : google ? "google-earnings" : sales ? "google-sales" : "standard";
+  const googleOrders = new Map<number, GoogleOrderProceeds>();
+  if (doc.googleOrderProceeds !== undefined) {
+    if (source !== "google-sales" || !Array.isArray(doc.googleOrderProceeds))
+      throw new Error("Google 주문 수익은 Google 판매 보고서에만 연결할 수 있습니다.");
+    const statusIndex = header.findIndex((cell) => cell.toLowerCase() === "financial status");
+    for (const entry of doc.googleOrderProceeds) {
+      const validTimestamp = entry && typeof entry.fetchedAt === "string" &&
+        /^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,9})?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/.test(entry.fetchedAt) &&
+        validDate(entry.fetchedAt.slice(0, 10)) && Number.isFinite(Date.parse(entry.fetchedAt));
+      if (!entry || !Number.isInteger(entry.rowIndex) || entry.rowIndex < 0 || entry.rowIndex >= table.length - 1 ||
+        typeof entry.proceeds !== "number" || !Number.isFinite(entry.proceeds) || Math.abs(entry.proceeds) > 1e13 ||
+        typeof entry.currency !== "string" || !/^[A-Z]{3}$/.test(entry.currency) || !validTimestamp)
+        throw new Error("Google 주문 수익의 행 번호·금액·통화·조회 시각을 확인해 주세요.");
+      if (googleOrders.has(entry.rowIndex))
+        throw new Error("같은 판매 행에 Google 주문 수익이 두 번 연결되어 있습니다.");
+      const state = table[entry.rowIndex + 1][statusIndex]?.toLowerCase().trim();
+      if (!["charged", "refund", "refunded", "partial refund"].includes(state))
+        throw new Error("Google 주문 수익이 유효한 판매·환불 행에 연결되지 않았습니다.");
+      googleOrders.set(entry.rowIndex, entry);
+    }
+  }
+  const reportScope = reportScopeFromKey(doc.key, source) || reportScopeFromKey(doc.name, source);
+  const filenameMonth = /(?:salesreport|earnings)_(\d{4})(\d{2})/i.exec(`${doc.key} ${doc.name}`);
+  const documentPeriod = doc.period || (filenameMonth ? `${filenameMonth[1]}-${filenameMonth[2]}` : "");
   const occurrences = new Map<string, number>();
   const result: RevenueRow[] = [];
   for (const [index, cells] of table.slice(1).entries()) {
     if (
       cells[0]?.startsWith("Total_Rows") ||
       cells[0]?.startsWith("Total Rows")
-    )
+    ) {
+      // The consolidated Apple finance file ends its transaction table with
+      // Total_Rows, then appends a country/currency summary. That summary is
+      // already represented by the transactions and must never be added again.
+      if (financial) break;
       continue;
+    }
     const get = (...names: string[]) => {
       for (const n of names) {
-        const i = header.indexOf(n);
+        const i = header.findIndex((cell) => cell.toLowerCase() === n.toLowerCase());
         if (i >= 0 && cells[i]) return cells[i];
       }
       return "";
@@ -102,23 +134,27 @@ export async function parseReport(doc: StoreDocument): Promise<RevenueRow[]> {
         reportKey: doc.key,
         country: "",
         taxClass: "unreviewed" as const,
+        source,
+        reportScope,
+        periodKind: financial ? "fiscal" as const : "calendar" as const,
       };
       if (apple) {
         const date = reportDate(get(financial ? "Start Date" : "Begin Date"));
+        const endDate = get("End Date") ? reportDate(get("End Date")) : date;
         const units = numeric(get(financial ? "Quantity" : "Units"));
         const price = Math.abs(numeric(get("Customer Price")));
         const perUnit = numeric(
           get(financial ? "Partner Share" : "Developer Proceeds"),
         );
-        const isRefund = units < 0 || get("Sale or Return") === "R";
+        const isRefund = units < 0 || get("Sales or Return", "Sale or Return") === "R";
         const total = financial
           ? numeric(get("Extended Partner Share"))
           : perUnit * units;
         row = {
           ...base,
           date,
-          endDate: get("End Date") ? reportDate(get("End Date")) : date,
-          period: doc.period || date.slice(0, 7),
+          endDate,
+          period: documentPeriod || (financial ? endDate : date).slice(0, 7),
           appId: `apple:${resolveAppleReportAppKey(get)}`,
           appName: get("Title"),
           platform: "apple",
@@ -143,24 +179,27 @@ export async function parseReport(doc: StoreDocument): Promise<RevenueRow[]> {
           tax = type.includes("tax"),
           refund = type.includes("refund") && !fee && !tax;
         const charge = type === "charge" || type === "charge rebill";
-        const packageId = get("Package ID", "Product ID", "SKU ID");
-        const title = (get("Product Title", "Description") || packageId).replace(/\s+/g, " ").trim();
+        // Account-wide adjustments/chargeback fees have no app identity. They
+        // still change the payout and must never be dropped from the report.
+        const packageId = get("Package ID", "Product ID") || "__account_adjustments__";
+        const title = (get("Product Title") ||
+          (packageId === "__account_adjustments__" ? "계정 조정" : packageId)).replace(/\s+/g, " ").trim();
         row = {
           ...base,
           date,
-          period: doc.period || date.slice(0, 7),
+          period: documentPeriod || date.slice(0, 7),
           appId: `google:${packageId}`,
           appName: title,
           platform: "google",
           country: get("Buyer Country", "Country of Buyer"),
-          currency: get("Merchant Currency") || get("Currency of Sale") || "KRW",
-          proceedsCurrency: get("Merchant Currency") || get("Currency of Sale") || "KRW",
+          currency: get("Merchant Currency"),
+          proceedsCurrency: get("Merchant Currency"),
           gross: charge ? amount : 0,
           refunds: refund ? -amount : 0,
           fee: fee ? -amount : 0,
           tax: tax ? -amount : 0,
           proceeds: amount,
-          units: charge ? 1 : refund ? -1 : 0,
+          units: charge ? 1 : refund && get("Refund Type").toLowerCase() !== "partial" ? -1 : 0,
           basis: "settled",
         };
       } else if (sales) {
@@ -170,32 +209,20 @@ export async function parseReport(doc: StoreDocument): Promise<RevenueRow[]> {
           continue; // skip cancelled / pending rows without failing the whole file
         const refund = state.includes("refund"),
           amount = Math.abs(numeric(get("Charged Amount")));
-        const packageId = get("Package ID", "Product ID", "SKU ID");
+        const packageId = get("Package ID", "Product ID");
         const title = (get("Product Title") || packageId).replace(/\s+/g, " ").trim();
         const taxCollected = get("Taxes Collected")
           ? Math.abs(numeric(get("Taxes Collected")))
           : null;
         const country = get("Country of Buyer", "Buyer Country");
         const currency =
-          get("Currency of Sale") || get("Buyer Currency") || "KRW";
+          get("Currency of Sale") || get("Buyer Currency");
         const gross = refund ? 0 : amount;
         const refunds = refund ? amount : 0;
-        const share = estimateGoogleDeveloperShare({
-          gross,
-          refunds,
-          tax:
-            taxCollected === null
-              ? null
-              : refund
-                ? -taxCollected
-                : taxCollected,
-          country,
-          currency,
-        });
         row = {
           ...base,
           date,
-          period: doc.period || date.slice(0, 7),
+          period: documentPeriod || date.slice(0, 7),
           appId: `google:${packageId}`,
           appName: title,
           platform: "google",
@@ -204,10 +231,10 @@ export async function parseReport(doc: StoreDocument): Promise<RevenueRow[]> {
           proceedsCurrency: currency.trim(),
           gross,
           refunds,
-          fee: share.fee,
-          tax: share.tax,
-          proceeds: share.proceeds,
-          units: refund ? -1 : 1,
+          fee: null,
+          tax: taxCollected === null ? null : refund ? -taxCollected : taxCollected,
+          proceeds: null,
+          units: state === "partial refund" ? 0 : refund ? -1 : 1,
           basis: "estimate",
         };
       } else {
@@ -235,6 +262,18 @@ export async function parseReport(doc: StoreDocument): Promise<RevenueRow[]> {
           basis: get("basis") as "estimate" | "settled",
         };
       }
+      const orderProceeds = googleOrders.get(index);
+      if (orderProceeds) {
+        if (orderProceeds.currency !== row.currency)
+          throw new Error("Google 주문 수익 통화가 원본 판매 통화와 다릅니다.");
+        // The server allocates the current order-net snapshot to the first
+        // eligible row and zero to its other refund rows. Use that signed
+        // amount as-is; subtracting CSV refunds again would double-count them.
+        row.proceeds = orderProceeds.proceeds;
+        row.proceedsCurrency = orderProceeds.currency;
+        row.proceedsSource = "google-orders";
+        row.proceedsFetchedAt = orderProceeds.fetchedAt;
+      }
       if (
         !/^[A-Z]{3}$/.test(row.currency) ||
         !/^[A-Z]{3}$/.test(row.proceedsCurrency)
@@ -245,7 +284,7 @@ export async function parseReport(doc: StoreDocument): Promise<RevenueRow[]> {
         !row.appName ||
         row.appId.endsWith(":")
       )
-        continue;
+        throw new Error("보고서 기간 또는 앱 식별자가 올바르지 않습니다.");
       const fingerprint = JSON.stringify({
         transaction: get("Description", "Order Number"),
         transactionType: get("Transaction Type"),
@@ -253,6 +292,15 @@ export async function parseReport(doc: StoreDocument): Promise<RevenueRow[]> {
         id: "",
         reportKey: "",
         taxClass: "",
+        source: undefined,
+        reportScope: undefined,
+        periodKind: undefined,
+        // Orders enrichment changes availability, not the original sale.
+        // The same charge can be repeated across report shards with its current
+        // net allocated to one copy and zero to the others.
+        proceeds: source === "google-sales" ? null : row.proceeds,
+        proceedsSource: source === "google-sales" ? undefined : row.proceedsSource,
+        proceedsFetchedAt: undefined,
       });
       const occurrence = occurrences.get(fingerprint) ?? 0;
       occurrences.set(fingerprint, occurrence + 1);
@@ -272,35 +320,79 @@ export function mergeReports(
   data: RevenueData,
   reports: { document: StoreDocument; rows: RevenueRow[] }[],
 ): RevenueData {
-  const keys = new Set(reports.map((r) => r.document.key));
+  // Revisions replace the same logical file across API/cache/manual transports.
+  // Separate adjustment filenames remain separate report scopes.
+  const active = new Map<string, { document: StoreDocument; rows: RevenueRow[] }>();
+  for (const report of reports) {
+    const scope = report.rows[0]?.reportScope || report.document.key;
+    const storedKeys = new Set(data.rows.filter((row) =>
+      (row.reportScope || reportScopeFromKey(row.reportKey, reportSource(row)) || row.reportKey) === scope,
+    ).map((row) => row.reportKey));
+    const storedApi = data.imports.find((entry) => entry.source === "api" &&
+      (storedKeys.has(entry.key) || entry.key === report.document.key));
+    if (report.document.source === "cache" && storedApi) {
+      const cacheTime = Date.parse(report.document.sourceUpdatedAt || "");
+      const apiTime = Date.parse(storedApi.sourceUpdatedAt || storedApi.fetchedAt || storedApi.importedAt);
+      if (!Number.isFinite(cacheTime) || !Number.isFinite(apiTime) || cacheTime <= apiTime) continue;
+    }
+    const prior = active.get(scope);
+    if (!prior || report.document.source !== "cache" || prior.document.source === "cache")
+      active.set(scope, report);
+  }
+  const incoming = [...active.values()];
+  const keys = new Set(incoming.map((r) => r.document.key));
+  const scopes = new Set(incoming.flatMap((r) => r.rows.map((row) => row.reportScope).filter(Boolean)));
+  const replacedKeys = new Set(data.rows.filter((row) => {
+    const scope = row.reportScope || reportScopeFromKey(row.reportKey, reportSource(row));
+    return keys.has(row.reportKey) || (scope !== undefined && scopes.has(scope));
+  }).map((row) => row.reportKey));
   const previous = new Map(data.rows.map((row) => [row.id, row]));
   const rows = new Map(
-    data.rows.filter((r) => !keys.has(r.reportKey)).map((r) => [r.id, r]),
+    data.rows.filter((r) => !replacedKeys.has(r.reportKey)).map((r) => [r.id, r]),
   );
-  for (const report of reports)
+  for (const report of incoming)
     for (const row of report.rows) {
-      const old = previous.get(row.id);
+      const collision = rows.get(row.id);
+      // Preserve the API-backed net across duplicated sales shards. Selection
+      // and persistence share the same latest-snapshot/allocation preference.
+      if (collision && compareGoogleOrderProceeds(collision, row) > 0) continue;
+      const collisionScope = collision && (collision.reportScope || reportScopeFromKey(collision.reportKey, reportSource(collision)));
+      // An extra earnings/adjustment shard can legitimately repeat an amount
+      // and order. Only the same source file is a duplicate snapshot.
+      const priorScoped = row.reportScope ? data.rows.find((prior) =>
+        (prior.reportScope || reportScopeFromKey(prior.reportKey, reportSource(prior))) === row.reportScope &&
+        (prior.id === row.id || prior.id.startsWith(`${row.id}:`)),
+      ) : undefined;
+      const id = priorScoped?.id || (row.source === "google-earnings" && row.reportScope &&
+        collisionScope && row.reportScope !== collisionScope
+          ? `${row.id}:${row.reportScope}` : row.id);
+      const old = previous.get(id);
+      const nextRow = id === row.id ? row : { ...row, id };
       rows.set(
-        row.id,
+        id,
         old
           ? {
-              ...row,
+              ...nextRow,
               taxClass: old.taxClass,
               supplyAmount: old.supplyAmount,
               outputVat: old.outputVat,
               evidence: old.evidence,
               taxDate: old.taxDate,
             }
-          : row,
+          : nextRow,
       );
     }
   const imports = [
-    ...data.imports.filter((i) => !keys.has(i.key)),
-    ...reports.map((r) => ({
+    ...data.imports.filter((i) => !keys.has(i.key) && !replacedKeys.has(i.key)),
+    ...incoming.map((r) => ({
       key: r.document.key,
       name: r.document.name,
       rows: r.rows.length,
       importedAt: new Date().toISOString(),
+      period: r.document.period || r.rows[0]?.period,
+      source: r.document.source,
+      fetchedAt: r.document.fetchedAt,
+      sourceUpdatedAt: r.document.sourceUpdatedAt,
     })),
   ];
   return { ...data, rows: [...rows.values()], imports };
@@ -327,7 +419,7 @@ export async function readReportFile(file: File): Promise<StoreDocument[]> {
     files = { [file.name.replace(/\.gz$/i, "")]: gunzipSync(bytes) };
   } else files = { [file.name]: bytes };
   return Object.entries(files).map(([name, content]) => ({
-    key: `file:${name}`,
+    key: /\.zip$/i.test(file.name) ? `file:${file.name}:${name}` : `file:${name}`,
     name,
     text:
       content[0] === 0xff && content[1] === 0xfe

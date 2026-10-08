@@ -47,10 +47,11 @@ export function formatSyncToast(input: {
   if (apple) parts.push(`Apple ${apple}`);
   if (google) parts.push(`Google ${google}`);
   if (!parts.length && input.apps) parts.push(`앱 ${input.apps}`);
-  if (!parts.length) parts.push("문서 0");
+  if (!parts.length) parts.push("수집된 보고서 없음");
   const fail = input.errors.length;
   const prefix = input.auto ? "자동 · " : "";
   if (fail) return `${prefix}${parts.join(" · ")} · 확인 ${fail}`;
+  if (!input.documents.length) return `${prefix}${parts.join(" · ")} · 수익 확인 필요`;
   return `${prefix}${parts.join(" · ")} · 완료`;
 }
 
@@ -65,8 +66,8 @@ export function syncLogStatus(
   apps: number,
   errors: number,
 ): "success" | "partial" | "error" {
-  if (!errors) return "success";
-  if (docs || apps) return "partial";
+  if (!errors && docs) return "success";
+  if (docs || apps || !errors) return "partial";
   return "error";
 }
 

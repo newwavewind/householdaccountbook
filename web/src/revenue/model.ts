@@ -1,4 +1,4 @@
-import { estimateGoogleDeveloperShare, isGoogleEstimatedShare, needsGoogleEstimatedShare } from "./googleFee";
+import { hasUnverifiedGoogleProceeds, selectRevenueRows } from "./reportSelection";
 import type { RevenueData, RevenueRow, TaxClass } from "./types";
 
 export const platformName = { apple: "App Store", google: "Google Play" };
@@ -45,75 +45,108 @@ export function validDate(value: string): boolean {
 export function rateFor(data: RevenueData, currency: string, month: string) {
   return currency === "KRW" ? 1 : data.rates[`${month}:${currency}`]?.value;
 }
+/** Preserve unknown provider values while identifying the native amounts used by accounting. */
+function nativeAmounts(row: RevenueRow) {
+  const unverified = hasUnverifiedGoogleProceeds(row);
+  return {
+    proceeds: unverified ? null : row.proceeds,
+    fee: unverified ? null : row.fee,
+    // Old Google tax guesses cannot be distinguished from source tax.
+    tax: unverified && !row.source ? null : row.tax,
+  };
+}
+
+/** Zero converts to zero without an exchange rate; unknown proceeds remain unknown. */
+export function rowCurrenciesNeedingConversion(row: RevenueRow): string[] {
+  const native = nativeAmounts(row);
+  const currencies = new Set<string>();
+  if (row.currency !== "KRW" &&
+    [row.gross, row.refunds, native.fee, native.tax].some((value) => value !== null && value !== 0))
+    currencies.add(row.currency);
+  if (row.proceedsCurrency !== "KRW" && native.proceeds !== null && native.proceeds !== 0)
+    currencies.add(row.proceedsCurrency);
+  return [...currencies];
+}
+
 export function amounts(row: RevenueRow, data: RevenueData) {
   const rate = rateFor(data, row.currency, row.period);
   const proceedsRate = rateFor(data, row.proceedsCurrency, row.period);
-  if (!rate || !proceedsRate) return null;
-  let feeRaw = row.fee;
-  let taxRaw = row.tax;
-  let proceedsRaw = row.proceeds;
-  // Google 예상 매출: 수익 미기입 또는 요율 변경 시 수수료 추정
-  if (needsGoogleEstimatedShare(row) || isGoogleEstimatedShare(row)) {
-    const share = estimateGoogleDeveloperShare({
-      gross: row.gross,
-      refunds: row.refunds,
-      tax: row.tax,
-      country: row.country,
-      currency: row.currency,
-    });
-    feeRaw = share.fee;
-    taxRaw = share.tax;
-    proceedsRaw = share.proceeds;
-  }
-  const gross = row.gross * rate,
-    refunds = row.refunds * rate;
-  const fee = (feeRaw ?? 0) * rate,
-    tax = (taxRaw ?? 0) * rate;
-  const proceeds = (proceedsRaw ?? 0) * proceedsRate;
+  const native = nativeAmounts(row);
+  const proceedsRaw = native.proceeds;
+  const feeRaw = native.fee;
+  const taxRaw = native.tax;
+  const validRate = !!rate && Number.isFinite(rate) && rate > 0;
+  const validProceedsRate = !!proceedsRate && Number.isFinite(proceedsRate) && proceedsRate > 0;
+  const zeroSalesCurrency = [row.gross, row.refunds, feeRaw, taxRaw]
+    .every((value) => value === null || value === 0);
+  const grossAvailable = zeroSalesCurrency || validRate;
+  const proceedsAvailable = proceedsRaw !== null && (proceedsRaw === 0 || validProceedsRate);
+  if (!grossAvailable && !proceedsAvailable) return null;
+  const salesFactor = validRate ? rate : 1;
+  const proceedsFactor = validProceedsRate ? proceedsRate : 1;
+  const gross = grossAvailable ? row.gross * salesFactor : 0;
+  const refunds = grossAvailable ? row.refunds * salesFactor : 0;
+  const fee = grossAvailable ? (feeRaw ?? 0) * salesFactor : 0;
+  const tax = grossAvailable ? (taxRaw ?? 0) * salesFactor : 0;
+  const proceeds = proceedsAvailable ? proceedsRaw! * proceedsFactor : 0;
   return {
-    gross,
-    refunds,
-    fee,
-    tax,
-    proceeds,
-    unallocated:
-      proceedsRaw === null ? 0 : gross - refunds - fee - tax - proceeds,
+    gross, refunds, fee, tax, proceeds,
+    unallocated: grossAvailable && proceedsAvailable
+      ? gross - refunds - fee - tax - proceeds : 0,
+    grossAvailable,
+    proceedsAvailable,
+    missingGrossFx: !grossAvailable,
+    missingProceedsFx: proceedsRaw !== null && !proceedsAvailable,
+    unknownProceeds: proceedsRaw === null,
   };
 }
 export function summarize(rows: RevenueRow[], data: RevenueData) {
+  const selection = selectRevenueRows(rows);
   const result = {
-    gross: 0,
-    refunds: 0,
-    fee: 0,
-    tax: 0,
-    proceeds: 0,
-    unallocated: 0,
-    units: 0,
-    missing: 0,
-    unseparated: 0,
-    unknownProceeds: 0,
+    gross: 0, refunds: 0, fee: 0, tax: 0, proceeds: 0, unallocated: 0,
+    units: 0, missing: 0, unseparated: 0, unknownProceeds: 0,
+    missingGrossFx: 0, missingProceedsFx: 0,
+    estimatedRows: 0, settledRows: 0,
+    excludedOverlapRows: selection.excludedOverlapRows,
+    completeProceeds: true,
   };
-  for (const row of rows) {
+  for (const row of selection.rows) {
+    result.units += row.units;
+    if (row.basis === "settled") result.settledRows++;
+    else result.estimatedRows++;
+    const unverified = hasUnverifiedGoogleProceeds(row);
+    const unknown = row.proceeds === null || unverified;
+    if (unknown) result.unknownProceeds++;
+    if (row.fee === null || row.tax === null || unverified) result.unseparated++;
     const value = amounts(row, data);
     if (!value) {
       result.missing++;
+      result.missingGrossFx++;
+      if (!unknown) result.missingProceedsFx++;
       continue;
     }
-    for (const key of [
-      "gross",
-      "refunds",
-      "fee",
-      "tax",
-      "proceeds",
-      "unallocated",
-    ] as const)
+    if (value.missingGrossFx) result.missingGrossFx++;
+    if (value.missingProceedsFx) result.missingProceedsFx++;
+    if (value.missingGrossFx || value.missingProceedsFx) result.missing++;
+    for (const key of ["gross", "refunds", "fee", "tax", "proceeds", "unallocated"] as const)
       result[key] += value[key];
-    result.units += row.units;
-    const estimated = isGoogleEstimatedShare(row);
-    if (!estimated && (row.fee === null || row.tax === null)) result.unseparated++;
-    if (row.proceeds === null && !estimated) result.unknownProceeds++;
   }
+  result.completeProceeds = result.unknownProceeds === 0 && result.missingProceedsFx === 0;
   return result;
+}
+
+/** The UI can explain exactly why a total is partial without showing zero income. */
+export function revenueQuality(rows: RevenueRow[], data: RevenueData) {
+  const totals = summarize(rows, data);
+  return {
+    missingGrossFx: totals.missingGrossFx,
+    missingProceedsFx: totals.missingProceedsFx,
+    unknownProceeds: totals.unknownProceeds,
+    estimatedRows: totals.estimatedRows,
+    settledRows: totals.settledRows,
+    excludedOverlapRows: totals.excludedOverlapRows,
+    completeProceeds: totals.completeProceeds,
+  };
 }
 export function taxWorksheet(data: RevenueData, year: string, half: "1" | "2") {
   const start = `${year}-${half === "1" ? "01" : "07"}`,
@@ -235,7 +268,7 @@ export function exportRows(rows: RevenueRow[], data: RevenueData) {
       r.tax ?? "미분리",
       r.proceedsCurrency,
       r.proceeds,
-      amounts(r, data)?.proceeds ?? "환율 미입력",
+      amounts(r, data)?.proceedsAvailable ? amounts(r, data)!.proceeds : "수익 또는 환율 미확인",
       taxLabels[r.taxClass],
       r.supplyAmount,
       r.outputVat,
@@ -250,13 +283,13 @@ export function countPaidSales(rows: RevenueRow[]) {
   let refunded = 0;
   let soldTx = 0;
   let refundTx = 0;
-  for (const r of rows) {
+  for (const r of selectRevenueRows(rows).rows) {
     if (r.gross > 0 && r.refunds === 0) {
       soldTx += 1;
-      sold += r.units > 0 ? r.units : 1;
+      sold += Math.max(0, r.units);
     } else if (r.refunds > 0) {
       refundTx += 1;
-      refunded += r.units < 0 ? -r.units : r.units > 0 ? r.units : 1;
+      refunded += Math.abs(r.units);
     }
   }
   return {
@@ -271,17 +304,15 @@ export function countPaidSales(rows: RevenueRow[]) {
 /** 총매출 − 환불 − 개발자수익 에 해당하는 스토어 공제(수수료·세금·미분리). */
 export function storeTake(totals: ReturnType<typeof summarize>) {
   const explicit = totals.fee + totals.tax + totals.unallocated;
-  // Apple은 fee가 null이라 미분리(unallocated)에 수수료가 들어감.
-  // 화면 공제액은 항상 총매출−환불−개발자수익 잔차로 맞춰 식이 성립하게 한다.
-  const residual = Math.max(0, Math.round(totals.gross - totals.refunds - totals.proceeds));
-  const total =
-    totals.unknownProceeds > 0 && totals.proceeds === 0 ? explicit : residual || explicit;
   return {
     fee: totals.fee,
     tax: totals.tax,
     unallocated: totals.unallocated,
-    total,
+    // Refund-only months legitimately have negative deductions. Never force
+    // reconciliation by rounding or clamping the signed report components.
+    total: explicit,
     explicit,
+    complete: totals.completeProceeds && totals.missingGrossFx === 0,
   };
 }
 
@@ -291,10 +322,7 @@ export function appProfit(
   expenses: number,
 ) {
   const totals = summarize(rows, data);
-  const displayProceeds =
-    totals.unknownProceeds && !rows.some((r) => r.proceeds !== null)
-      ? totals.gross
-      : totals.proceeds;
+  const displayProceeds = totals.proceeds;
   return {
     ...totals,
     displayProceeds,
@@ -313,15 +341,9 @@ export function yearOverYear(
   const prevRows = data.rows.filter((r) => r.period === prevYear && match(r));
   const cur = summarize(thisRows, data);
   const prev = summarize(prevRows, data);
-  const curVal =
-    cur.unknownProceeds && !thisRows.some((r) => r.proceeds !== null)
-      ? cur.gross
-      : cur.proceeds;
-  const prevVal =
-    prev.unknownProceeds && !prevRows.some((r) => r.proceeds !== null)
-      ? prev.gross
-      : prev.proceeds;
-  if (!prevRows.length || prevVal === 0) {
+  const curVal = cur.proceeds;
+  const prevVal = prev.proceeds;
+  if (!cur.completeProceeds || !prev.completeProceeds || !prevRows.length || prevVal === 0) {
     return { prevYear, curVal, prevVal, growth: null as number | null, hasPrev: prevRows.length > 0 };
   }
   return {
@@ -336,8 +358,7 @@ export function yearOverYear(
 export function neededCurrencies(rows: RevenueRow[], month: string) {
   const set = new Set<string>();
   for (const r of rows.filter((x) => x.period === month)) {
-    if (r.currency !== "KRW") set.add(r.currency);
-    if (r.proceedsCurrency !== "KRW") set.add(r.proceedsCurrency);
+    for (const currency of rowCurrenciesNeedingConversion(r)) set.add(currency);
   }
   return [...set].sort();
 }

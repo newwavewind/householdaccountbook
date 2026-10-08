@@ -1,4 +1,5 @@
-import { summarize, shiftMonth } from "./model";
+import { summarize, shiftMonth, platformName } from "./model";
+import { summarizePeriodCoverage } from "./completeness";
 import type { ConnectorStatus, RevenueData } from "./types";
 
 export type Anomaly = {
@@ -21,7 +22,7 @@ export function detectAnomalies(
 
   const matchMonth = (r: { period: string }) => r.period === month;
   const rows = data.rows.filter(matchMonth);
-  const google = rows.filter((r) => r.platform === "google");
+  const coverage = summarizePeriodCoverage(data, month);
 
   if (!rows.length) {
     add({
@@ -32,12 +33,12 @@ export function detectAnomalies(
     });
   }
 
-  if (rows.length && !google.length && connection?.google.configured) {
+  for (const platform of coverage.missingSettledPlatforms) {
     add({
-      id: "google-empty-month",
-      severity: "critical",
-      title: "Google만 비어 있음",
-      body: "Apple은 있는데 Google Play 매출이 없습니다. GCS·번들·Package ID를 확인해 주세요.",
+      id: `settled-missing:${month}:${platform}`,
+      severity: "warn",
+      title: `${platformName[platform]} 확정 보고서 없음`,
+      body: `${month} ${platformName[platform]} 확정 보고서가 미수집 또는 미발행 상태입니다. 이 달 전체 수익은 아직 확인되지 않았습니다.`,
     });
   }
 
@@ -50,12 +51,19 @@ export function detectAnomalies(
     });
   }
 
-  const prev = data.rows.filter((r) => r.period === shiftMonth(month, -1));
-  const curSum = summarize(rows, data);
-  const prevSum = summarize(prev, data);
-  const curVal = curSum.proceeds || curSum.gross;
-  const prevVal = prevSum.proceeds || prevSum.gross;
-  if (prevVal > 0 && curVal < prevVal * 0.5) {
+  // Compare the same sales basis and only stores present in both months.
+  // Closed fiscal reports and calendar estimates must never be added together.
+  const salesRows = rows.filter((r) => r.basis === "estimate");
+  const prev = data.rows.filter((r) => r.period === shiftMonth(month, -1) && r.basis === "estimate");
+  const comparableStores = ["apple", "google"].filter((platform) =>
+    salesRows.some((r) => r.platform === platform) && prev.some((r) => r.platform === platform),
+  );
+  const curSum = summarize(salesRows, data);
+  const curComparison = summarize(salesRows.filter((r) => comparableStores.includes(r.platform)), data);
+  const prevSum = summarize(prev.filter((r) => comparableStores.includes(r.platform)), data);
+  const curVal = curComparison.gross - curComparison.refunds;
+  const prevVal = prevSum.gross - prevSum.refunds;
+  if (comparableStores.length && !curComparison.missingGrossFx && !prevSum.missingGrossFx && prevVal > 0 && curVal < prevVal * 0.5) {
     add({
       id: "revenue-drop-50",
       severity: "warn",
@@ -73,12 +81,13 @@ export function detectAnomalies(
     });
   }
 
-  if (curSum.missing > 0) {
+  const missing = summarize(rows.filter((r) => r.basis === "settled"), data).missing + curSum.missing;
+  if (missing > 0) {
     add({
       id: "fx-missing",
       severity: "warn",
       title: "환율 미입력",
-      body: `${curSum.missing}건이 원화 환산되지 않았습니다.`,
+      body: `${missing}건의 매출 또는 수익 환율을 확인해 주세요.`,
     });
   }
 

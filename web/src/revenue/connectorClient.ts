@@ -69,7 +69,7 @@ export async function revenueFetch<T>(
           : `클라우드 동기화 요청이 실패했습니다. (${res.status})`,
       )
     }
-    throw new Error(connectorDownMessage(res.status))
+    throw new Error(res.status === 502 || res.status === 504 ? connectorDownMessage(res.status) : `동기화 요청을 처리하지 못했습니다. (${res.status}) 데이터 관리에서 연결 상태를 확인해 주세요.`)
   }
   return res.json() as Promise<T>
 }

@@ -14,11 +14,11 @@
   "functions": {
     "api/app-revenue/[[...path]].ts": {
       "maxDuration": 300,
-      "includeFiles": "server/dist/**;server/data/**"
+      "includeFiles": "server/{dist,data}/**"
     },
     "api/app-revenue/index.ts": {
       "maxDuration": 300,
-      "includeFiles": "server/dist/**;server/data/**"
+      "includeFiles": "server/{dist,data}/**"
     }
   },
   "rewrites": [
