@@ -55,6 +55,10 @@ export function getStoreIncomeStatus({ data, month, platform, income, now = new 
     state: "fx-missing", label: "환율 확인 필요", actionRequired: true,
     detail: `수익 ${income.missingFx}건의 원화 환산에 필요한 환율이 없습니다. 환율을 가져오거나 입력해 주세요.`,
   });
+  if (income.missingReportDates?.length) return status({
+    state: "report-incomplete", label: "회계기간 연결 중", actionRequired: true,
+    detail: `Apple 집계 기간 중 ${income.missingReportDates.length}일의 판매 보고서가 아직 없습니다. 수집된 금액만 소계에 반영했습니다. 전체 수익을 다시 가져오면 해당 날짜도 조회합니다.`,
+  });
   if (income.value !== null) {
     const googleOrders = income.rows.length > 0 && income.rows.every(hasVerifiedGoogleOrderProceeds);
     return status({

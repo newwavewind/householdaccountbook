@@ -68,6 +68,39 @@ test('past-month, cached and already settled reports never issue Orders requests
   await enrichGoogleOrderProceeds({ job: state, month: '2026-09', now, request: async () => assert.fail('Historical order snapshot must not be applied') })
 })
 
+test('an adjustment earnings archive alone cannot suppress current order proceeds', async () => {
+  const sales = document([row()])
+  const adjustment = document([], { key: 'google:earnings/earnings_202610_adjustment.zip:earnings.csv' })
+  const { calls, state } = await run([sales, adjustment])
+  assert.equal(calls, 1)
+  assert.equal(sales.googleOrderProceeds?.[0].proceeds, 85)
+  assert.equal(state.errors.length, 0)
+})
+
+test('base earnings with numeric, currency or other suffixes still supersede order snapshots', async () => {
+  for (const suffix of ['_00000000-0', '_KRW', '_regional']) {
+    const sales = document([row()])
+    const base = document([], { key: `google:earnings/earnings_202610${suffix}.zip:PlayApps_202610.csv` })
+    assert.equal((await run([sales, base])).calls, 0)
+    assert.equal(sales.googleOrderProceeds, undefined)
+  }
+})
+
+test('subscription renewal suffixes identify separate orders and never collapse to a shared base order', async () => {
+  const identifiers = [`${orderId}..0`, `${orderId}..1`]
+  const state = job([document(identifiers.map(id => row({ id })))])
+  let requests = 0
+  await enrichGoogleOrderProceeds({ job: state, month: '2026-10', now, request: async url => {
+    requests++
+    const id = decodeURIComponent(new URL(url).pathname.split('/').at(-1)!)
+    assert.ok(identifiers.includes(id))
+    return response(order({ orderId: id }))
+  } })
+  assert.equal(requests, 2)
+  assert.deepEqual(state.documents[0].googleOrderProceeds?.map(entry => entry.proceeds), [85, 85])
+  assert.equal(state.errors.length, 0)
+})
+
 test('a group containing prior-month refund or mixed currencies is entirely left unknown', async () => {
   for (const extra of [row({ date: '2026-09-03', status: 'Refund' }), row({ currency: 'USD' })]) {
     const report = document([row(), extra])

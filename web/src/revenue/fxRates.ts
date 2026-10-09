@@ -76,7 +76,7 @@ async function fetchEcbRates(month: string, end: string, currencies: string[]): 
       const value = krw / base;
       if (!positive(value)) continue;
       out[month + ":" + currency] = {
-        value,
+        value, source: "ecb", observedAt: date, asOf: end,
         note: "자동 · ECB 직접 " + date + " · 1 " + currency + "당 원화 · Frankfurter 조회 보완",
       };
       break;
@@ -118,7 +118,7 @@ export async function fetchMonthRatesKrw(
       if (!positive(value) || !observationInPeriod(json.date, month, date) ||
         (json.base !== undefined && json.base !== code) ||
         (json.amount !== undefined && json.amount !== 1)) return;
-      out[month + ":" + code] = { value, note: "자동 · Frankfurter/ECB " + json.date };
+      out[month + ":" + code] = { value, source: "frankfurter", observedAt: json.date, asOf: date, note: "자동 · Frankfurter/ECB " + json.date };
     } catch {
       // Recover provider/network failures through the independent official ECB endpoint.
     }
@@ -132,18 +132,65 @@ export async function fetchMonthRatesKrw(
   return out;
 }
 
-/** Fetch only absent period/currency keys, with at most three months in flight. */
+function rateCutoff(month: string): string | undefined {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return undefined;
+  const today = new Date().toISOString().slice(0, 10);
+  if (month > today.slice(0, 7)) return undefined;
+  const [year, number] = month.split("-").map(Number);
+  const end = new Date(Date.UTC(year, number, 0)).toISOString().slice(0, 10);
+  return end < today ? end : today;
+}
+
+/** Preserve manual/unidentified entries. Only our exact old notes migrate. */
+function automaticRateDate(key: string, rate: Rates[string]): string | undefined {
+  if (rate.source === "manual") return undefined;
+  const month = key.slice(0, 7), currency = key.slice(8);
+  if (rate.source === "frankfurter" || rate.source === "ecb") {
+    const date = rate.asOf || rate.observedAt;
+    return typeof date === "string" && validDate(date) && date.startsWith(month) ? date : undefined;
+  }
+  if (rate.source !== undefined) return undefined;
+  const primary = /^자동 · Frankfurter\/ECB (\d{4}-\d{2}-\d{2})$/.exec(rate.note);
+  const fallback = /^자동 · ECB 직접 (\d{4}-\d{2}-\d{2}) · 1 ([A-Z]{3})당 원화 · Frankfurter 조회 보완$/.exec(rate.note);
+  const date = primary?.[1] || (fallback?.[2] === currency ? fallback[1] : undefined);
+  return date && validDate(date) && date.startsWith(month) ? date : undefined;
+}
+
+function sameRate(a: Rates[string] | undefined, b: Rates[string] | undefined) {
+  return a === b || (!!a && !!b && a.value === b.value && a.note === b.note &&
+    a.source === b.source && a.observedAt === b.observedAt && a.asOf === b.asOf);
+}
+
+/** Apply fetched updates only if the user has not edited/deleted their baseline. */
+export function mergeFetchedRevenueRates(current: Rates, fetched: Rates, baseline: Rates): Rates {
+  const next = { ...current };
+  for (const [key, rate] of Object.entries(fetched)) {
+    if (!sameRate(current[key], baseline[key])) continue;
+    if (current[key] && automaticRateDate(key, current[key]) === undefined) continue;
+    next[key] = rate;
+  }
+  return next;
+}
+
+/** Missing and stale automatic rates; at most three report months in flight. */
 export async function fetchMissingRevenueRates(
   rows: RevenueRow[],
   existingRates: RevenueData["rates"],
   onIssue?: (issue: FxRateIssue) => void,
 ): Promise<RevenueData["rates"]> {
+  const baseline: Rates = Object.fromEntries(Object.entries(existingRates).map(([key, rate]) => [key, { ...rate }]));
   const byMonth = new Map<string, Set<string>>();
   for (const row of rows) {
+    const cutoff = rateCutoff(row.period);
+    if (!cutoff) continue;
     for (const currency of rowCurrenciesNeedingConversion(row)) {
       const code = currency.toUpperCase();
-      if (code === "KRW" || !/^[A-Z]{3}$/.test(code) ||
-        Object.hasOwn(existingRates, `${row.period}:${code}`)) continue;
+      if (code === "KRW" || !/^[A-Z]{3}$/.test(code)) continue;
+      const key = `${row.period}:${code}`, previous = baseline[key];
+      if (previous) {
+        const fetchedThrough = automaticRateDate(key, previous);
+        if (!fetchedThrough || fetchedThrough >= cutoff) continue;
+      }
       const currencies = byMonth.get(row.period) || new Set<string>();
       currencies.add(code);
       byMonth.set(row.period, currencies);
@@ -157,8 +204,9 @@ export async function fetchMissingRevenueRates(
       const [month, currencies] = months[next++];
       const fetched = await fetchMonthRatesKrw(month, [...currencies], onIssue);
       for (const [key, rate] of Object.entries(fetched)) {
-        // Recheck in case the caller added a manual rate while requests ran.
-        if (!Object.hasOwn(existingRates, key)) fresh[key] = rate;
+        // Handle even in-place edits during a lookup, while UI merge handles
+        // immutable state changes against the same request baseline.
+        if (sameRate(existingRates[key], baseline[key])) fresh[key] = rate;
       }
     }
   }));

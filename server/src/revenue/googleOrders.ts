@@ -93,7 +93,15 @@ export async function enrichGoogleOrderProceeds(options: {
   // Google transaction months are UTC. At Korea's month boundary the current
   // UTC report can still be the preceding calendar month for nine hours.
   if (month !== now.toISOString().slice(0, 7)) return
-  if (job.documents.some(document => document.key.startsWith('google:earnings/') && document.period === month)) return
+  // Adjustment archives supplement the base earnings report; alone they do
+  // not settle every order in the month or replace live order proceeds.
+  // Real base archives can have account/currency suffixes. Only an explicit
+  // adjustment token identifies a supplemental report; suffix alone does not.
+  if (job.documents.some(document => {
+    const archive = /^google:earnings\/(earnings_\d{6}[^:/]*)\.zip:/i.exec(document.key)?.[1]
+    return document.period === month && archive?.toLowerCase().startsWith(`earnings_${month.replace('-', '')}`) &&
+      !/(?:^|[_-])adjustments?(?:[_-]|$)/i.test(archive)
+  })) return
   const documents = job.documents.filter(document => document.source === 'api' && document.period === month && document.key.startsWith('google:sales/'))
   if (!documents.length) return
   const groups = new Map<string, Group>()

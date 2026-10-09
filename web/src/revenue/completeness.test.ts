@@ -136,3 +136,66 @@ describe("store and period coverage", () => {
     expect(coverage.completeSettled).toBe(false);
   });
 });
+
+
+describe("supplemental settlement report coverage", () => {
+  const googleFinal = (id: string, reportKey: string, proceeds: number) => row("google", "2026-09", "settled", { id, reportKey, source: "google-earnings", proceeds, gross: 0 });
+  it("retains an adjustment-only subtotal while requiring the regular earnings report", () => {
+    const data = emptyData();
+    data.rows = [googleFinal("adjustment", "google:earnings/earnings_202609_adjustment.zip:earnings_202609.csv", -5)];
+    const coverage = summarizePeriodCoverage(data, "2026-09");
+    expect(coverage.perPlatform.google).toMatchObject({ hasSettled: true, missingPrimarySettledReport: true, completeSettled: false });
+    expect(coverage.settled.proceeds).toBe(-5);
+    expect(coverage.completeSettled).toBe(false);
+    expect(summarizeRangeCoverage(data, ["2026-09"]).completeSettled).toBe(false);
+  });
+  it("recognizes the regular monthly report together with its extra adjustments", () => {
+    const data = emptyData();
+    data.rows = [
+      googleFinal("base", "google:earnings/earnings_202609.zip:nested/earnings_202609.csv", 67),
+      googleFinal("adjustment", "google:earnings/earnings_202609_adjustment.zip:earnings_202609.csv", -5),
+    ];
+    const coverage = summarizePeriodCoverage(data, "2026-09");
+    expect(coverage.perPlatform.google).toMatchObject({ missingPrimarySettledReport: false, completeSettled: true });
+    expect(coverage.settled.proceeds).toBe(62);
+  });
+  it.each([
+    "earnings_202609_12345678-1.zip:PlayApps_202609.csv",
+    "earnings_202609_1.zip:earnings_202609.csv",
+    "earnings_202609_KRW.zip:PlayApps_202609.csv",
+    "earnings_202609_export.zip:PlayApps_202609.csv",
+    "earnings_202609.zip:nested/adjustments.csv",
+  ])("accepts a regular archive with a legitimate or unclassified suffix: %s", (name) => {
+    const data = emptyData();
+    data.rows = [googleFinal("base", "google:earnings/" + name, 67)];
+    const coverage = summarizePeriodCoverage(data, "2026-09");
+    expect(coverage.perPlatform.google).toMatchObject({ hasSettled: true, missingPrimarySettledReport: false, completeSettled: true });
+    expect(coverage.settled.proceeds).toBe(67);
+    expect(summarizeRangeCoverage(data, ["2026-09"]).completeSettled).toBe(true);
+  });
+  it.each([
+    "earnings_202609_adjustments.zip:PlayApps_202609.csv",
+    "earnings_202609_12345678-1_adjustment.zip:PlayApps_202609.csv",
+    "earnings_202609-ADJUSTMENT-KRW.zip:PlayApps_202609.csv",
+  ])("requires a base report for an explicitly named adjustment archive: %s", (name) => {
+    const data = emptyData();
+    data.rows = [googleFinal("adjustment", "google:earnings/" + name, -5)];
+    expect(summarizePeriodCoverage(data, "2026-09").perPlatform.google)
+      .toMatchObject({ missingPrimarySettledReport: true, completeSettled: false });
+  });
+  it("includes a numeric-suffix base and a separate adjustment exactly once", () => {
+    const data = emptyData();
+    data.rows = [
+      googleFinal("base", "google:earnings/earnings_202609_12345678-1.zip:PlayApps_202609.csv", 67),
+      googleFinal("adjustment", "google:earnings/earnings_202609_adjustment.zip:PlayApps_202609.csv", -5),
+    ];
+    const coverage = summarizePeriodCoverage(data, "2026-09");
+    expect(coverage.perPlatform.google).toMatchObject({ missingPrimarySettledReport: false, completeSettled: true });
+    expect(coverage.settled.proceeds).toBe(62);
+  });
+  it("does not infer supplemental status from an arbitrary manual filename", () => {
+    const data = emptyData();
+    data.rows = [googleFinal("manual", "file:monthly-export.csv", 67)];
+    expect(summarizePeriodCoverage(data, "2026-09").perPlatform.google.missingPrimarySettledReport).toBe(false);
+  });
+});

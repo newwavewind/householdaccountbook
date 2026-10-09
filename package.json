@@ -1,7 +1,7 @@
 {
   "name": "householdaccountbook",
   "private": true,
-  "description": "\uac00\uacc4\ubd80\uc571 \u2014 \ub85c\uceec\uc5d0\uc11c \ub8e8\ud2b8 \ube4c\ub4dc: \uba3c\uc800 web\uc5d0\uc11c npm ci \ub610\ub294 npm install",
+  "description": "가계부앱 — 로컬에서 루트 빌드: 먼저 web에서 npm ci 또는 npm install",
   "scripts": {
     "build": "npm run build --prefix web",
     "revenue:connector": "bash scripts/revenue-connector.sh start",
@@ -16,7 +16,6 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",
     "@vercel/functions": "^2.0.0",
-    "@vercel/node": "^5.1.8",
     "dotenv": "^16.6.1",
     "express": "^4.21.2",
     "fflate": "^0.8.3",

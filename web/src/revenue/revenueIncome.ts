@@ -1,6 +1,7 @@
 import { summarizePeriodCoverage } from "./completeness";
 import { summarize } from "./model";
 import { reportSource } from "./reportSelection";
+import { selectOpenAppleIncome } from "./appleIncome";
 import type { Platform, RevenueData, RevenueRow } from "./types";
 
 type IncomePeriodKind = "calendar" | "fiscal" | "mixed" | "unknown";
@@ -15,6 +16,8 @@ export interface StoreRevenueIncome {
   rows: RevenueRow[];
   periodKind: IncomePeriodKind;
   periodRanges: IncomePeriodRange[];
+  missingReportDates?: string[];
+  includesPreviousMonth?: boolean;
 }
 export interface RevenueIncome {
   month: string;
@@ -47,11 +50,19 @@ function periodMetadata(rows: RevenueRow[], month: string) {
   for (const row of rows) {
     // Calendar reports are attributed by report month, not an order's original
     // transaction date. Apple financial reports carry an explicit fiscal range.
-    const range = rowPeriodKind(row) === "calendar" ? calendarRange(month) :
+    const range = rowPeriodKind(row) === "calendar" && reportSource(row) !== "apple-sales" ? calendarRange(month) :
       { start: row.date, end: row.endDate || row.date };
     ranges.set(`${range.start}:${range.end}`, range);
   }
-  return { periodKind, periodRanges: [...ranges.values()].sort((a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end)) };
+  const sorted = [...ranges.values()].sort((a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end));
+  const merged: IncomePeriodRange[] = [];
+  for (const range of sorted) {
+    const previous = merged.at(-1);
+    if (previous && Date.parse(`${range.start}T00:00:00Z`) <= Date.parse(`${previous.end}T00:00:00Z`) + 86400000)
+      previous.end = previous.end > range.end ? previous.end : range.end;
+    else merged.push({ ...range });
+  }
+  return { periodKind, periodRanges: merged };
 }
 
 /**
@@ -72,16 +83,23 @@ export function summarizeRevenueIncome(
     const estimateRows = coverage.salesRows.filter((row) => row.platform === platform);
     // A present final report with an unavailable FX rate remains incomplete:
     // silently falling back to a different estimate would conceal that issue.
-    const selected = finalRows.length ? finalRows : estimateRows;
-    const basis: StoreRevenueIncome["basis"] = finalRows.length ? "settled" : estimateRows.length ? "estimate" : "missing";
+    const openApple = platform === "apple" && !finalRows.length ? selectOpenAppleIncome(data, month, rows, estimateRows) : undefined;
+    const selected = finalRows.length ? finalRows : openApple?.rows || estimateRows;
+    const basis: StoreRevenueIncome["basis"] = finalRows.length ? "settled" : selected.length ? "estimate" : "missing";
     const totals = summarize(selected, data);
-    const value = selected.length && totals.completeProceeds ? totals.proceeds : null;
+    const value = selected.length && totals.completeProceeds && !openApple?.missingDates.length &&
+      !coverage.perPlatform[platform].missingPrimarySettledReport ? totals.proceeds : null;
     const result: StoreRevenueIncome = {
       basis, value, partialSum: totals.proceeds,
       missingFx: totals.missingProceedsFx,
       unknownProceeds: totals.unknownProceeds,
       rows: selected,
       ...periodMetadata(selected, month),
+      ...(openApple ? {
+        ...(openApple.shifted ? { periodKind: "fiscal" as const } : {}),
+        missingReportDates: openApple.missingDates,
+        includesPreviousMonth: openApple.includesPreviousMonth,
+      } : {}),
     };
     return [platform, result];
   })) as Record<Platform, StoreRevenueIncome>;
@@ -121,7 +139,15 @@ export function summarizeRevenueIncomeRange(
   rows: RevenueRow[] = data.rows,
   expectedPlatforms?: Platform[],
 ) {
-  const monthKeys = [...new Set(months)].sort();
+  const suppliedMonths = [...new Set(months)].sort();
+  const monthKeys: string[] = [];
+  // A month with no rows is still a missing month, not evidence of zero income.
+  if (suppliedMonths.length) {
+    for (let month = suppliedMonths[0]; month <= suppliedMonths.at(-1)!;) {
+      monthKeys.push(month);
+      month = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5)), 1)).toISOString().slice(0, 7);
+    }
+  }
   const periods = monthKeys.map((month) => summarizeRevenueIncome(data, month, rows, expectedPlatforms));
   const overlaps = new Map<string, IncomePeriodOverlap>();
   for (let left = 0; left < periods.length; left++) {

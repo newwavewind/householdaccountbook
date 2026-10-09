@@ -12,6 +12,15 @@ export type ReportDocument = {
 
 const MONTH = /^20\d{2}-(0[1-9]|1[0-2])$/
 
+// The owner confirmed that this account's apps launched in 2026. Keep a
+// conservative January floor; the first downloaded report is not a launch date.
+export const REVENUE_HISTORY_FLOOR = '2026-01'
+
+export function revenueHistoryFrom(configured: unknown): string {
+  const value = typeof configured === 'string' ? configured.trim() : ''
+  return MONTH.test(value) && value >= REVENUE_HISTORY_FLOOR ? value : REVENUE_HISTORY_FLOOR
+}
+
 export function currentMonth(now = new Date()): string {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit' }).formatToParts(now)
   return `${parts.find(p => p.type === 'year')!.value}-${parts.find(p => p.type === 'month')!.value}`
@@ -25,12 +34,15 @@ export function syncMonths(input: unknown, todayMonth: string, historyFrom: stri
   if (scope === 'month') {
     const month = body.month ?? todayMonth
     if (typeof month !== 'string' || !MONTH.test(month) || month > todayMonth) throw new Error('동기화할 월을 확인해 주세요.')
+    if (month < REVENUE_HISTORY_FLOOR) throw new Error('앱 출시 연도인 2026년 1월부터 동기화할 수 있습니다.')
     return [month]
   }
-  const from = body.from ?? (scope === 'all' ? historyFrom : undefined)
+  const requestedFrom = body.from ?? (scope === 'all' ? revenueHistoryFrom(historyFrom) : undefined)
   const to = body.to ?? todayMonth
-  if (typeof from !== 'string' || !MONTH.test(from) || from > todayMonth) throw new Error('동기화 시작 월을 확인해 주세요.')
-  if (typeof to !== 'string' || !MONTH.test(to) || to > todayMonth || from > to) throw new Error('동기화 종료 월을 확인해 주세요.')
+  if (typeof requestedFrom !== 'string' || !MONTH.test(requestedFrom) || requestedFrom > todayMonth) throw new Error('동기화 시작 월을 확인해 주세요.')
+  if (typeof to !== 'string' || !MONTH.test(to) || to > todayMonth || requestedFrom > to) throw new Error('동기화 종료 월을 확인해 주세요.')
+  if (to < REVENUE_HISTORY_FLOOR) throw new Error('앱 출시 연도인 2026년 1월부터 동기화할 수 있습니다.')
+  const from = requestedFrom < REVENUE_HISTORY_FLOOR ? REVENUE_HISTORY_FLOOR : requestedFrom
   const months: string[] = []
   for (let year = Number(from.slice(0, 4)), month = Number(from.slice(5)); ; ) {
     const value = `${year}-${String(month).padStart(2, '0')}`
@@ -97,6 +109,7 @@ export async function collectApplePeriods(options: {
   months: string[]
   todayMonth: string
   oldestSalesMonth?: string
+  includePreviousFinanceForCurrent?: boolean
   skippedSales?(month: string): void
   monthly(month: string): Promise<void>
   finance(month: string): Promise<void>
@@ -106,7 +119,7 @@ export async function collectApplePeriods(options: {
 }): Promise<void> {
   let salesDenied = false, financeDenied = false
   for (const month of options.months) {
-    if (month >= options.todayMonth) continue
+    if (month < REVENUE_HISTORY_FLOOR || month >= options.todayMonth) continue
     if (options.oldestSalesMonth && month < options.oldestSalesMonth) options.skippedSales?.(month)
     else if (!salesDenied) {
       try { await options.monthly(month) }
@@ -117,5 +130,14 @@ export async function collectApplePeriods(options: {
       catch (error) { options.failed('finance', month, error); financeDenied = options.denied(error) }
     }
   }
-  if (options.months.includes(options.todayMonth) && !salesDenied) await options.daily(options.todayMonth)
+  if (options.todayMonth >= REVENUE_HISTORY_FLOOR && options.months.includes(options.todayMonth)) {
+    // A current-month-only request still needs the last closed fiscal boundary
+    // to fetch the preceding calendar month's unsettled daily tail.
+    const previousMonth = new Date(Date.parse(`${options.todayMonth}-01T00:00:00Z`) - 86400000).toISOString().slice(0, 7)
+    if (options.includePreviousFinanceForCurrent && previousMonth >= REVENUE_HISTORY_FLOOR && !options.months.includes(previousMonth) && !financeDenied) {
+      try { await options.finance(previousMonth) }
+      catch (error) { options.failed('finance', previousMonth, error) }
+    }
+    if (!salesDenied) await options.daily(options.todayMonth)
+  }
 }

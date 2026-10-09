@@ -105,7 +105,7 @@ export interface RevenueData {
   imports: ImportRecord[];
   logs: SyncLog[];
   // Rate is KRW per one foreign unit, keyed by YYYY-MM:currency.
-  rates: Record<string, { value: number; note: string }>;
+  rates: Record<string, { value: number; note: string; source?: "manual" | "frankfurter" | "ecb"; observedAt?: string; asOf?: string }>;
   goal: number;
   business: {
     name: string;

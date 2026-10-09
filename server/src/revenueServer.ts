@@ -10,10 +10,10 @@ import { spawn } from 'node:child_process'
 import { authenticateRevenueRequest, type RevenueAuth } from './revenue/auth.js'
 import { getJobStore, persistJobProgress, type RevenueJob } from './revenue/jobs.js'
 import { envPem, googleServiceAccount, isCloudRuntime } from './revenue/credentials.js'
-import { appleMonthlyRetentionFrom, collectApplePeriods, currentMonth, partitionMissingReportMonths, syncMonths } from './revenue/reportPolicy.js'
+import { appleMonthlyRetentionFrom, collectApplePeriods, currentMonth, partitionMissingReportMonths, revenueHistoryFrom, syncMonths } from './revenue/reportPolicy.js'
 import { collectGoogleReports, pushGoogleZipDocuments } from './revenue/googleReports.js'
 import { enrichGoogleOrderProceeds } from './revenue/googleOrders.js'
-import { downloadAppleFinanceReport, downloadAppleSalesReport } from './revenue/appleReports.js'
+import { appleDailyReportDates, appleFinancialReportRange, downloadAppleFinanceReport, downloadAppleSalesReport } from './revenue/appleReports.js'
 
 function rebuildGoogleReportBundleFromCache(): { files: number; sales: number; earnings: number } {
   mkdirSync(googleImportDir, { recursive: true, mode: 0o700 })
@@ -232,8 +232,7 @@ async function appleApps(job: Job, token: string) {
 }
 
 function historyFromMonth(): string {
-  const raw = (process.env.REVENUE_HISTORY_FROM || '2020-01').trim()
-  return /^20\d{2}-(0[1-9]|1[0-2])$/.test(raw) ? raw : '2020-01'
+  return revenueHistoryFrom(process.env.REVENUE_HISTORY_FROM)
 }
 function monthFromYyyymm(yyyymm: string): string | null {
   const m = /^(\d{4})(\d{2})$/.exec(yyyymm)
@@ -252,19 +251,22 @@ async function appleMonthlySales(job: Job, token: string, vendor: string, month:
 }
 
 async function appleDailySales(job: Job, token: string, vendor: string, month: string) {
-  const [year, m] = month.split('-').map(Number)
   const today = new Date().toISOString().slice(0, 10)
+  const financialRanges = job.documents.filter(document => document.key.startsWith('apple-finance:')).flatMap(document => {
+    const range = appleFinancialReportRange(document.text)
+    return range ? [range] : []
+  })
+  const plan = appleDailyReportDates({ month, today, financialRanges })
+  if (plan.omitted) job.errors.push(`Apple 일별 보충 ${plan.omitted.start}~${plan.omitted.end}: 최신 확정 보고서 이후 기간이 길어 이번 조회는 최근 62일로 제한했습니다. 이전 기간은 미집계 상태입니다.`)
   let count = 0, unavailable = 0
-  for (let day = 1; day <= new Date(year, m, 0).getDate(); day++) {
-    const date = `${month}-${String(day).padStart(2, '0')}`
-    if (date >= today) break
+  for (const date of plan.dates) {
     job.progress = `Apple ${date} 일별 판매 보고서 확인 중`
     try {
       const text = await downloadAppleSalesReport({
         frequency: 'DAILY', date, vendor,
         request: url => request(url, token, { headers: { Accept: 'application/a-gzip' } }),
       })
-      job.documents.push({ key: `apple-sales:${date}`, name: `Apple 판매 ${date}`, text, period: month, source: 'api', fetchedAt: new Date().toISOString(), periodKind: 'calendar' }); count++
+      job.documents.push({ key: `apple-sales:${date}`, name: `Apple 판매 ${date}`, text, period: date.slice(0, 7), source: 'api', fetchedAt: new Date().toISOString(), periodKind: 'calendar' }); count++
     } catch (e) {
       if (e instanceof ProviderError && e.code === 404) unavailable++
       else if (e instanceof ProviderError && e.code === 403) {
@@ -293,13 +295,13 @@ async function appleReports(job: Job, token: string, months: string[]) {
   let monthlyOk = 0, financeOk = 0, expiredSales = 0
   const monthlyMiss: string[] = [], financeMiss: string[] = []
   await collectApplePeriods({
-    months, todayMonth, oldestSalesMonth: appleMonthlyRetentionFrom(todayMonth),
+    months, todayMonth, oldestSalesMonth: appleMonthlyRetentionFrom(todayMonth), includePreviousFinanceForCurrent: true,
     skippedSales: () => { expiredSales++ },
     monthly: async month => { await appleMonthlySales(job, token, vendor, month); monthlyOk++ },
     finance: async month => { await appleFinanceMonth(job, token, vendor, month); financeOk++ },
     daily: async month => {
       const daily = await appleDailySales(job, token, vendor, month)
-      if (daily.count) job.completed.push(`Apple 일별 판매(당월) ${daily.count}개`)
+      if (daily.count) job.completed.push(`Apple 일별 판매(미정산 기간 보충) ${daily.count}개`)
       if (daily.unavailable) job.errors.push(`Apple 일별 보고서 ${daily.unavailable}일 미제공 · 무매출 또는 생성 지연일 수 있으며 0원으로 확정하지 않습니다.`)
     },
     failed: (kind, month, error) => {

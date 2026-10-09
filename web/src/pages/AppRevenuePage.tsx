@@ -23,7 +23,7 @@ import {
   taxLabels,
   taxWorksheet,
 } from "../revenue/model";
-import { fetchMissingRevenueRates, fetchMonthRatesKrw } from "../revenue/fxRates";
+import { fetchMissingRevenueRates, fetchMonthRatesKrw, mergeFetchedRevenueRates } from "../revenue/fxRates";
 import {
   preferNewer,
   pullRevenueSnapshot,
@@ -431,7 +431,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
       }
       if (!start) start = await connector<{ id: string }>("/sync", {
         method: "POST",
-        body: JSON.stringify({ scope: "all" }),
+        body: JSON.stringify({ scope: "all", from: "2026-01" }),
       });
       try { sessionStorage.setItem(pendingKey, start.id); } catch { /* polling works without storage */ }
       setConnectorHealth("online");
@@ -525,7 +525,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
       const fxIssues: string[] = [];
       const freshRates = await fetchMissingRevenueRates(savedData.rows, savedData.rates, issue => fxIssues.push(issue.message));
       if (Object.keys(freshRates).length || fxIssues.length) store.update(d => ({
-        ...d, rates: { ...freshRates, ...d.rates },
+        ...d, rates: mergeFetchedRevenueRates(d.rates, freshRates, savedData.rates),
         logs: fxIssues.length ? d.logs.map(item => item.id === savedLogId ? {
           ...item, status: "partial", message: `${item.message} · 환율 ${fxIssues.length}건 확인 필요`,
           detail: { ...item.detail, errors: [...(item.detail?.errors || []), ...fxIssues] },
@@ -593,10 +593,11 @@ function RevenueWorkspace({ owner }: { owner: string }) {
     );
     if (!missing.length) return;
     let cancelled = false;
+    const baselineRates = data.rates;
     void (async () => {
       const fetched = await fetchMonthRatesKrw(month, missing);
       if (cancelled || !Object.keys(fetched).length) return;
-      update((d) => ({ ...d, rates: { ...d.rates, ...fetched } }));
+      update((d) => ({ ...d, rates: mergeFetchedRevenueRates(d.rates, fetched, baselineRates) }));
       setToast(`${monthLabel(month)} 환율 ${Object.keys(fetched).length}건 자동 반영`);
     })();
     return () => {
@@ -787,6 +788,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                 ? "커넥터 확인 중"
                 : "커넥터 끊김"}
           </span>
+          {!demo && <span className="rev-status-meta">2026년 출시 이후 조회</span>}
           <span className="rev-status-meta">
             {demo
               ? "샘플 데이터 · 실제 수익 아님"
@@ -2691,7 +2693,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                   ...d,
                   rates: {
                     ...d.rates,
-                    [`${month}:${c}`]: { value: v, note: fieldText(f, "note") },
+                    [`${month}:${c}`]: { value: v, note: fieldText(f, "note"), source: "manual" },
                   },
                 }));
                 saveMessage();

@@ -175,3 +175,70 @@ describe("Google order-proceeds availability states", () => {
     expect(result.status.state).toBe("fx-missing");
   });
 });
+
+
+describe("Google Orders snapshots across UTC month rollover", () => {
+  const previousSnapshot = () => ({ ...doc(charged, [metadata({ proceeds: 67, fetchedAt: "2026-10-31T23:00:00Z" })]), source: "api" as const, fetchedAt: "2026-10-31T23:00:00Z" });
+  const historicalRefresh = (text = charged) => ({ ...doc(text), source: "api" as const, fetchedAt: "2026-11-01T01:00:00Z" });
+  const november = { now: new Date("2026-11-01T00:00:00Z") };
+  async function savedSnapshot() {
+    const document = previousSnapshot();
+    return mergeReports(emptyData(), [{ document, rows: await parseReport(document) }]);
+  }
+  it("preserves the last verified snapshot when historical sales are fetched without Orders enrichment", async () => {
+    const before = await savedSnapshot();
+    const document = historicalRefresh();
+    const next = mergeReports(before, [{ document, rows: await parseReport(document) }], november);
+    expect(next.rows).toHaveLength(1);
+    expect(next.rows[0]).toMatchObject({ proceeds: 67, proceedsSource: "google-orders", proceedsFetchedAt: "2026-10-31T23:00:00Z" });
+    expect(summarizeRevenueIncome(next, "2026-10").total).toBe(67);
+    expect(next.imports[0].fetchedAt).toBe(document.fetchedAt);
+  });
+  it("keeps a failed current-UTC-month lookup unknown even after Korea reaches the next month", async () => {
+    const document = historicalRefresh();
+    const next = mergeReports(await savedSnapshot(), [{ document, rows: await parseReport(document) }], { now: new Date("2026-10-31T23:59:59Z") });
+    expect(next.rows[0].proceeds).toBeNull();
+  });
+  it("does not reuse an old snapshot for revised source amounts", async () => {
+    const document = historicalRefresh(charged.replace(",100,", ",120,"));
+    const next = mergeReports(await savedSnapshot(), [{ document, rows: await parseReport(document) }], november);
+    expect(next.rows[0].proceeds).toBeNull();
+    expect(summarizeRevenueIncome(next, "2026-10").total).toBeNull();
+  });
+  it("leaves newly reported refunds incomplete rather than subtracting them from an old snapshot twice", async () => {
+    const document = historicalRefresh([charged, refund].join("\n"));
+    const next = mergeReports(await savedSnapshot(), [{ document, rows: await parseReport(document) }], november);
+    expect(summarize(next.rows, next)).toMatchObject({ gross: 100, refunds: 20, proceeds: 67, unknownProceeds: 1 });
+    expect(summarizeRevenueIncome(next, "2026-10")).toMatchObject({ total: null, partialSum: 67 });
+  });
+  it("accepts an explicitly updated zero instead of restoring the prior nonzero snapshot", async () => {
+    const document = { ...historicalRefresh(), googleOrderProceeds: [metadata({ proceeds: 0, fetchedAt: "2026-11-01T01:00:00Z" })] };
+    const next = mergeReports(await savedSnapshot(), [{ document, rows: await parseReport(document) }], november);
+    expect(next.rows[0].proceeds).toBe(0);
+  });
+});
+
+
+it("does not hide a newer current-month Orders failure behind an older duplicate archive", async () => {
+  const original = { ...doc(charged, [metadata({ proceeds: 67 })]), source: "api" as const, fetchedAt: timestamp };
+  const latest = { ...doc(), key: "google:sales/salesreport_202610_2.zip:salesreport_202610.csv", source: "api" as const, fetchedAt: "2026-10-08T15:00:00Z" };
+  const now = { now: new Date("2026-10-08T16:00:00Z") };
+  let data = mergeReports(emptyData(), [{ document: original, rows: await parseReport(original) }], now);
+  data = mergeReports(data, [{ document: latest, rows: await parseReport(latest) }], now);
+  expect(data.rows).toHaveLength(1);
+  expect(data.rows[0].proceeds).toBeNull();
+  expect(summarizeRevenueIncome(data, "2026-10").total).toBeNull();
+});
+
+
+it("counts an identical charged order repeated within one CSV only once", async () => {
+  const document = doc([charged, charged, refund, refund].join("\n"), [
+    metadata({ proceeds: 42 }), metadata({ rowIndex: 1, proceeds: 0 }),
+    metadata({ rowIndex: 2, proceeds: 0 }), metadata({ rowIndex: 3, proceeds: 0 }),
+  ]);
+  const rows = await parseReport(document);
+  expect(rows[0].id).toBe(rows[1].id);
+  expect(rows[2].id).not.toBe(rows[3].id);
+  const data = mergeReports(emptyData(), [{ document, rows }]);
+  expect(summarize(data.rows, data)).toMatchObject({ gross: 100, refunds: 40, proceeds: 42, units: 1 });
+});

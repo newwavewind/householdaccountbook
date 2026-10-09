@@ -1,5 +1,5 @@
 import { summarize } from "./model";
-import { selectRevenueRows } from "./reportSelection";
+import { reportScopeFromKey, reportSource, selectRevenueRows } from "./reportSelection";
 import type { Platform, RevenueData, RevenueRow } from "./types";
 
 const PLATFORMS: Platform[] = ["apple", "google"];
@@ -9,6 +9,8 @@ export interface PlatformPeriodCoverage {
   expected: boolean;
   hasSales: boolean;
   hasSettled: boolean;
+  /** Supplemental Google earnings alone cannot establish the whole store total. */
+  missingPrimarySettledReport: boolean;
   sales: Totals;
   settled: Totals;
   completeSales: boolean;
@@ -58,14 +60,24 @@ export function summarizePeriodCoverage(
     const storeSettled = settledRows.filter((row) => row.platform === platform);
     const salesTotal = summarize(storeSales, data);
     const settledTotal = summarize(storeSettled, data);
+    // Ordinary Google monthly archives also carry numeric, currency, or other
+    // opaque suffixes. Only an explicit adjustment(s) token establishes a
+    // supplemental file; an arbitrary suffix cannot prove the base is absent.
+    const settledScopes = storeSettled.map((row) => row.reportScope || reportScopeFromKey(row.reportKey, reportSource(row)));
+    const missingPrimarySettledReport = platform === "google" && settledScopes.length > 0 &&
+      settledScopes.every((scope) => {
+        const archive = /^google-earnings:(earnings_\d{6}[^:]*)\.zip:/i.exec(scope ?? "")?.[1];
+        return archive !== undefined && /(?:^|[_-])adjustments?(?:[_-]|$)/i.test(archive);
+      });
     const coverage: PlatformPeriodCoverage = {
       expected: expected.has(platform),
       hasSales: storeSales.length > 0,
       hasSettled: storeSettled.length > 0,
+      missingPrimarySettledReport,
       sales: salesTotal,
       settled: settledTotal,
       completeSales: storeSales.length > 0 && salesTotal.missingGrossFx === 0,
-      completeSettled: storeSettled.length > 0 && settledTotal.completeProceeds,
+      completeSettled: storeSettled.length > 0 && !missingPrimarySettledReport && settledTotal.completeProceeds,
     };
     return [platform, coverage];
   })) as Record<Platform, PlatformPeriodCoverage>;

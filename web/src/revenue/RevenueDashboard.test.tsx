@@ -15,6 +15,20 @@ const noop = () => {};
 const render = (data: RevenueData) => renderToStaticMarkup(createElement(RevenueDashboard, { data, busy: false, onMonth: noop, onPayouts: noop, onReports: noop }));
 
 describe("revenue dashboard amount scope", () => {
+  it("does not label a mixed partial subtotal as one store's confirmed income", () => {
+    const data = emptyData();
+    data.rows = [{ ...row("apple", "estimate", 100, 50), source: "apple-sales" }, { ...row("apple", "estimate", 100, null), id: "unknown" }, row("google", "settled", 100, 60)];
+    const html = render(data);
+    expect(html).toContain("확인액 ₩110");
+    expect(html).not.toContain("Google Play 확정 ₩110");
+  });
+  it("distinguishes gross customer payments from sales after refunds", () => {
+    const data = emptyData(); data.rows = [{ ...row("google", "estimate", 100, null), refunds: 30 }];
+    const html = render(data);
+    expect(html).toContain("환불 전");
+    expect(html).toContain("환불 ₩30 · 차감 후 ₩70");
+    expect(html).toContain("환불 차감 후 ₩70");
+  });
   it("keeps one store's proceeds out of the combined monthly and cumulative totals", () => {
     const data = emptyData();
     data.rows = [row("apple", "estimate", 399200, null), row("google", "estimate", 140600, null), row("google", "settled", 140600, 94990)];

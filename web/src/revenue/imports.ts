@@ -1,7 +1,7 @@
 import { gunzipSync, unzipSync, strFromU8 } from "fflate";
 import { validDate } from "./model";
 import type { GoogleOrderProceeds, RevenueData, RevenueRow, StoreDocument } from "./types";
-import { compareGoogleOrderProceeds, reportScopeFromKey, reportSource } from "./reportSelection";
+import { compareGoogleOrderProceeds, hasVerifiedGoogleOrderProceeds, reportScopeFromKey, reportSource } from "./reportSelection";
 import { resolveAppleReportAppKey } from "./appMatch";
 
 export function parseDelimited(text: string): string[][] {
@@ -302,8 +302,13 @@ export async function parseReport(doc: StoreDocument): Promise<RevenueRow[]> {
         proceedsSource: source === "google-sales" ? undefined : row.proceedsSource,
         proceedsFetchedAt: undefined,
       });
-      const occurrence = occurrences.get(fingerprint) ?? 0;
-      occurrences.set(fingerprint, occurrence + 1);
+      // One Google order cannot contain the identical charged sale twice.
+      // Repeated partial-refund amounts can be distinct events, so preserve
+      // their occurrences (and other providers' aggregate rows) as before.
+      const duplicateCharge = source === "google-sales" && get("Order Number") &&
+        get("Financial Status").toLowerCase().trim() === "charged";
+      const occurrence = duplicateCharge ? 0 : occurrences.get(fingerprint) ?? 0;
+      if (!duplicateCharge) occurrences.set(fingerprint, occurrence + 1);
       row.id = await digest(`${fingerprint}:${occurrence}`);
       result.push(row);
     } catch (e) {
@@ -319,7 +324,9 @@ export async function parseReport(doc: StoreDocument): Promise<RevenueRow[]> {
 export function mergeReports(
   data: RevenueData,
   reports: { document: StoreDocument; rows: RevenueRow[] }[],
+  options: { now?: Date } = {},
 ): RevenueData {
+  const utcMonth = (options.now ?? new Date()).toISOString().slice(0, 7);
   // Revisions replace the same logical file across API/cache/manual transports.
   // Separate adjustment filenames remain separate report scopes.
   const active = new Map<string, { document: StoreDocument; rows: RevenueRow[] }>();
@@ -355,7 +362,11 @@ export function mergeReports(
       const collision = rows.get(row.id);
       // Preserve the API-backed net across duplicated sales shards. Selection
       // and persistence share the same latest-snapshot/allocation preference.
-      if (collision && compareGoogleOrderProceeds(collision, row) > 0) continue;
+      const refreshFailedCurrentOrder = collision && report.document.source === "api" &&
+        row.period === utcMonth && reportSource(row) === "google-sales" &&
+        !hasVerifiedGoogleOrderProceeds(row) && hasVerifiedGoogleOrderProceeds(collision) &&
+        Date.parse(report.document.fetchedAt || "") >= Date.parse(collision.proceedsFetchedAt!);
+      if (collision && !refreshFailedCurrentOrder && compareGoogleOrderProceeds(collision, row) > 0) continue;
       const collisionScope = collision && (collision.reportScope || reportScopeFromKey(collision.reportKey, reportSource(collision)));
       // An extra earnings/adjustment shard can legitimately repeat an amount
       // and order. Only the same source file is a duplicate snapshot.
@@ -367,7 +378,21 @@ export function mergeReports(
         collisionScope && row.reportScope !== collisionScope
           ? `${row.id}:${row.reportScope}` : row.id);
       const old = previous.get(id);
-      const nextRow = id === row.id ? row : { ...row, id };
+      let nextRow = id === row.id ? row : { ...row, id };
+      // Orders only enrich the open UTC month. Re-fetching the same historical
+      // CSV after month-end must not erase the last verified order snapshot.
+      // The unchanged source-row identity is required; changed sales/refunds
+      // stay unknown. Current-month lookup failures also remain unknown.
+      if (old && report.document.source === "api" && row.period < utcMonth &&
+        reportSource(row) === "google-sales" && !hasVerifiedGoogleOrderProceeds(row) &&
+        hasVerifiedGoogleOrderProceeds(old) && old.period === row.period &&
+        old.proceedsCurrency === row.currency &&
+        new Date(old.proceedsFetchedAt!).toISOString().slice(0, 7) === row.period) {
+        nextRow = {
+          ...nextRow, proceeds: old.proceeds, proceedsCurrency: old.proceedsCurrency,
+          proceedsSource: old.proceedsSource, proceedsFetchedAt: old.proceedsFetchedAt,
+        };
+      }
       rows.set(
         id,
         old

@@ -30,7 +30,7 @@ export function reportScopeFromKey(key: string, source: string): string | undefi
   return undefined;
 }
 
-function isAppleMonthly(row: RevenueRow): boolean {
+export function isAppleMonthly(row: RevenueRow): boolean {
   if (reportSource(row) !== "apple-sales") return false;
   if (/apple-sales-month:|(?:^|[:/])s_m_/i.test(row.reportKey)) return true;
   const end = row.endDate;

@@ -51,13 +51,13 @@ export function RevenueDashboard({ data, busy, onMonth, onPayouts, onReports }: 
         <div className="rd-hero-foot"><span>실제 입금액은 별도로 확인하세요.</span><button onClick={onReports}>수집 현황 ↗</button></div>
       </div>
       <div className="rd-mini-chart" aria-label="최근 월별 판매액 흐름">
-        <div className="rd-chart-caption"><span>월별 판매액</span><span>수수료 공제 전</span></div>
+        <div className="rd-chart-caption"><span>월별 판매액</span><span>환불·수수료 차감 전</span></div>
         <div className="rd-mini-bars">{series.map(p => <button key={p.month} onClick={() => onMonth(p.month, "estimate")} aria-label={`${monthLabel(p.month)}, ${p.known ? cash(p.value) : "판매액 미집계"}`}><div><i className={!p.known ? "is-empty" : p.value < 0 ? "is-negative" : ""} style={{ height: p.known ? `${Math.max(3, Math.abs(p.value) / max * 100)}%` : "3px" }} /></div><span>{Number(p.month.slice(5))}월</span></button>)}</div>
         <p className="rd-chart-note">자료·환율이 확인된 월만 표시합니다.</p>
       </div>
     </section>
     <section className="rd-metrics" aria-label="전체 기간 금액 구분">
-      <article><div><span className="rd-metric-icon">↗</span><span>{coverage.completeSales ? "전체 판매액" : "확인된 판매액"}</span><span className="rd-mini-tag">예상</span></div><strong>{salesRows.length ? cash(sales.gross) : "—"}</strong><p>{!coverage.completeSales ? "수집 자료 중 환산 가능한 판매액 소계" : "고객 결제액 · 수수료 공제 전"}</p></article>
+      <article><div><span className="rd-metric-icon">↗</span><span>{coverage.completeSales ? "전체 판매액" : "확인된 판매액"}</span><span className="rd-mini-tag">환불 전</span></div><strong>{salesRows.length ? cash(sales.gross) : "—"}</strong><p>{!coverage.completeSales ? "수집 자료 중 환산 가능한 판매액 소계" : "고객 결제액 · 환불·수수료 차감 전"}</p>{salesRows.length > 0 && <p>환불 {cash(sales.refunds)} · 차감 후 {cash(sales.gross - sales.refunds)}{!coverage.completeSales ? " (확인분)" : ""}</p>}</article>
       <article><div><span className="rd-metric-icon">↙</span><span>실제로 받은 금액</span></div><strong>{received.length ? cash(received.reduce((n,p) => n + p.received, 0)) : "—"}</strong><button onClick={onPayouts}>{received.length ? "입금 내역 확인" : "입금 기록 추가"} <span>→</span></button></article>
       <article><div><span className="rd-metric-icon">▤</span><span>모아 둔 보고서</span></div><strong>{data.imports.length}<small>개</small></strong><p>{imported ? `보관본 ${imported}개 포함 · 최신 여부 확인 필요` : lastSuccess ? `최근 완료 ${new Date(lastSuccess.at).toLocaleDateString("ko-KR")}` : busy ? "스토어에서 가져오는 중" : "아래에서 월별로 확인하세요"}</p></article>
     </section>
@@ -70,7 +70,7 @@ export function RevenueDashboard({ data, busy, onMonth, onPayouts, onReports }: 
           <p>{summarizePeriodCoverage(data, latestWaiting.month).completeSales ? "판매액은 이미 집계됐어요. " : "판매 보고서에 있는 금액부터 반영하고 있어요. "}{(incomeStatuses.get(latestWaiting.month) || []).map(status => `${platformName[status.platform]}: ${status.detail}`).join(" ")}</p>
           <small>공개 후 ‘전체 수익 가져오기’를 누르면 확정 수익에 반영됩니다.</small></div>
       </div>}
-      <div className="rd-table-wrap"><table><thead><tr><th>기간</th><th>판매액 <small>예상</small></th><th>보고서 기준 수익</th><th>실제 입금</th><th><span className="rev-sr-only">스토어별 내역</span></th></tr></thead><tbody>
+      <div className="rd-table-wrap"><table><thead><tr><th>기간</th><th>판매액 <small>환불 전</small></th><th>보고서 기준 수익</th><th>실제 입금</th><th><span className="rev-sr-only">스토어별 내역</span></th></tr></thead><tbody>
         {(showAll ? periods : periods.slice(0, 6)).map(p => {
           const { month, sales: s, salesRows: sRows, settledRows: fRows } = p;
           const income = summarizeRevenueIncome(data, month);
@@ -80,11 +80,13 @@ export function RevenueDashboard({ data, busy, onMonth, onPayouts, onReports }: 
           const open = detailMonth === month;
           const statuses = income.unknownPlatforms.map(platform => ({ platform, ...getStoreIncomeStatus({ data, month, platform, income: income.perPlatform[platform] }) }));
           const waiting = statuses.length > 0 && statuses.every(status => status.state === "settlement-pending");
-          const known = income.expectedPlatforms.filter(platform => income.perPlatform[platform].value !== null);
-          const knownLabel = known.length === 1 ? `${platformName[known[0]]} ${income.perPlatform[known[0]].basis === "estimate" ? "예상" : "확정"}` : "확인액";
+          const contributors = income.expectedPlatforms.filter(platform => income.perPlatform[platform].partialSum !== 0);
+          const sole = contributors.length === 1 ? contributors[0] : undefined;
+          const knownLabel = sole && income.perPlatform[sole].value !== null
+            ? `${platformName[sole]} ${income.perPlatform[sole].basis === "estimate" ? "예상" : "확정"}` : "확인액";
           return <Fragment key={month}>
             <tr className={open ? "rd-month-open" : ""}><th><button onClick={() => setExpandedMonth(open ? null : month)} aria-expanded={open} aria-controls={`rd-stores-${month}`}><b>{Number(month.slice(5))}월</b><span>{month.slice(0,4)}</span></button></th>
-              <td><button onClick={() => onMonth(month, "estimate")}>{sRows.length ? cash(s.gross) : "—"}{!p.completeSales && sRows.length > 0 && <small>일부 판매액</small>}</button></td>
+              <td><button onClick={() => onMonth(month, "estimate")}>{sRows.length ? cash(s.gross) : "—"}{!p.completeSales && sRows.length > 0 && <small>일부 판매액</small>}{s.refunds !== 0 && <small>환불 차감 후 {cash(s.gross - s.refunds)}</small>}</button></td>
               <td className="rd-net"><button onClick={() => setExpandedMonth(open ? null : month)} aria-expanded={open} aria-controls={`rd-stores-${month}`}>{income.total !== null ? cash(income.total) : <span className={waiting ? "rd-pending-label" : ""}>{waiting ? "정산 예정" : "집계 자료 확인"}</span>}<small>{income.total !== null ? <span className="rd-income-badge">{income.hasEstimates ? "예상 포함" : "확정"}</span> : statuses.map(status => <span className="rd-income-reason" key={status.platform}>{platformName[status.platform]} · {status.state === "settlement-pending" ? `보통 ${Number(status.expectedBy?.slice(5, 7))}월 5일까지 공개` : status.label}</span>)}</small>{income.total === null && income.partialSum !== 0 && <small>{knownLabel} {cash(income.partialSum)}</small>}</button></td>
               <td>{paid.length ? cash(paid.reduce((n,item) => n + item.received, 0)) : "—"}</td>
               <td><button className="rd-store-toggle" onClick={() => setExpandedMonth(open ? null : month)} aria-label={`${monthLabel(month)} 스토어별 내역 ${open ? "닫기" : "보기"}`} aria-expanded={open} aria-controls={`rd-stores-${month}`}>스토어별 <span aria-hidden>{open ? "−" : "+"}</span></button></td>
@@ -101,7 +103,7 @@ export function RevenueDashboard({ data, busy, onMonth, onPayouts, onReports }: 
                     return <div className="rd-store-grid-row" role="row" key={platform}><strong role="rowheader">{platformName[platform]}<small>{storeIncome.periodKind === "fiscal" ? "회계기간 " : "판매기간 "}{reportPeriod || "자료 확인 중"}</small></strong><span role="cell">{store.hasSales ? cash(store.sales.gross) : "보고서 대기"}{store.hasSales && !store.completeSales && <small>일부 판매액</small>}</span><span role="cell">{storeIncome.value !== null ? cash(storeIncome.value) : <span className={status.state === "settlement-pending" ? "rd-pending-label" : ""}>{status.label}</span>}<small>{storeIncome.value !== null ? <span className="rd-income-badge">{status.label}</span> : status.detail}</small></span></div>;
                   })}
                 </div>
-                <p>{income.hasEstimates ? "예상 수익은 Apple 판매 보고서와 Google 주문 조회에서 스토어가 제공한 금액입니다. 월 정산 시 환불·조정에 따라 달라질 수 있습니다. " : ""}{income.total === null ? "확인되지 않은 스토어 금액은 0원으로 합산하지 않습니다. " : ""}Apple 회계기간은 달력월과 달라 판매액과 수익의 집계 기간이 다를 수 있습니다.</p>
+                <p>{income.hasEstimates ? "예상 수익은 Apple 판매 보고서와 Google 주문 조회에서 스토어가 제공한 금액입니다. 월 정산 시 환불·조정에 따라 달라질 수 있습니다. " : ""}{income.total === null ? "확인되지 않은 스토어 금액은 0원으로 합산하지 않습니다. " : ""}{income.perPlatform.apple.includesPreviousMonth ? "Apple 수익에는 직전 회계기간 마감 이후의 이전 달 판매분도 포함됩니다. " : ""}Apple 회계기간은 달력월과 달라 판매액과 수익의 집계 기간이 다를 수 있습니다.</p>
                 <div className="rd-detail-actions"><button onClick={() => onMonth(month, "estimate")}>판매 원본 내역 ↗</button><button onClick={() => onMonth(month, "settled")}>확정 보고서 내역 ↗</button></div>
               </div>
             </td></tr>

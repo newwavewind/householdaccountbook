@@ -83,7 +83,7 @@ test('full history summarizes the unobserved early period and reports gaps after
     },
     loadCaches: () => {}, errorMessage: error => (error as Error).message,
   })
-  assert.ok(result.completed.some(e => e.includes('2020-01~2026-07 보고서는 확인되지 않았습니다')))
+  assert.ok(result.completed.some(e => e.includes('2026-01~2026-07 보고서는 확인되지 않았습니다')))
   // August must remain a known gap even though its download failed.
   assert.ok(result.errors.some(e => e.includes('예상 매출 2개월 미확인 (2026-08, 2026-10)')))
   assert.ok(result.errors.some(e => e.includes('확정 수익 3개월 미확인 (2026-08, 2026-09, 2026-10)')))

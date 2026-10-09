@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchMissingRevenueRates } from "./fxRates";
+import { fetchMissingRevenueRates, mergeFetchedRevenueRates } from "./fxRates";
 import type { RevenueData, RevenueRow } from "./types";
 
 const row = (period: string, currency = "USD", proceedsCurrency = currency): RevenueRow => ({
@@ -97,4 +97,62 @@ describe("missing revenue rates across periods", () => {
     expect(fetcher).toHaveBeenCalledTimes(3);
   });
 
+});
+
+
+describe("automatic FX refresh without replacing reviewed rates", () => {
+  afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
+  const key = "2026-10:USD";
+  const oldAuto = () => ({ value: 1300, note: "자동 · Frankfurter/ECB 2026-10-08", source: "frankfurter" as const, observedAt: "2026-10-08", asOf: "2026-10-08" });
+  it("refreshes an open-month automatic rate through month-end and records the holiday cutoff", async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date("2026-11-01T03:00:00Z"));
+    const fetcher = vi.fn(async () => response(1400, "2026-10-30")); vi.stubGlobal("fetch", fetcher);
+    const baseline = { [key]: oldAuto() };
+    const fresh = await fetchMissingRevenueRates([row("2026-10")], baseline);
+    expect(fresh[key]).toMatchObject({ value: 1400, source: "frankfurter", observedAt: "2026-10-30", asOf: "2026-10-31" });
+    const merged = mergeFetchedRevenueRates(baseline, fresh, baseline);
+    expect(merged[key].value).toBe(1400);
+    expect(await fetchMissingRevenueRates([row("2026-10")], merged)).toEqual({});
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+  it("refreshes earlier automatic observations during the current month", async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date("2026-10-09T03:00:00Z"));
+    vi.stubGlobal("fetch", vi.fn(async () => response(1400, "2026-10-09")));
+    expect((await fetchMissingRevenueRates([row("2026-10")], { [key]: oldAuto() }))[key].asOf).toBe("2026-10-09");
+  });
+  it("migrates only exact legacy auto notes and preserves manual or ambiguous notes", async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date("2026-11-01T03:00:00Z"));
+    const fetcher = vi.fn(async () => response(1400, "2026-10-30")); vi.stubGlobal("fetch", fetcher);
+    for (const rate of [
+      { value: 1234, note: "직접 확인한 환율" },
+      { value: 1234, note: "자동 · Frankfurter/ECB 2026-10-08 (수정)" },
+      { value: 1234, note: "자동 · Frankfurter/ECB 2026-10-08", source: "manual" as const },
+      { value: 1234, note: "자동 · Frankfurter/ECB 2026-09-30" },
+    ]) expect(await fetchMissingRevenueRates([row("2026-10")], { [key]: rate })).toEqual({});
+    expect(fetcher).not.toHaveBeenCalled();
+    expect((await fetchMissingRevenueRates([row("2026-10")], { [key]: { value: 1300, note: "자동 · Frankfurter/ECB 2026-10-08" } }))[key].value).toBe(1400);
+  });
+  it("keeps old rates after lookup failure and leaves the source data untouched", async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date("2026-11-01T03:00:00Z"));
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+    const baseline = { [key]: oldAuto() }, issues: unknown[] = [];
+    const fresh = await fetchMissingRevenueRates([row("2026-10")], baseline, issue => issues.push(issue));
+    expect(fresh).toEqual({});
+    expect(mergeFetchedRevenueRates(baseline, fresh, baseline)).toEqual(baseline);
+    expect(issues).toHaveLength(1);
+  });
+  it("does not overwrite a concurrent immutable manual edit or restore a deleted rate", () => {
+    const baseline = { [key]: oldAuto() };
+    const fetched = { [key]: { ...oldAuto(), value: 1400, observedAt: "2026-10-30", asOf: "2026-10-31" } };
+    const edited = { [key]: { value: 1500, note: "검토함", source: "manual" as const } };
+    expect(mergeFetchedRevenueRates(edited, fetched, baseline)).toEqual(edited);
+    expect(mergeFetchedRevenueRates({}, fetched, baseline)).toEqual({});
+  });
+  it("does not overwrite a manual edit made in place while refresh runs", async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date("2026-11-01T03:00:00Z"));
+    const baseline: RevenueData["rates"] = { [key]: oldAuto() };
+    vi.stubGlobal("fetch", vi.fn(async () => { baseline[key].value = 1500; baseline[key].source = "manual"; return response(1400, "2026-10-30"); }));
+    expect(await fetchMissingRevenueRates([row("2026-10")], baseline)).toEqual({});
+    expect(baseline[key].value).toBe(1500);
+  });
 });
