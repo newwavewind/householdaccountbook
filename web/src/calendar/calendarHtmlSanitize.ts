@@ -2,52 +2,60 @@ import DOMPurify from 'dompurify'
 
 /** 일정 제목·메모 HTML (Tiptap 출력) — 허용 태그만 남김 */
 export function sanitizeCalendarEventHtml(raw: string): string {
-  const s = raw.trim()
+  const s = typeof raw === 'string' ? raw.trim() : ''
   if (!s) return ''
-  return DOMPurify.sanitize(s, {
-    ALLOWED_TAGS: [
-      'p',
-      'br',
-      'strong',
-      'b',
-      'em',
-      'i',
-      'u',
-      's',
-      'span',
-      'mark',
-      'ul',
-      'ol',
-      'li',
-      'img',
-    ],
-    ALLOWED_ATTR: ['style', 'class', 'data-color', 'color', 'src', 'alt'],
-  })
+  try {
+    return DOMPurify.sanitize(s, {
+      ALLOWED_TAGS: [
+        'p',
+        'br',
+        'strong',
+        'b',
+        'em',
+        'i',
+        'u',
+        's',
+        'span',
+        'mark',
+        'ul',
+        'ol',
+        'li',
+        'img',
+      ],
+      ALLOWED_ATTR: ['style', 'class', 'data-color', 'color', 'src', 'alt'],
+    })
+  } catch {
+    return s.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+  }
 }
 
 /** 스티커 메모 (리스트·이미지 data URL 허용) */
 export function sanitizeStickyNoteHtml(raw: string): string {
-  const s = raw.trim()
+  const s = typeof raw === 'string' ? raw.trim() : ''
   if (!s) return ''
-  return DOMPurify.sanitize(s, {
-    ALLOWED_TAGS: [
-      'p',
-      'br',
-      'strong',
-      'b',
-      'em',
-      'i',
-      'u',
-      's',
-      'span',
-      'mark',
-      'ul',
-      'ol',
-      'li',
-      'img',
-    ],
-    ALLOWED_ATTR: ['class', 'style', 'data-color', 'color', 'src', 'alt'],
-  })
+  try {
+    return DOMPurify.sanitize(s, {
+      ALLOWED_TAGS: [
+        'p',
+        'br',
+        'strong',
+        'b',
+        'em',
+        'i',
+        'u',
+        's',
+        'span',
+        'mark',
+        'ul',
+        'ol',
+        'li',
+        'img',
+      ],
+      ALLOWED_ATTR: ['class', 'style', 'data-color', 'color', 'src', 'alt'],
+    })
+  } catch {
+    return s.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+  }
 }
 
 /** 달력 칸·목록용 미리보기(짧게) */

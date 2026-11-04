@@ -4,5 +4,5 @@
     "src/revenueServer.ts",
     "src/revenue/**/*.ts"
   ],
-  "exclude": ["src/index.ts"]
+  "exclude": ["src/index.ts", "src/**/*.test.ts"]
 }

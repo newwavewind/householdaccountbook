@@ -149,8 +149,8 @@ function mergeCalendarEventToUnifiedMemo(e: CalendarDayEvent): CalendarDayEvent 
   const nhRaw = e.noteHtml?.trim()
   const lh = lhRaw ? sanitizeCalendarEventHtml(lhRaw) : ''
   const nh = nhRaw ? sanitizeCalendarEventHtml(nhRaw) : ''
-  const lp = e.label.trim()
-  const np = (e.note ?? '').trim()
+  const lp = typeof e.label === 'string' ? e.label.trim() : ''
+  const np = typeof e.note === 'string' ? e.note.trim() : ''
 
   const hasLh = !!(lh && htmlToPlain(lh))
   const hasNh = !!(nh && htmlToPlain(nh))
@@ -234,10 +234,10 @@ function calendarCellPreviewContent(e: CalendarDayEvent): CalendarCellPreview | 
       return { text: plain, ink, ...typo }
     }
   }
-  const lt = e.label.trim()
+  const lt = typeof e.label === 'string' ? e.label.trim() : ''
   if (lt) return { text: lt, ink }
 
-  const t = e.time?.trim()
+  const t = typeof e.time === 'string' ? e.time.trim() : ''
   if (t) return { text: formatTimeKo(t), ink }
 
   return null

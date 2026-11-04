@@ -1,31 +1,5 @@
 import { csvString, taxWorksheet } from "./model";
-import type { RevenueData, RevenueRow, TaxClass } from "./types";
-
-export function suggestTaxClass(row: RevenueRow): TaxClass {
-  if (row.taxClass !== "unreviewed") return row.taxClass;
-  if (row.country === "KR" || row.currency === "KRW") return "taxable";
-  if (row.basis === "estimate") return "unreviewed";
-  return "zero";
-}
-
-export function applyTaxSuggestions(rows: RevenueRow[]): RevenueRow[] {
-  return rows.map((r) => {
-    if (r.taxClass !== "unreviewed") return r;
-    const next = suggestTaxClass(r);
-    if (next === "unreviewed") return r;
-    const base = r.proceeds ?? r.gross;
-    const supply = r.supplyAmount ?? Math.round(base / 1.1);
-    const vat = r.outputVat ?? (next === "taxable" ? Math.round(supply * 0.1) : 0);
-    return {
-      ...r,
-      taxClass: next,
-      supplyAmount: supply,
-      outputVat: vat,
-      taxDate: r.taxDate || r.date,
-      evidence: r.evidence || "스토어 보고서(자동 제안)",
-    };
-  });
-}
+import type { RevenueData } from "./types";
 
 export function exportTaxPackCsv(data: RevenueData, year: string, half: "1" | "2") {
   const tax = taxWorksheet(data, year, half);
@@ -35,9 +9,10 @@ export function exportTaxPackCsv(data: RevenueData, year: string, half: "1" | "2
     ["매출세액", tax.output],
     ["매입세액", tax.input],
     ["미검토", tax.pending.length],
+    ["집계 기준", "확정 보고서 중 귀속일·분류·금액·증빙을 입력한 자료만 포함. 자동 제안값과 미검토 자료 제외."],
   ]);
   const lines = csvString([
-    ["날짜", "귀속월", "앱", "스토어", "분류", "공급가액", "매출세액", "증빙"],
+    ["날짜", "귀속월", "앱", "스토어", "분류", "공급가액", "매출세액", "증빙", "검토 상태"],
     ...tax.rows.map((r) => [
       r.taxDate || r.date,
       r.period,
@@ -47,6 +22,7 @@ export function exportTaxPackCsv(data: RevenueData, year: string, half: "1" | "2
       r.supplyAmount ?? "",
       r.outputVat ?? "",
       r.evidence ?? "",
+      tax.pending.includes(r) ? "검토 필요 · 합계 제외" : "입력 자료",
     ]),
   ]);
   return { summary, lines, filename: `부가세_검토_${year}_${half}기` };

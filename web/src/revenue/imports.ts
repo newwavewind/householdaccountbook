@@ -157,6 +157,11 @@ export async function parseReport(doc: StoreDocument): Promise<RevenueRow[]> {
           period: documentPeriod || (financial ? endDate : date).slice(0, 7),
           appId: `apple:${resolveAppleReportAppKey(get)}`,
           appName: get("Title"),
+          // Free downloads vs paid/IAP/updates need Product Type Identifier.
+          // Omit blanks so rows without classification stay distinguishable.
+          ...((type) => type ? { productType: type.toUpperCase() } : {})(get("Product Type Identifier").trim()),
+          ...((sku) => sku ? { productId: sku } : {})(get("SKU", "SKU ID").trim()),
+          ...((title) => title ? { productName: title } : {})(get("Title").trim()),
           platform: "apple",
           country: get("Country of Sale", "Country Code"),
           currency: get("Customer Currency"),
@@ -190,6 +195,9 @@ export async function parseReport(doc: StoreDocument): Promise<RevenueRow[]> {
           period: documentPeriod || date.slice(0, 7),
           appId: `google:${packageId}`,
           appName: title,
+          transactionReference: /^GPA\.[0-9.\-]+$/.test(get("Description")) ? get("Description") : undefined,
+          productId: get("SKU ID", "SKU"),
+          productName: get("Product Title"),
           platform: "google",
           country: get("Buyer Country", "Country of Buyer"),
           currency: get("Merchant Currency"),
@@ -225,6 +233,9 @@ export async function parseReport(doc: StoreDocument): Promise<RevenueRow[]> {
           period: documentPeriod || date.slice(0, 7),
           appId: `google:${packageId}`,
           appName: title,
+          transactionReference: /^GPA\.[0-9.\-]+$/.test(get("Order Number")) ? get("Order Number") : undefined,
+          productId: get("SKU ID", "SKU"),
+          productName: get("Product Title"),
           platform: "google",
           country,
           currency,
@@ -249,6 +260,8 @@ export async function parseReport(doc: StoreDocument): Promise<RevenueRow[]> {
           period: get("period") || date.slice(0, 7),
           appId: `${get("platform")}:${get("app_id")}`,
           appName: get("app_name"),
+          productId: get("product_id"),
+          productName: get("product_name"),
           platform: get("platform") as "apple" | "google",
           country: get("country"),
           currency: get("currency"),
@@ -295,6 +308,11 @@ export async function parseReport(doc: StoreDocument): Promise<RevenueRow[]> {
         source: undefined,
         reportScope: undefined,
         periodKind: undefined,
+        productId: undefined,
+        productName: undefined,
+        productType: undefined,
+        transactionReference: undefined,
+        chargedAt: undefined,
         // Orders enrichment changes availability, not the original sale.
         // The same charge can be repeated across report shards with its current
         // net allocated to one copy and zero to the others.
@@ -310,6 +328,12 @@ export async function parseReport(doc: StoreDocument): Promise<RevenueRow[]> {
       const occurrence = duplicateCharge ? 0 : occurrences.get(fingerprint) ?? 0;
       if (!duplicateCharge) occurrences.set(fingerprint, occurrence + 1);
       row.id = await digest(`${fingerprint}:${occurrence}`);
+      // Add display-only metadata after hashing to retain existing row IDs and tax reviews.
+      if (sales && get("Financial Status").toLowerCase().trim() === "charged") {
+        const timestamp = get("Order Charged Timestamp");
+        const seconds = /^\d{10}$/.test(timestamp) ? Number(timestamp) : NaN;
+        if (Number.isFinite(seconds)) row.chargedAt = new Date(seconds * 1000).toISOString();
+      }
       result.push(row);
     } catch (e) {
       throw new Error(

@@ -16,6 +16,9 @@ export function isValidTx(x: unknown): x is Transaction {
     return false
   }
   if (t.cardBrand !== undefined && typeof t.cardBrand !== 'string') return false
+  if (t.category !== undefined && typeof t.category !== 'string') return false
+  if (t.memo !== undefined && typeof t.memo !== 'string') return false
+  if (t.memberName !== undefined && typeof t.memberName !== 'string') return false
   return true
 }
 

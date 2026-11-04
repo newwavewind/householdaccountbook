@@ -4,7 +4,7 @@ import type { IncomingMessage } from 'node:http'
 
 export type RevenueAuth =
   | { mode: 'local' }
-  | { mode: 'user'; user: User; accessToken: string }
+  | { mode: 'user'; user: User; accessToken: string; sharedOwnerId?: string }
 
 function header(req: IncomingMessage, name: string): string {
   const raw = req.headers[name.toLowerCase()]
@@ -49,7 +49,7 @@ export async function authenticateRevenueRequest(
   localToken: string,
 ): Promise<{ ok: true; auth: RevenueAuth } | { ok: false; status: number; error: string }> {
   const local = header(req, 'x-revenue-local-token')
-  if (local && safeEqual(local, localToken)) {
+  if (local && safeEqual(local, localToken) && header(req, 'x-revenue-shared') !== '1') {
     return { ok: true, auth: { mode: 'local' } }
   }
 
@@ -78,10 +78,20 @@ export async function authenticateRevenueRequest(
     global: { headers: { Authorization: `Bearer ${bearer}` } },
   })
   const { data, error } = await supabase.auth.getUser(bearer)
-  if (error || !data.user) {
+  if (error || !data.user || data.user.is_anonymous) {
     return { ok: false, status: 401, error: '세션이 만료되었습니다. 다시 로그인해 주세요.' }
   }
   if (!isUserAllowed(data.user)) {
+    const shared = await supabase.from('app_revenue_viewers').select('owner_id,can_refresh')
+      .eq('viewer_id', data.user.id).eq('can_refresh', true).maybeSingle()
+    // The explicit grant is RLS-filtered by current household membership.
+    if (!shared.error && shared.data?.can_refresh === true && shared.data.owner_id === process.env.REVENUE_REFRESH_OWNER_ID) {
+      const method = req.method || 'GET'
+      const path = (req.url || '').split('?')[0]
+      if (!isSharedRefreshRoute(method, path))
+        return { ok: false, status: 403, error: '공유 계정은 보고서 조회와 새로고침만 가능합니다.' }
+      return { ok: true, auth: { mode: 'user', user: data.user, accessToken: bearer, sharedOwnerId: shared.data.owner_id } }
+    }
     return {
       ok: false,
       status: 403,
@@ -98,4 +108,9 @@ export function userSupabase(accessToken: string): SupabaseClient {
     auth: { persistSession: false, autoRefreshToken: false },
     global: { headers: { Authorization: `Bearer ${accessToken}` } },
   })
+}
+
+export function isSharedRefreshRoute(method: string, path: string): boolean {
+  return (method === 'GET' && ['/api/app-revenue/status', '/api/app-revenue/job'].includes(path)) ||
+    (method === 'POST' && path === '/api/app-revenue/sync')
 }

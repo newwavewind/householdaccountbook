@@ -9,6 +9,7 @@ export function RevenueIcon({
   style?: CSSProperties;
 }) {
   const paths: Record<string, React.ReactNode> = {
+    calendar: <><rect x="3" y="5" width="18" height="16" rx="3" /><path d="M7 3v4M17 3v4M3 11h18M8 15h2M14 15h2" /></>,
     chart: (
       <>
         <path d="M4 19.5h16M7 15v-4M12 15V5M17 15V8" />

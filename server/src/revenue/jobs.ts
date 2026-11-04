@@ -5,6 +5,7 @@ export type RevenueApp = {
   name: string
   platform: 'apple' | 'google'
   bundleId: string
+  sku?: string
   version: string
   build: string
   status: string
@@ -34,6 +35,8 @@ export type RevenueJob = {
   completed: string[]
   started: number
   userId?: string
+  sharedOwnerId?: string
+  refreshProof?: string
 }
 
 type JobStore = {
@@ -84,6 +87,8 @@ const memoryStore: JobStore = {
 
 function serializeResult(job: RevenueJob) {
   return {
+    sharedOwnerId: job.sharedOwnerId,
+    refreshProof: job.refreshProof,
     apps: job.apps,
     documents: job.documents,
     errors: job.errors,
@@ -114,6 +119,8 @@ const supabaseStore: JobStore = {
       completed: result.completed || [],
       started: Date.parse(data.created_at) || Date.now(),
       userId: auth.user.id,
+      sharedOwnerId: result.sharedOwnerId,
+      refreshProof: result.refreshProof,
     }
   },
   async set(job, auth) {
@@ -179,9 +186,9 @@ const supabaseStore: JobStore = {
   },
 }
 
-export function getJobStore(): JobStore {
+export function getJobStore(auth?: RevenueAuth): JobStore {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || ''
-  if (url.startsWith('http') && (process.env.VERCEL || process.env.REVENUE_JOB_BACKEND === 'supabase')) {
+  if (url.startsWith('http') && (process.env.VERCEL || process.env.REVENUE_JOB_BACKEND === 'supabase' || (auth?.mode === 'user' && auth.sharedOwnerId))) {
     return supabaseStore
   }
   return memoryStore
@@ -189,7 +196,7 @@ export function getJobStore(): JobStore {
 
 export async function persistJobProgress(job: RevenueJob, auth: RevenueAuth) {
   // Throttle cloud writes while running: every ~4s or on done.
-  const store = getJobStore()
+  const store = getJobStore(auth)
   const key = `__lastPersist:${job.id}`
   const g = globalThis as unknown as Record<string, number>
   const now = Date.now()

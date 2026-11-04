@@ -53,3 +53,13 @@ describe("appMatch", () => {
     expect(matched).toHaveLength(1);
   });
 });
+
+it("uses the verified app SKU to associate Apple in-app subjects without guessing names", () => {
+  const catalog = [{...apps[0], id:"apple:6814271261", name:"봄기출 소방공무원", bundleId:"com.sanghyun.firefighter", sku:"BOMGICHUL-FIRE-001"}];
+  const subject = row({appId:"apple:BOMGICHUL-FIRE-001", productId:"premium_unlock_fire_sobang_national", productName:"소방학개론 프리미엄 잠금해제"});
+  const [resolved] = enrichRowsWithApps([subject], catalog);
+  expect(resolved.appId).toBe(catalog[0].id);
+  expect(resolved.productName).toBe(subject.productName);
+  expect(rowsForApp(catalog[0], [subject])).toEqual([subject]);
+  expect(findAppForRowKey("apple:unknown-sku", catalog,"apple")).toBeUndefined();
+});

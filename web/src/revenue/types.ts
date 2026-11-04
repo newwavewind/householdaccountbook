@@ -13,6 +13,7 @@ export interface AppProduct {
   name: string;
   platform: Platform;
   bundleId: string;
+  sku?: string;
   version: string;
   build: string;
   status: string;
@@ -27,10 +28,18 @@ export interface RevenueRow {
   reportScope?: string;
   periodKind?: "calendar" | "fiscal";
   date: string;
+  /** Actual Google order charge instant, ISO UTC; never inferred from report date. */
+  chargedAt?: string;
+  /** Private provider transaction reference used to reconcile Google settlement lines. */
+  transactionReference?: string;
   endDate?: string;
   period: string;
   appId: string;
   appName: string;
+  /** Original store product identity, preserved when app names are resolved. */
+  productType?: string;
+  productId?: string;
+  productName?: string;
   platform: Platform;
   country: string;
   currency: string;
@@ -96,10 +105,18 @@ export interface SyncLog {
     googleMonths?: number;
   };
 }
+export interface InstallReport {
+  key: string;
+  period: string;
+  appId: string;
+  fetchedAt?: string;
+  days: {date: string; users: number}[];
+}
 export interface RevenueData {
   schema: 1;
   apps: AppProduct[];
   rows: RevenueRow[];
+  installReports?: InstallReport[];
   expenses: Expense[];
   payouts: Payout[];
   imports: ImportRecord[];

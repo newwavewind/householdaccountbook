@@ -11,26 +11,31 @@ export function RevenueDialog({
   description,
   close,
   children,
+  className = "",
 }: {
   title: string;
   description?: string;
   close: () => void;
   children: ReactNode;
+  className?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const el = ref.current;
     const before = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     el?.showModal();
     return () => {
       el?.close();
+      document.body.style.overflow = previousOverflow;
       before?.focus();
     };
   }, []);
   return (
     <dialog
       ref={ref}
-      className="rev-dialog"
+      className={`rev-dialog ${className}`.trim()}
       onCancel={close}
       onClick={(e) => {
         if (e.target === e.currentTarget) close();

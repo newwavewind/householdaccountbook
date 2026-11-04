@@ -21,6 +21,7 @@ import {
   reportDate,
 } from "./imports";
 import { estimateGoogleDeveloperShare, fillGoogleEstimatedShares } from "./googleFee";
+import { exportTaxPackCsv } from "./taxEnhance";
 import { selectRevenueRows } from "./reportSelection";
 import { syncLogStatus, formatSyncToast } from "./syncHelpers";
 import { fetchMonthRatesKrw } from "./fxRates";
@@ -159,6 +160,21 @@ describe("revenue accounting", () => {
       output: 0,
       prepaid: 100,
     });
+  });
+  it("deduplicates tax records and excludes legacy automatic guesses and invalid amounts", () => {
+    const d = emptyData();
+    const reviewed = row({taxClass:"taxable",supplyAmount:10000,outputVat:1000,taxDate:"2026-07-01",evidence:"invoice verified"});
+    d.rows = [reviewed, {...reviewed},
+      {...reviewed,id:"legacy",evidence:"스토어 보고서(자동 제안)"},
+      {...reviewed,id:"invalid",supplyAmount:NaN},
+      {...reviewed,id:"estimate",basis:"estimate"}];
+    const tax = taxWorksheet(d,"2026","2");
+    expect(tax.rows).toHaveLength(3);
+    expect(tax.pending.map(r=>r.id)).toEqual(["legacy","invalid"]);
+    expect(tax).toMatchObject({taxable:10000,output:1000});
+    const csv = exportTaxPackCsv(d,"2026","2");
+    expect(csv.lines).toContain("검토 필요 · 합계 제외");
+    expect(csv.summary).toContain("자동 제안값과 미검토 자료 제외");
   });
   it("respects reviewed attribution date instead of Apple fiscal period", () => {
     const d = emptyData();

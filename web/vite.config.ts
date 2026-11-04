@@ -21,8 +21,10 @@ export default defineConfig({
   base: process.env.VITE_BASE_PATH ?? '/',
   server: {
     /** OAuth redirect_to 와 Supabase Redirect URLs 가 항상 맞도록 포트 고정 */
+    host: true,
     port: 5173,
     strictPort: true,
+    allowedHosts: true,
     proxy: {
       '/api/app-revenue': revenueProxy(),
       '/api': {

@@ -242,7 +242,7 @@ function DefaultIcon({ className }: { className?: string }) {
 }
 
 export function CategoryIcon({ name, className = 'size-4' }: Props) {
-  const key = name.trim()
+  const key = typeof name === 'string' ? name.trim() : ''
   if (!key) return null
   const render = ICONS[key]
   return render ? render(className) : <DefaultIcon className={className} />

@@ -1,3 +1,6 @@
+import { fetchProviderReport } from "./revenue/providerRetry.js"
+import { signRefreshResult } from './revenue/refreshProof.js'
+import { reportingApiErrorHint } from "./revenue/providerErrors.js"
 /** Private desktop connector. Never bind this service to a public interface. */
 import express from 'express'
 import { config } from 'dotenv'
@@ -10,7 +13,8 @@ import { spawn } from 'node:child_process'
 import { authenticateRevenueRequest, type RevenueAuth } from './revenue/auth.js'
 import { getJobStore, persistJobProgress, type RevenueJob } from './revenue/jobs.js'
 import { envPem, googleServiceAccount, isCloudRuntime } from './revenue/credentials.js'
-import { appleMonthlyRetentionFrom, collectApplePeriods, currentMonth, partitionMissingReportMonths, revenueHistoryFrom, syncMonths } from './revenue/reportPolicy.js'
+import { calendarDailyReportDates, appleMonthlyRetentionFrom, collectApplePeriods, currentMonth, partitionMissingReportMonths, revenueHistoryFrom, syncMonths } from './revenue/reportPolicy.js'
+import { collectGoogleInstalls } from './revenue/googleInstalls.js'
 import { collectGoogleReports, pushGoogleZipDocuments } from './revenue/googleReports.js'
 import { enrichGoogleOrderProceeds } from './revenue/googleOrders.js'
 import { appleDailyReportDates, appleFinancialReportRange, downloadAppleFinanceReport, downloadAppleSalesReport } from './revenue/appleReports.js'
@@ -70,6 +74,7 @@ const root = resolve(moduleDir, '../..')
 const startedAt = Date.now()
 const cloudFs = Boolean(process.env.VERCEL || process.env.REVENUE_CLOUD === '1')
 config({ path: resolve(root, '.env.revenue.local'), override: true, quiet: true } as Parameters<typeof config>[0])
+if (!process.env.VERCEL) config({ path: resolve(root, 'web/.env.local'), quiet: true } as Parameters<typeof config>[0])
 for (const key of [
   'ASC_KEY_PATH',
   'ASC_FINANCE_KEY_PATH',
@@ -181,10 +186,15 @@ async function discoverConnections(): Promise<{ vendor: string; bucket: string; 
   }
   return { vendor: settings().vendor, bucket: settings().bucket, packages: settings().packages, notes }
 }
-class ProviderError extends Error { constructor(public code: number, label: string) { super(`${label} (${code})${code === 403 ? ' · 계정의 보고서 조회 권한을 확인해 주세요.' : code === 401 ? ' · 인증 설정을 확인해 주세요.' : ''}`) } }
+class ProviderError extends Error { constructor(public code: number, label: string, hint?: string) { super(`${label} (${code})${hint ? ` · ${hint}` : code === 403 ? ' · 계정의 보고서 조회 권한을 확인해 주세요.' : code === 401 ? ' · 인증 설정을 확인해 주세요.' : ''}`) } }
 async function request(url: string, token: string, init: RequestInit = {}) {
-  const response = await fetch(url, { ...init, headers: { Authorization: `Bearer ${token}`, ...(init.body ? { 'Content-Type': 'application/json' } : {}), ...init.headers }, signal: init.signal ?? AbortSignal.timeout(25000), redirect: 'error' })
-  if (!response.ok) throw new ProviderError(response.status, new URL(url).hostname.includes('apple') ? 'Apple 요청 실패' : 'Google 요청 실패')
+  const response = await fetchProviderReport(url, { ...init, headers: { Authorization: `Bearer ${token}`, ...(init.body ? { 'Content-Type': 'application/json' } : {}), ...init.headers }, signal: init.signal, redirect: 'error' })
+  if (!response.ok) {
+    const hostname = new URL(url).hostname
+    const payload: unknown = hostname === 'playdeveloperreporting.googleapis.com' && response.status === 403
+      ? await response.json().catch(() => null) : null
+    throw new ProviderError(response.status, hostname.includes('apple') ? 'Apple 요청 실패' : 'Google 요청 실패', reportingApiErrorHint(hostname, response.status, payload))
+  }
   const size = Number(response.headers.get('content-length') || '0')
   if (size > 25 * 1024 * 1024) throw new Error('보고서가 25MB를 초과합니다. 기간을 줄여 주세요.')
   return response
@@ -215,7 +225,7 @@ async function appleApps(job: Job, token: string) {
     if (!url.startsWith('https://api.appstoreconnect.apple.com/')) throw new Error('Unexpected pagination host')
     const page = await (await request(url, token)).json() as { data: Resource[]; links?: { next?: string } }
     for (const item of page.data) {
-      const app: App = { id: `apple:${item.id}`, name: item.attributes.name, platform: 'apple', bundleId: item.attributes.bundleId, version: '', build: '', status: '상태 조회 중', updatedAt: new Date().toISOString(), source: 'api' }
+      const app: App = { id: `apple:${item.id}`, name: item.attributes.name, platform: 'apple', bundleId: item.attributes.bundleId, sku: item.attributes.sku, version: '', build: '', status: '상태 조회 중', updatedAt: new Date().toISOString(), source: 'api' }
       const detail = await Promise.allSettled([
         request(`https://api.appstoreconnect.apple.com/v1/apps/${item.id}/appStoreVersions?limit=10&filter[platform]=IOS`, token).then(r => r.json()),
         request(`https://api.appstoreconnect.apple.com/v1/builds?filter[app]=${item.id}&sort=-uploadedDate&limit=1`, token).then(r => r.json()),
@@ -278,6 +288,30 @@ async function appleDailySales(job: Job, token: string, vendor: string, month: s
   return { count, unavailable, fatal: false as const }
 }
 
+async function appleCalendarDailySales(job: Job, token: string, month: string) {
+  const vendor = settings().vendor
+  if (!vendor) return
+  const existing = new Set(job.documents.map(document => document.key))
+  const dates = calendarDailyReportDates(month, new Date().toISOString().slice(0, 10))
+  let collected = 0, missing = 0
+  for (const date of dates) {
+    if (existing.has(`apple-sales:${date}`)) continue
+    job.progress = `Apple ${date} 일별 현황 가져오는 중`
+    try {
+      const text = await downloadAppleSalesReport({ frequency: 'DAILY', date, vendor,
+        request: url => request(url, token, { headers: { Accept: 'application/a-gzip' } }),
+      })
+      job.documents.push({ key: `apple-sales:${date}`, name: `Apple 판매 ${date}`, text, period: month, source: 'api', fetchedAt: new Date().toISOString(), periodKind: 'calendar' })
+      collected++
+    } catch (error) {
+      if (error instanceof ProviderError && error.code === 404) missing++
+      else { job.errors.push(`Apple 일별 현황 ${date}: ${message(error)}`); break }
+    }
+  }
+  if (collected) job.completed.push(`Apple ${month} 일별 자료 ${collected}개 추가`)
+  if (missing) job.errors.push(`Apple ${month} 일별 보고서 ${missing}일 미제공 · 무매출 또는 생성 지연일 수 있으며 0원으로 확정하지 않습니다.`)
+}
+
 async function appleFinanceMonth(job: Job, token: string, vendor: string, month: string) {
   const financeToken = financeKeyId && financeKeyPem() ? appleFinanceToken() : token
   job.progress = `Apple ${month} 확정 재무 보고서 확인 중`
@@ -335,11 +369,10 @@ const GOOGLE_PACKAGE_LABELS: Record<string, string> = {
   'com.sanghyun.firefighter': '봄기출 소방공무원',
   'com.sanghyun.housing': '봄기출 주택관리사',
   'com.sanghyun.socialworker': '봄기출 사회복지사1급',
-  'com.sanghyun.haengjung': '봄기출 행정사',
+  'com.sanghyun.haengjeongsa': '봄기출 행정사',
   'com.sanghyun.semusa': '봄기출 세무사',
   'com.sanghyun.nomusa': '봄기출 공인노무사',
   'com.sanghyun.sonhae': '봄기출 손해평가사',
-  'com.sanghyun.tax': '봄기출 세무',
 }
 async function googleApps(job: Job, token: string) {
   const packages = new Map(settings().packages.map(p => [p, GOOGLE_PACKAGE_LABELS[p] || p]))
@@ -452,7 +485,7 @@ async function googleReports(job: Job, token: string, months: string[]) {
   })
   await enrichGoogleOrderProceeds({ job, month: new Date().toISOString().slice(0, 7), request: (url, signal) => request(url, token, { signal }) })
 }
-async function run(job: Job, months: string[]) {
+async function run(job: Job, months: string[], dailyMonth?: string) {
   const status = connectionStatus()
   const tasks: Promise<unknown>[] = []
   job.progress = `전체 ${months.length}개월(${months[0]}~${months[months.length - 1]}) 동기화 중`
@@ -461,7 +494,7 @@ async function run(job: Job, months: string[]) {
     const appsToken = (appsKeyId && appsKeyPem()) ? appleToken(appsKeyId, appsKeyPem()) : salesToken
     await Promise.allSettled([
       appleApps(job, appsToken).catch(e => job.errors.push(message(e))),
-      appleReports(job, salesToken, months).catch(e => job.errors.push(message(e))),
+      (async () => { await appleReports(job, salesToken, months); if (dailyMonth) await appleCalendarDailySales(job, salesToken, dailyMonth) })().catch(e => job.errors.push(message(e))),
     ])
   })().catch(e => job.errors.push(message(e))))
   else job.errors.push('Apple API 키 설정이 필요합니다.')
@@ -470,6 +503,7 @@ async function run(job: Job, months: string[]) {
     await Promise.allSettled([
       googleApps(job, token).catch(e => job.errors.push(message(e))),
       googleReports(job, token, months).catch(e => job.errors.push(message(e))),
+      collectGoogleInstalls({ job, bucket:settings().bucket, packages:settings().packages, month:dailyMonth || months[months.length-1], request:url=>request(url,token), errorMessage:message }),
     ])
   })().catch(e => job.errors.push(message(e))))
   else job.errors.push('Google 서비스 계정 설정이 필요합니다.')
@@ -489,7 +523,7 @@ app.use(async (req, res, next) => {
   if (origin && originAllowed) {
     res.set('Access-Control-Allow-Origin', origin)
     res.set('Access-Control-Allow-Credentials', 'true')
-    res.set('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Revenue-Local-Token')
+    res.set('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Revenue-Local-Token, X-Revenue-Shared')
     res.set('Access-Control-Allow-Methods', 'GET,POST,PUT,OPTIONS')
     res.set('Vary', 'Origin')
   }
@@ -532,8 +566,11 @@ app.post('/api/app-revenue/sync', async (req, res) => {
   } catch (e) {
     return res.status(400).json({ error: e instanceof Error ? e.message : '동기화할 기간을 확인해 주세요.' })
   }
+  const dailyMonth = req.body?.dailyMonth ?? (months.includes(todayMonth) ? todayMonth : undefined)
+  if (dailyMonth !== undefined && (typeof dailyMonth !== 'string' || !months.includes(dailyMonth))) return res.status(400).json({ error: '일별 자료 조회 월을 확인해 주세요.' })
   const auth = reqAuth(req)
-  const store = getJobStore()
+  if (auth.mode === 'user' && auth.sharedOwnerId && !process.env.REVENUE_REFRESH_SIGNING_KEY) return res.status(503).json({ error: '공유 새로고침 설정을 확인해 주세요.' })
+  const store = getJobStore(auth)
   const active = await store.findRunning(auth)
   // Reattach after a reload/HMR instead of rejecting the caller or starting duplicate work.
   if (active) return res.json({ id: active.id, reused: true })
@@ -549,6 +586,7 @@ app.post('/api/app-revenue/sync', async (req, res) => {
     completed: [],
     started: Date.now(),
     userId: auth.mode === 'user' ? auth.user.id : undefined,
+    sharedOwnerId: auth.mode === 'user' ? auth.sharedOwnerId : undefined,
   }
   await store.set(job, auth)
   const work = (async () => {
@@ -566,7 +604,7 @@ app.post('/api/app-revenue/sync', async (req, res) => {
       }
       const progressTimer = setInterval(() => { void persistJobProgress(job, auth) }, 4000)
       try {
-        await run(job, months)
+        await run(job, months, dailyMonth)
       } finally {
         clearInterval(progressTimer)
       }
@@ -574,6 +612,10 @@ app.post('/api/app-revenue/sync', async (req, res) => {
       job.errors.push(message(e))
       job.state = 'done'
       job.progress = '확인할 항목이 있습니다.'
+    }
+    if (job.sharedOwnerId) {
+      try { job.refreshProof = signRefreshResult(job) }
+      catch (e) { job.errors.push(message(e)); job.refreshProof = undefined }
     }
     await store.set(job, auth)
   })()
@@ -587,7 +629,7 @@ app.post('/api/app-revenue/sync', async (req, res) => {
 })
 app.get('/api/app-revenue/sync/:id', async (req, res) => {
   const auth = reqAuth(req)
-  const job = await getJobStore().get(req.params.id, auth)
+  const job = await getJobStore(auth).get(req.params.id, auth)
   if (!job) return res.status(404).json({ error: '동기화 기록이 만료되었습니다.' })
   res.json(job.state === 'running' ? { ...job, documents: [], apps: [] } : job)
 })
@@ -596,7 +638,7 @@ app.get('/api/app-revenue/job', async (req, res) => {
   const auth = reqAuth(req)
   const id = typeof req.query.id === 'string' ? req.query.id : ''
   if (!id) return res.status(400).json({ error: '동기화 ID가 필요합니다.' })
-  const job = await getJobStore().get(id, auth)
+  const job = await getJobStore(auth).get(id, auth)
   if (!job) return res.status(404).json({ error: '동기화 기록이 만료되었습니다.' })
   res.json(job.state === 'running' ? { ...job, documents: [], apps: [] } : job)
 })

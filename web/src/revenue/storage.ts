@@ -25,11 +25,21 @@ export function validateBackup(value: unknown): RevenueData {
   const finite = (x: unknown) =>
     typeof x === "number" && Number.isFinite(x) && Math.abs(x) <= 1e14;
   const str = (x: unknown) => typeof x === "string";
+  if (d.installReports !== undefined && (!Array.isArray(d.installReports) || d.installReports.some(report =>
+    !report || !str(report.key) || !str(report.appId) || !report.appId.startsWith("google:") ||
+    !/^20\d{2}-(0[1-9]|1[0-2])$/.test(report.period) ||
+    (report.fetchedAt !== undefined && (!str(report.fetchedAt) || !Number.isFinite(Date.parse(report.fetchedAt)))) ||
+    !Array.isArray(report.days) || report.days.some(day => !day || !validDate(day.date) || !day.date.startsWith(report.period+"-") || !Number.isSafeInteger(day.users) || day.users < 0) ||
+    new Set(report.days.map(day=>day.date)).size !== report.days.length
+  ))) throw new Error("설치 통계 백업 형식 오류");
   for (const r of d.rows) {
     if (
       !str(r.id) ||
       !str(r.reportKey) ||
       !str(r.appName) ||
+      (r.productType !== undefined && !str(r.productType)) ||
+      (r.productId !== undefined && !str(r.productId)) ||
+      (r.productName !== undefined && !str(r.productName)) ||
       !str(r.appId) ||
       !str(r.country) ||
       !validDate(r.date) ||
@@ -64,6 +74,7 @@ export function validateBackup(value: unknown): RevenueData {
         a.updatedAt,
       ].every(str) ||
       !["apple", "google"].includes(a.platform) ||
+      (a.sku !== undefined && !str(a.sku)) ||
       !["manual", "api", "demo"].includes(a.source)
     )
       throw new Error("백업 앱 형식 오류");

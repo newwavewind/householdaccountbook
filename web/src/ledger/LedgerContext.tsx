@@ -171,11 +171,10 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
   const transactionsRef = useRef<Transaction[]>(transactions)
   transactionsRef.current = transactions
 
-  // supabase 모드: 로그인 상태에 따른 초기 syncState
+  // supabase/prisma: 첫 화면은 로컬 캐시로 바로 그리고, 세션·클라우드 확인은 뒤에서.
+  // 예전엔 status:'loading' 으로 시작해 모바일에서 전면 흰 오버레이만 남는 경우가 있었다
+  // (getSession·가구 조회가 지연/중단될 때).
   const [syncState, setSyncState] = useState<LedgerSyncState>(() => {
-    if (backend === 'supabase' && isCloudSyncEnabled()) {
-      return { mode: 'cloud', cloudBackend: 'supabase', status: 'loading' }
-    }
     if (backend === 'prisma') {
       return { mode: 'cloud', cloudBackend: 'prisma', status: 'loading' }
     }
@@ -204,18 +203,42 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    void sb.auth.getSession().then(({ data: { session } }) => {
-      setUserId(session?.user?.id ?? null)
+    let authReadyMarked = false
+    const markAuthReady = () => {
+      if (authReadyMarked) return
+      authReadyMarked = true
       if (backend === 'supabase') setAuthReady(true)
-    })
+    }
+
+    // iOS Safari 등에서 getSession이 IndexedDB에서 멈추면 authReady가 안 열려
+    // 클라우드 동기화 effect가 영구 대기 → 예전엔 전면 흰 오버레이만 남았음
+    const AUTH_TIMEOUT_MS = 4000
+    const timeoutId = window.setTimeout(() => {
+      markAuthReady()
+    }, AUTH_TIMEOUT_MS)
+
+    void sb.auth.getSession()
+      .then(({ data: { session } }) => {
+        window.clearTimeout(timeoutId)
+        setUserId(session?.user?.id ?? null)
+        markAuthReady()
+      })
+      .catch(() => {
+        window.clearTimeout(timeoutId)
+        markAuthReady()
+      })
 
     const { data: { subscription } } = sb.auth.onAuthStateChange((_evt, session) => {
+      window.clearTimeout(timeoutId)
       setUserId(session?.user?.id ?? null)
       if (!session) setHouseholdId(null)
-      if (backend === 'supabase') setAuthReady(true)
+      markAuthReady()
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      window.clearTimeout(timeoutId)
+      subscription.unsubscribe()
+    }
   }, [backend])
 
   // ── userId 확정 후 household_id 조회 (Supabase 클라이언트가 있을 때) ──────────
@@ -292,54 +315,73 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     }
 
     void (async () => {
-      const { data, error } = await sb
-        .from('household_ledgers')
-        .select('payload')
-        .eq('id', lid)
-        .maybeSingle()
+      try {
+        const FETCH_TIMEOUT_MS = 12_000
+        const fetchResult = await Promise.race([
+          sb.from('household_ledgers').select('payload').eq('id', lid).maybeSingle(),
+          new Promise<never>((_, reject) => {
+            window.setTimeout(
+              () => reject(new Error('장부 동기화 시간이 초과되었습니다.')),
+              FETCH_TIMEOUT_MS,
+            )
+          }),
+        ])
 
-      if (cancelled) return
+        if (cancelled) return
 
-      if (error) {
-        setSyncState({ mode: 'cloud', cloudBackend: 'supabase', status: 'error', errorMessage: error.message })
-        return
-      }
+        const { data, error } = fetchResult
 
-      if (data?.payload != null) {
-        const remoteParsed = parseTransactionsPayload(data.payload)
-        const localParsed = loadFromStorage()
-        // 원격이 비어 있고 로컬에 데이터가 있으면 → 로컬을 원격에 업로드
-        if (remoteParsed.length === 0 && localParsed.length > 0) {
-          const { error: upErr } = await sb.from('household_ledgers').upsert(
-            { id: lid, payload: localParsed, updated_at: new Date().toISOString() },
-            { onConflict: 'id' },
-          )
-          if (cancelled) return
-          if (upErr) {
-            setSyncState({ mode: 'cloud', cloudBackend: 'supabase', status: 'error', errorMessage: upErr.message })
-            return
-          }
-          applyPayload(localParsed)
-        } else {
-          applyPayload(data.payload)
+        if (error) {
+          setSyncState({ mode: 'cloud', cloudBackend: 'supabase', status: 'error', errorMessage: error.message })
+          return
         }
-        setSyncState({ mode: 'cloud', cloudBackend: 'supabase', status: 'ready' })
-        return
-      }
 
-      // 원격에 행 없음 → 로컬 데이터로 첫 행 생성
-      const initial = loadFromStorage()
-      const { error: upErr } = await sb.from('household_ledgers').upsert(
-        { id: lid, payload: initial, updated_at: new Date().toISOString() },
-        { onConflict: 'id' },
-      )
-      if (cancelled) return
-      if (upErr) {
-        setSyncState({ mode: 'cloud', cloudBackend: 'supabase', status: 'error', errorMessage: upErr.message })
-        return
+        if (data?.payload != null) {
+          const remoteParsed = parseTransactionsPayload(data.payload)
+          const localParsed = loadFromStorage()
+          // 원격이 비어 있고 로컬에 데이터가 있으면 → 로컬을 원격에 업로드
+          if (remoteParsed.length === 0 && localParsed.length > 0) {
+            const { error: upErr } = await sb.from('household_ledgers').upsert(
+              { id: lid, payload: localParsed, updated_at: new Date().toISOString() },
+              { onConflict: 'id' },
+            )
+            if (cancelled) return
+            if (upErr) {
+              setSyncState({ mode: 'cloud', cloudBackend: 'supabase', status: 'error', errorMessage: upErr.message })
+              return
+            }
+            applyPayload(localParsed)
+          } else {
+            applyPayload(data.payload)
+          }
+          setSyncState({ mode: 'cloud', cloudBackend: 'supabase', status: 'ready' })
+          return
+        }
+
+        // 원격에 행 없음 → 로컬 데이터로 첫 행 생성
+        const initial = loadFromStorage()
+        const { error: upErr } = await sb.from('household_ledgers').upsert(
+          { id: lid, payload: initial, updated_at: new Date().toISOString() },
+          { onConflict: 'id' },
+        )
+        if (cancelled) return
+        if (upErr) {
+          setSyncState({ mode: 'cloud', cloudBackend: 'supabase', status: 'error', errorMessage: upErr.message })
+          return
+        }
+        applyPayload(initial)
+        setSyncState({ mode: 'cloud', cloudBackend: 'supabase', status: 'ready' })
+      } catch (e) {
+        if (cancelled) return
+        // 동기화 실패해도 로컬 장부는 보이게 — 모바일 흰 화면 방지
+        setTransactions(loadFromStorage())
+        setSyncState({
+          mode: 'cloud',
+          cloudBackend: 'supabase',
+          status: 'error',
+          errorMessage: e instanceof Error ? e.message : '장부 동기화에 실패했습니다.',
+        })
       }
-      applyPayload(initial)
-      setSyncState({ mode: 'cloud', cloudBackend: 'supabase', status: 'ready' })
     })()
 
     const channel = sb
@@ -582,6 +624,26 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
 
   const LS_MEMBERS_KEY = 'household-members-v1'
 
+  /** DB·로컬에 객체가 섞여 있어도 문자열 이름만 남김 (객체면 렌더 시 앱이 죽음) */
+  const sanitizeMemberNames = (raw: unknown): string[] => {
+    if (!Array.isArray(raw)) return []
+    const seen = new Set<string>()
+    const out: string[] = []
+    for (const item of raw) {
+      let s = ''
+      if (typeof item === 'string') s = item.trim()
+      else if (item && typeof item === 'object') {
+        const o = item as Record<string, unknown>
+        if (typeof o.name === 'string') s = o.name.trim()
+        else if (typeof o.memberName === 'string') s = o.memberName.trim()
+      }
+      if (!s || seen.has(s)) continue
+      seen.add(s)
+      out.push(s)
+    }
+    return out
+  }
+
   const saveMembersToStorage = (members: string[]) => {
     try { localStorage.setItem(LS_MEMBERS_KEY, JSON.stringify(members)) } catch { /* ignore */ }
   }
@@ -590,8 +652,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     try {
       const raw = localStorage.getItem(LS_MEMBERS_KEY)
       if (!raw) return []
-      const parsed = JSON.parse(raw)
-      return Array.isArray(parsed) ? (parsed as string[]) : []
+      return sanitizeMemberNames(JSON.parse(raw))
     } catch { return [] }
   }
 
@@ -602,14 +663,13 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
   const mergeMemberNamesWithTransactions = useCallback((base: string[]): string[] => {
     const seen = new Set<string>()
     const out: string[] = []
-    for (const raw of base) {
-      const s = raw.trim()
-      if (!s || seen.has(s)) continue
+    for (const s of sanitizeMemberNames(base)) {
+      if (seen.has(s)) continue
       seen.add(s)
       out.push(s)
     }
     for (const t of transactionsRef.current) {
-      const m = t.memberName?.trim()
+      const m = typeof t.memberName === 'string' ? t.memberName.trim() : ''
       if (m && !seen.has(m)) {
         seen.add(m)
         out.push(m)
@@ -620,7 +680,9 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
 
   const setCloudMembers = useCallback((update: SetStateAction<string[]>) => {
     setCloudMembersState((prev) => {
-      const next = typeof update === 'function' ? update(prev) : update
+      const next = sanitizeMemberNames(
+        typeof update === 'function' ? update(prev) : update,
+      )
       saveMembersToStorage(next)
       const sb = getSupabase()
       if (!sb || !userId) return next
@@ -670,10 +732,8 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
 
       if (cancelled) return
 
-      const userMembers =
-        Array.isArray(uRow?.members) ? (uRow.members as string[]) : []
-      const householdMembers =
-        Array.isArray(hRow?.members) ? (hRow.members as string[]) : []
+      const userMembers = sanitizeMemberNames(uRow?.members)
+      const householdMembers = sanitizeMemberNames(hRow?.members)
 
       if (hidSnap != null && householdIdRef.current !== hidSnap) return
 

@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RevenueDashboard } from "./RevenueDashboard";
 import { RevenueSummary } from "./RevenueSummary";
+import { RevenueDaily } from "./RevenueDaily";
 import { emptyData } from "./model";
 import type { RevenueData, RevenueRow } from "./types";
 
@@ -107,4 +108,56 @@ describe("upcoming Google settlement", () => {
     expect(html).toContain("확인액 ₩54,000");
     expect(html).not.toContain("수익 합계 · 예상 포함");
   });
+});
+
+
+describe("store-reported net income instead of a fixed fee assumption", () => {
+  const renderDaily = (data: RevenueData) => renderToStaticMarkup(createElement(RevenueDaily, { data, month: "2026-09", onMonthChange: noop, canRefresh: true }));
+  it("shows each provider's net proceeds without deducting a fee again in monthly and daily views", () => {
+    const data = emptyData();
+    data.rows = [
+      { ...row("apple", "estimate", 4900, 3564), source: "apple-sales", reportKey: "apple-sales:2026-09-01" },
+      { ...row("google", "estimate", 4900, 4000), source: "google-sales", proceedsSource: "google-orders", proceedsFetchedAt: "2026-10-08T10:00:00Z" },
+    ];
+    const monthly = render(data), daily = renderDaily(data);
+    expect(monthly).toContain('class="rd-total"><span>₩</span>7,564');
+    expect(monthly).toContain('role="cell">₩3,564');
+    expect(monthly).toContain('role="cell">₩4,000');
+    expect(daily).not.toContain('class="rd-daily-selected"');
+    expect(daily).not.toContain('class="rd-daily-history"');
+    expect(daily).not.toContain('<dialog');
+    expect(daily).toContain('aria-haspopup="dialog"');
+    const calendar = daily.split('class="rd-daily-calendar-grid"')[1].split('</section>')[0];
+    expect(calendar).toContain('매출 ₩9,800, 수익 ₩7,564');
+    expect(calendar).toContain('<b>9,800</b>');
+    expect(calendar).toContain('<b>7,564</b>');
+    for (const html of [monthly, daily]) {
+      expect(html).not.toContain("15% 수수료 가정");
+      expect(html).not.toContain("₩8,330");
+      expect(html).toContain("수수료 차감 후");
+    }
+  });
+  it("keeps missing Google proceeds unknown instead of manufacturing 85% of sales", () => {
+    const data = emptyData();
+    data.rows = [{ ...row("google", "estimate", 4900, null), source: "google-sales" }];
+    const daily = renderDaily(data);
+    expect(daily).toContain('<b>확인 중</b>');
+    const calendar = daily.split('class="rd-daily-calendar-grid"')[1].split('</section>')[0];
+    expect(calendar).toContain('매출 ₩4,900 일부, 수익 확인 중');
+    expect(calendar).toContain('매출 확인 중, 수익 확인 중');
+    expect(daily).not.toContain("₩4,165");
+    expect(render(data)).not.toContain("₩4,165");
+  });
+  it("distinguishes reported zero income from missing and partial calendar totals", () => {
+    const data = emptyData();
+    data.rows = [
+      { ...row("apple", "estimate", 0, 0), source: "apple-sales" },
+      { ...row("google", "estimate", 4900, null), source: "google-sales" },
+    ];
+    const calendar = renderDaily(data).split('class="rd-daily-calendar-grid"')[1].split('</section>')[0];
+    expect(calendar).toContain('매출 ₩4,900, 수익 ₩0 일부');
+    expect(calendar).toContain('수익·일부</small><b>0</b>');
+    expect(calendar).not.toContain('매출 ₩0, 수익 ₩0');
+  });
+
 });

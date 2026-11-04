@@ -152,9 +152,8 @@ export function taxWorksheet(data: RevenueData, year: string, half: "1" | "2") {
   const start = `${year}-${half === "1" ? "01" : "07"}`,
     end = `${year}-${half === "1" ? "06" : "12"}`;
   // Only closed reports are eligible; estimates never silently become tax evidence.
-  const rows = data.rows.filter(
+  const rows = selectRevenueRows(data.rows, "settled").rows.filter(
     (r) =>
-      r.basis === "settled" &&
       (r.taxDate || r.date).slice(0, 7) >= start &&
       (r.taxDate || r.date).slice(0, 7) <= end,
   );
@@ -164,11 +163,12 @@ export function taxWorksheet(data: RevenueData, year: string, half: "1" | "2") {
   const pending = rows.filter(
     (r) =>
       r.taxClass === "unreviewed" ||
+      r.evidence?.trim() === "스토어 보고서(자동 제안)" ||
       (r.taxClass !== "excluded" &&
-        (!r.taxDate ||
+        (!r.taxDate || !validDate(r.taxDate) ||
           !r.evidence?.trim() ||
-          r.supplyAmount === undefined ||
-          (r.taxClass === "taxable" && r.outputVat === undefined))),
+          !Number.isFinite(r.supplyAmount) ||
+          (r.taxClass === "taxable" && !Number.isFinite(r.outputVat)))),
   );
   const eligible = rows.filter((r) => !pending.includes(r));
   const total = (category: TaxClass) =>

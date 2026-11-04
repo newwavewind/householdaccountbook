@@ -141,3 +141,10 @@ export async function collectApplePeriods(options: {
     if (!salesDenied) await options.daily(options.todayMonth)
   }
 }
+
+/** Calendar-day detail is requested separately from monthly/fiscal totals. */
+export function calendarDailyReportDates(month: string, today: string): string[] {
+  if (!MONTH.test(month) || !/^20\d{2}-\d{2}-\d{2}$/.test(today) || month < REVENUE_HISTORY_FLOOR || month > today.slice(0, 7)) throw new Error('일별 자료 조회 월을 확인해 주세요.');
+  const last = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5)), 0)).getUTCDate();
+  return Array.from({length: last}, (_, i) => `${month}-${String(i+1).padStart(2, '0')}`).filter(date => date < today);
+}

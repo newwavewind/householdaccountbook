@@ -6,12 +6,12 @@ import { getStoreIncomeStatus } from "./incomeStatus";
 import type { Basis, RevenueData } from "./types";
 
 const cash = (value: number) => `₩${money(value)}`;
-export function RevenueDashboard({ data, busy, onMonth, onPayouts, onReports }: {
-  data: RevenueData; busy: boolean; onMonth: (month: string, basis: Basis) => void;
+export function RevenueDashboard({ data, busy, onMonth, onPayouts, onReports, readOnly = false }: {
+  data: RevenueData; busy: boolean; readOnly?: boolean; onMonth: (month: string, basis: Basis) => void;
   onPayouts: () => void; onReports: () => void;
 }) {
   const [showAll, setShowAll] = useState(false);
-  const [expandedMonth, setExpandedMonth] = useState<string | null | undefined>();
+  const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
   const received = data.payouts.filter(p => p.receivedDate);
   const months = [...new Set(data.rows.map(r => r.period))].sort().reverse();
   const coverage = summarizeRangeCoverage(data, months);
@@ -58,17 +58,25 @@ export function RevenueDashboard({ data, busy, onMonth, onPayouts, onReports }: 
     </section>
     <section className="rd-metrics" aria-label="전체 기간 금액 구분">
       <article><div><span className="rd-metric-icon">↗</span><span>{coverage.completeSales ? "전체 판매액" : "확인된 판매액"}</span><span className="rd-mini-tag">환불 전</span></div><strong>{salesRows.length ? cash(sales.gross) : "—"}</strong><p>{!coverage.completeSales ? "수집 자료 중 환산 가능한 판매액 소계" : "고객 결제액 · 환불·수수료 차감 전"}</p>{salesRows.length > 0 && <p>환불 {cash(sales.refunds)} · 차감 후 {cash(sales.gross - sales.refunds)}{!coverage.completeSales ? " (확인분)" : ""}</p>}</article>
-      <article><div><span className="rd-metric-icon">↙</span><span>실제로 받은 금액</span></div><strong>{received.length ? cash(received.reduce((n,p) => n + p.received, 0)) : "—"}</strong><button onClick={onPayouts}>{received.length ? "입금 내역 확인" : "입금 기록 추가"} <span>→</span></button></article>
+      <article><div><span className="rd-metric-icon">↙</span><span>실제로 받은 금액</span></div><strong>{received.length ? cash(received.reduce((n,p) => n + p.received, 0)) : "—"}</strong><button onClick={onPayouts}>{received.length || readOnly ? "입금 내역 확인" : "입금 기록 추가"} <span>→</span></button></article>
       <article><div><span className="rd-metric-icon">▤</span><span>모아 둔 보고서</span></div><strong>{data.imports.length}<small>개</small></strong><p>{imported ? `보관본 ${imported}개 포함 · 최신 여부 확인 필요` : lastSuccess ? `최근 완료 ${new Date(lastSuccess.at).toLocaleDateString("ko-KR")}` : busy ? "스토어에서 가져오는 중" : "아래에서 월별로 확인하세요"}</p></article>
     </section>
+    <details className="rev-money-explainer"><summary>판매액·수익·입금, 어떻게 다른가요?</summary>
+    <div className="rev-money-guide" aria-label="금액 읽는 방법">
+      <div><span>01</span><strong>판매액</strong><p>고객이 결제한 금액</p></div><b aria-hidden>→</b>
+      <div><span>02</span><strong>수익</strong><p>스토어가 보고한 내 몫</p></div><b aria-hidden>→</b>
+      <div><span>03</span><strong>실제 입금</strong><p>통장에 들어온 금액</p></div>
+      <small>같은 돈의 서로 다른 단계예요. 세 금액을 더하지 않아요.</small>
+    </div>
+    </details>
     <section className="rd-months" aria-label="월별 실적">
-      <div className="rd-section-title"><div><span>YOUR PERFORMANCE</span><h2>월별 실적</h2></div><span className="rd-count">{months.length}개월 수집</span></div>
-      <p className="rd-coverage-explainer">확정 수익을 우선 표시하고, 정산 전에는 스토어가 제공한 예상 수익을 보여드려요. 스토어별로 금액과 보고서 기간을 확인할 수 있습니다.</p>
+      <div className="rd-section-title"><div><span>매달 얼마나 벌었나요?</span><h2>월별 실적</h2></div><span className="rd-count">{months.length}개월 수집</span></div>
+      <p className="rd-coverage-explainer">App Store Connect와 Google Play Console에서 수수료 차감 후 보고한 개발자 수익입니다. 확정 수익을 우선 표시하고, 정산 전에는 스토어가 제공한 예상 수익을 보여드려요.</p>
       {latestWaiting && <div className="rd-settlement-note" role="note">
         <span className="rd-settlement-mark" aria-hidden>◷</span>
         <div><strong>{Number(latestWaiting.month.slice(5))}월은 정산 전이에요</strong>
           <p>{summarizePeriodCoverage(data, latestWaiting.month).completeSales ? "판매액은 이미 집계됐어요. " : "판매 보고서에 있는 금액부터 반영하고 있어요. "}{(incomeStatuses.get(latestWaiting.month) || []).map(status => `${platformName[status.platform]}: ${status.detail}`).join(" ")}</p>
-          <small>공개 후 ‘전체 수익 가져오기’를 누르면 확정 수익에 반영됩니다.</small></div>
+          <small>공개 후 ‘최신 자료 가져오기’를 누르면 확정 수익에 반영됩니다.</small></div>
       </div>}
       <div className="rd-table-wrap"><table><thead><tr><th>기간</th><th>판매액 <small>환불 전</small></th><th>보고서 기준 수익</th><th>실제 입금</th><th><span className="rev-sr-only">스토어별 내역</span></th></tr></thead><tbody>
         {(showAll ? periods : periods.slice(0, 6)).map(p => {
@@ -86,10 +94,10 @@ export function RevenueDashboard({ data, busy, onMonth, onPayouts, onReports }: 
             ? `${platformName[sole]} ${income.perPlatform[sole].basis === "estimate" ? "예상" : "확정"}` : "확인액";
           return <Fragment key={month}>
             <tr className={open ? "rd-month-open" : ""}><th><button onClick={() => setExpandedMonth(open ? null : month)} aria-expanded={open} aria-controls={`rd-stores-${month}`}><b>{Number(month.slice(5))}월</b><span>{month.slice(0,4)}</span></button></th>
-              <td><button onClick={() => onMonth(month, "estimate")}>{sRows.length ? cash(s.gross) : "—"}{!p.completeSales && sRows.length > 0 && <small>일부 판매액</small>}{s.refunds !== 0 && <small>환불 차감 후 {cash(s.gross - s.refunds)}</small>}</button></td>
-              <td className="rd-net"><button onClick={() => setExpandedMonth(open ? null : month)} aria-expanded={open} aria-controls={`rd-stores-${month}`}>{income.total !== null ? cash(income.total) : <span className={waiting ? "rd-pending-label" : ""}>{waiting ? "정산 예정" : "집계 자료 확인"}</span>}<small>{income.total !== null ? <span className="rd-income-badge">{income.hasEstimates ? "예상 포함" : "확정"}</span> : statuses.map(status => <span className="rd-income-reason" key={status.platform}>{platformName[status.platform]} · {status.state === "settlement-pending" ? `보통 ${Number(status.expectedBy?.slice(5, 7))}월 5일까지 공개` : status.label}</span>)}</small>{income.total === null && income.partialSum !== 0 && <small>{knownLabel} {cash(income.partialSum)}</small>}</button></td>
-              <td>{paid.length ? cash(paid.reduce((n,item) => n + item.received, 0)) : "—"}</td>
-              <td><button className="rd-store-toggle" onClick={() => setExpandedMonth(open ? null : month)} aria-label={`${monthLabel(month)} 스토어별 내역 ${open ? "닫기" : "보기"}`} aria-expanded={open} aria-controls={`rd-stores-${month}`}>스토어별 <span aria-hidden>{open ? "−" : "+"}</span></button></td>
+              <td data-label="판매액 · 환불 전"><button onClick={() => onMonth(month, "estimate")}>{sRows.length ? cash(s.gross) : "—"}{!p.completeSales && sRows.length > 0 && <small>일부 판매액</small>}{s.refunds !== 0 && <small>환불 차감 후 {cash(s.gross - s.refunds)}</small>}</button></td>
+              <td className="rd-net" data-label="보고서 기준 수익"><button onClick={() => setExpandedMonth(open ? null : month)} aria-expanded={open} aria-controls={`rd-stores-${month}`}>{income.total !== null ? cash(income.total) : <span className={waiting ? "rd-pending-label" : ""}>{waiting ? "정산 예정" : "집계 자료 확인"}</span>}<small>{income.total !== null ? <span className="rd-income-badge">{income.hasEstimates ? "예상 포함" : "확정"}</span> : statuses.map(status => <span className="rd-income-reason" key={status.platform}>{platformName[status.platform]} · {status.state === "settlement-pending" ? `보통 ${Number(status.expectedBy?.slice(5, 7))}월 5일까지 공개` : status.label}</span>)}</small>{income.total === null && income.partialSum !== 0 && <small>{knownLabel} {cash(income.partialSum)}</small>}</button></td>
+              <td data-label="실제 입금">{paid.length ? cash(paid.reduce((n,item) => n + item.received, 0)) : "—"}</td>
+              <td className="rd-month-action"><button className="rd-store-toggle" onClick={() => setExpandedMonth(open ? null : month)} aria-label={`${monthLabel(month)} 스토어별 내역 ${open ? "닫기" : "보기"}`} aria-expanded={open} aria-controls={`rd-stores-${month}`}>스토어별 <span aria-hidden>{open ? "−" : "+"}</span></button></td>
             </tr>
             <tr id={`rd-stores-${month}`} className="rd-store-detail" hidden={!open}><td colSpan={5}>
               <div className="rd-store-detail-inner">
@@ -103,6 +111,7 @@ export function RevenueDashboard({ data, busy, onMonth, onPayouts, onReports }: 
                     return <div className="rd-store-grid-row" role="row" key={platform}><strong role="rowheader">{platformName[platform]}<small>{storeIncome.periodKind === "fiscal" ? "회계기간 " : "판매기간 "}{reportPeriod || "자료 확인 중"}</small></strong><span role="cell">{store.hasSales ? cash(store.sales.gross) : "보고서 대기"}{store.hasSales && !store.completeSales && <small>일부 판매액</small>}</span><span role="cell">{storeIncome.value !== null ? cash(storeIncome.value) : <span className={status.state === "settlement-pending" ? "rd-pending-label" : ""}>{status.label}</span>}<small>{storeIncome.value !== null ? <span className="rd-income-badge">{status.label}</span> : status.detail}</small></span></div>;
                   })}
                 </div>
+                <p>보고서에 이미 반영된 수수료는 다시 차감하지 않습니다. 수수료율이 변경되면 새 보고서의 개발자 수익에 따라 반영됩니다. 실제 입금액은 추가 세금·환율·정산 조정으로 달라질 수 있습니다.</p>
                 <p>{income.hasEstimates ? "예상 수익은 Apple 판매 보고서와 Google 주문 조회에서 스토어가 제공한 금액입니다. 월 정산 시 환불·조정에 따라 달라질 수 있습니다. " : ""}{income.total === null ? "확인되지 않은 스토어 금액은 0원으로 합산하지 않습니다. " : ""}{income.perPlatform.apple.includesPreviousMonth ? "Apple 수익에는 직전 회계기간 마감 이후의 이전 달 판매분도 포함됩니다. " : ""}Apple 회계기간은 달력월과 달라 판매액과 수익의 집계 기간이 다를 수 있습니다.</p>
                 <div className="rd-detail-actions"><button onClick={() => onMonth(month, "estimate")}>판매 원본 내역 ↗</button><button onClick={() => onMonth(month, "settled")}>확정 보고서 내역 ↗</button></div>
               </div>

@@ -18,6 +18,7 @@ type Props = {
   onDismissAlert: (id: string) => void;
   onToggleCloseItem: (id: string, done: boolean) => void;
   compact?: boolean;
+  readOnly?: boolean;
 };
 
 export function RevenueInsights({
@@ -27,6 +28,7 @@ export function RevenueInsights({
   onDismissAlert,
   onToggleCloseItem,
   compact,
+  readOnly = false,
 }: Props) {
   const dismissed = data.meta?.dismissedAlerts ?? [];
   const anomalies = detectAnomalies(data, month, connection, dismissed);
@@ -64,7 +66,7 @@ export function RevenueInsights({
                   <b>{a.title}</b>
                   <p>{a.body}</p>
                 </div>
-                <button type="button" onClick={() => onDismissAlert(a.id)}>
+                <button type="button" disabled={readOnly} onClick={() => onDismissAlert(a.id)}>
                   닫기
                 </button>
               </li>
@@ -87,7 +89,7 @@ export function RevenueInsights({
                 <input
                   type="checkbox"
                   checked={item.done}
-                  disabled={item.auto}
+                  disabled={readOnly || item.auto}
                   onChange={(e) => onToggleCloseItem(item.id, e.target.checked)}
                 />
                 {item.label}

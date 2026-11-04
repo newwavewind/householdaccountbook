@@ -12,7 +12,7 @@ export function CategoryLabel({
   className = 'inline-flex items-center gap-1.5',
   textClassName = '',
 }: Props) {
-  const trimmed = name.trim()
+  const trimmed = typeof name === 'string' ? name.trim() : ''
   if (!trimmed) return null
   return (
     <span className={className}>

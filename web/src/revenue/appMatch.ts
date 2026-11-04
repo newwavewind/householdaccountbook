@@ -44,6 +44,9 @@ export function findAppForRowKey(
   if (byId) return byId;
   const byBundle = list.find((a) => a.bundleId.toLowerCase() === key);
   if (byBundle) return byBundle;
+  // Parent Identifier in Apple IAP reports can be the app SKU, not its numeric ID.
+  const bySku = list.filter(a => a.platform === "apple" && a.sku?.toLowerCase() === key);
+  if (bySku.length === 1) return bySku[0];
   const mapped = SKU_TO_BUNDLE[key];
   if (mapped) {
     const hit = list.find((a) => a.bundleId.toLowerCase() === mapped);
@@ -98,7 +101,7 @@ export function rowsForApp(app: AppProduct, rows: RevenueRow[]): RevenueRow[] {
     if (r.platform !== app.platform) return false;
     if (r.appId === app.id || aliases.has(r.appId)) return true;
     const key = stripPrefix(r.appId).toLowerCase();
-    if (key === bundle) return true;
+    if (key === bundle || (app.platform === "apple" && key === app.sku?.toLowerCase())) return true;
     if (SKU_TO_BUNDLE[key] === app.bundleId) return true;
     return false;
   });

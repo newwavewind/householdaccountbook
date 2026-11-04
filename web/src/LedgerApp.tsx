@@ -919,11 +919,11 @@ export default function LedgerApp() {
       <div className="min-h-dvh bg-neutral-warm pb-28">
       {syncState.mode === 'cloud' && syncState.status === 'loading' ? (
         <div
-          className="fixed inset-0 z-[55] flex items-center justify-center bg-surface-raised/75 backdrop-blur-[1px]"
+          className="pointer-events-none fixed inset-x-0 top-[max(0.5rem,env(safe-area-inset-top,0px))] z-[55] flex justify-center px-4"
           aria-busy
           aria-live="polite"
         >
-          <p className="rounded-[var(--radius-card)] border border-border-subtle bg-surface-raised px-5 py-4 text-sm text-text-primary shadow-[var(--shadow-card)]">
+          <p className="rounded-full border border-border-subtle bg-surface-raised/95 px-3.5 py-1.5 text-xs text-text-primary shadow-[var(--shadow-card)]">
             서버와 동기화하는 중…
           </p>
         </div>

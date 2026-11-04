@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { RevenueRefreshButton } from "../revenue/RevenueRefreshButton";
+import { parseInstallReport, mergeInstallReports } from "../revenue/downloads";
+import type { InstallReport } from "../revenue/types";
+import { RevenueDaily } from "../revenue/RevenueDaily";
+import { isDailySale } from "../revenue/dailyRevenue";
+import { reconcileCorrectedApps } from "../revenue/reconcileApps";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useCommunityAuth } from "../community/CommunityAuthContext";
 import { RevenueIcon as Icon } from "../revenue/RevenueIcon";
 import { RevenueDialog, DataForm } from "../revenue/RevenueDialog";
@@ -75,23 +81,28 @@ import {
   withResolvedAppNames,
 } from "../revenue/appDisplayNames";
 import {
-  applyTaxSuggestions,
   exportTaxPackCsv,
 } from "../revenue/taxEnhance";
+import { readSharedRevenueWorkspace, publishSharedRefresh, type SharedRevenueWorkspace } from "../revenue/sharedWorkspace";
+import { latestCollectedLog, collectionIssues, canPublishRevenue, createRevenueSaveQueue } from "../revenue/connectionState";
 import "../revenue/revenue.css";
 
+const RevenueReadOnly = createContext(false);
+
 type Section =
-  "overview" | "apps" | "transactions" | "payouts" | "tax" | "connections";
+  "overview" | "daily" | "apps" | "transactions" | "payouts" | "tax" | "connections";
 type Dialog =
   "app" | "expense" | "payout" | "goal" | "rates" | "business" | null;
 type Connection = ConnectorStatus & {
   settings: { vendor: string; bucket: string; packages: string[] };
 };
 const sections: { id: Section; label: string; icon: string }[] = [
-  { id: "overview", label: "대시보드", icon: "chart" },
-  { id: "apps", label: "내 앱", icon: "apps" },
-  { id: "transactions", label: "매출 내역", icon: "receipt" },
-  { id: "connections", label: "데이터 관리", icon: "link" },
+  { id: "overview", label: "한눈에 보기", icon: "chart" },
+  { id: "daily", label: "일별 현황", icon: "calendar" },
+  { id: "payouts", label: "입금·비용", icon: "wallet" },
+  { id: "apps", label: "앱별 현황", icon: "apps" },
+  { id: "connections", label: "자료·연결", icon: "link" },
+  { id: "tax", label: "세무 자료", icon: "shield" },
 ];
 const statusNames: Record<string, string> = {
   READY_FOR_SALE: "배포 중",
@@ -125,12 +136,13 @@ function Action({
   primary?: boolean;
   disabled?: boolean;
 }) {
+  const readOnly = useContext(RevenueReadOnly);
   return (
     <button
       type="button"
       className={`rev-button ${primary ? "rev-button-primary" : ""}`}
       onClick={onClick}
-      disabled={disabled}
+      disabled={disabled || (readOnly && icon !== "download")}
     >
       {icon && <Icon name={icon} size={17} />}
       {children}
@@ -187,17 +199,61 @@ const connector = revenueFetch;
 
 export default function AppRevenuePage() {
   const { user } = useCommunityAuth();
-  return (
-    <RevenueWorkspace key={user?.id || "device"} owner={user?.id || "device"} />
-  );
+  const viewerId = user?.id || "device";
+  return <RevenueAccess key={viewerId} viewerId={viewerId} />;
 }
 
-function RevenueWorkspace({ owner }: { owner: string }) {
-  const store = useRevenueData(owner);
+function RevenueAccess({ viewerId }: { viewerId: string }) {
+  const [shared, setShared] = useState<SharedRevenueWorkspace | null>();
+  const [error, setError] = useState("");
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    let loading = false;
+    const refresh = async () => {
+      if (loading) return;
+      loading = true;
+      try {
+        const next = await readSharedRevenueWorkspace(viewerId);
+        if (!cancelled) { setShared(next); setError(""); }
+      } catch (e) {
+        if (!cancelled) {
+          setShared(previous => previous === null ? null : undefined);
+          setError(e instanceof Error ? e.message : "권한 확인 실패");
+        }
+      } finally { loading = false; }
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 30000);
+    window.addEventListener("focus", refresh);
+    return () => { cancelled = true; window.clearInterval(timer); window.removeEventListener("focus", refresh); };
+  }, [viewerId, attempt]);
+  if (error && shared !== null) return <div className="rev-error" role="alert">공유 권한을 확인하지 못했어요. 인터넷 연결을 확인해 주세요. <button className="rev-button" onClick={() => setAttempt(value => value + 1)}>다시 불러오기</button><details><summary>상세 정보</summary>{error}</details></div>;
+  if (shared === undefined) return <div role="status" className="p-8 text-center">앱 수익을 불러오는 중…</div>;
+  return <RevenueReadOnly.Provider value={!!shared}>
+    <RevenueWorkspace key={shared ? `shared:${shared.ownerId}` : viewerId} owner={viewerId} shared={shared} onSharedRefresh={() => setAttempt(value => value + 1)} />
+  </RevenueReadOnly.Provider>;
+}
+
+function RevenueWorkspace({ owner, shared, onSharedRefresh }: { owner: string; shared: SharedRevenueWorkspace | null; onSharedRefresh: () => void }) {
+  const readOnly = !!shared;
+  const canRefresh = !readOnly || shared.canRefresh;
+  const workspaceConnector = <T,>(path: string, init?: RequestInit) => connector<T>(path,
+    readOnly ? { ...init, headers: { ...Object.fromEntries(new Headers(init?.headers)), "X-Revenue-Shared": "1" } } : init);
+
+  const personalStore = useRevenueData(owner);
+  // Shared financial data stays in memory; it never replaces either account's local workspace.
+  const store = shared ? {
+    data: shared.data, error: "", blocked: true,
+    update: (() => false) as typeof personalStore.update,
+    restore: (() => false) as typeof personalStore.restore,
+    getData: () => shared.data,
+  } : personalStore;
   const [demo, setDemo] = useState(false),
     [sample, setSample] = useState<RevenueData | null>(null);
   const data = demo && sample ? sample : store.data;
   function update(next: RevenueData | ((prev: RevenueData) => RevenueData)) {
+    if (readOnly) return;
     if (demo)
       setSample((prev) =>
         typeof next === "function"
@@ -208,6 +264,8 @@ function RevenueWorkspace({ owner }: { owner: string }) {
   }
   const [section, setSection] = useState<Section>("overview"),
     [month, setMonth] = useState(currentMonth);
+  const [selectedDailyMonth, setSelectedDailyMonth] = useState<string | null>(null);
+  const dailyMonth = selectedDailyMonth || (data.rows.filter(isDailySale).map(row => row.date).filter(date => date <= localDate()).sort().at(-1) || localDate()).slice(0, 7);
   const [platform, setPlatform] = useState<Platform | "all">("all"),
     [appFilter, setAppFilter] = useState("all"),
     [groupFilter, setGroupFilter] = useState("all"),
@@ -228,6 +286,13 @@ function RevenueWorkspace({ owner }: { owner: string }) {
       useState<ConnectorHealth>("checking"),
     [lastSyncDetail, setLastSyncDetail] = useState<string[]>([]);
   const [cloudNote, setCloudNote] = useState("");
+  const [cloudLoadError, setCloudLoadError] = useState("");
+  const [cloudAttempt, setCloudAttempt] = useState(0);
+  const lastPublished = useRef<string | undefined>(undefined);
+  const queuedPush = useMemo(() => createRevenueSaveQueue((snapshot: RevenueData) => pushRevenueSnapshot(owner, snapshot)), [owner]);
+  const [connectionAttempt, setConnectionAttempt] = useState(0);
+  const lastCollected = latestCollectedLog(data.logs);
+  const issues = collectionIssues(data.logs[0]?.detail?.errors ?? []);
   const [googleSaEmail, setGoogleSaEmail] = useState("");
   const [dropActive, setDropActive] = useState(false);
   const cloudPulled = useRef(false);
@@ -260,7 +325,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
     };
   }, []);
   useEffect(() => {
-    if (demo) return;
+    if (demo || readOnly) return;
     store.update((d) => {
       const apps = withResolvedAppNames(d.apps);
       const enriched = enrichRowsWithApps(d.rows, apps);
@@ -272,35 +337,32 @@ function RevenueWorkspace({ owner }: { owner: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot remap Apple SKU → app id + Google fee
   }, [owner, demo]);
   useEffect(() => {
+    if (!canRefresh) return;
     let cancelled = false;
-    const poll = () => {
-      connector<Connection>("/status")
-        .then((c) => {
-          if (cancelled) return;
-          setConnection(c);
-          setConnectionError("");
-          setConnectorHealth("online");
-        })
-        .catch((e: unknown) => {
-          if (cancelled) return;
-          setConnection(null);
-          setConnectorHealth("offline");
-          setConnectionError(
-            (e instanceof Error && e.message) ||
-              (isRevenueCloudMode()
-                ? "클라우드 동기화에 연결되지 않았습니다. 로그인 후 다시 시도해 주세요."
-                : "로컬 수익 커넥터가 꺼져 있습니다. npm run revenue:connector 를 실행하거나, 휴대폰은 배포 사이트에서 로그인하세요."),
-          );
-        });
+    let inFlight = false;
+    const controller = new AbortController();
+    const poll = async () => {
+      if (inFlight || document.hidden) return;
+      inFlight = true;
+      try {
+        const next = await workspaceConnector<Connection>("/status", { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]) });
+        if (!cancelled) { setConnection(next); setConnectionError(""); setConnectorHealth("online"); }
+      } catch (error) {
+        if (!cancelled) {
+          setConnection(null); setConnectorHealth("offline");
+          setConnectionError(error instanceof Error ? error.message : "연결을 확인하지 못했습니다.");
+        }
+      } finally { inFlight = false; }
     };
-    poll();
-    const id = window.setInterval(poll, 4000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-    };
-  }, []);
+    void poll();
+    const timer = window.setInterval(() => void poll(), 30000);
+    document.addEventListener("visibilitychange", poll);
+    return () => { cancelled = true; controller.abort(); window.clearInterval(timer); document.removeEventListener("visibilitychange", poll); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- permission/attempt controls connection polling
+  }, [canRefresh, readOnly, connectionAttempt]);
+  const retryConnection = () => { setConnectorHealth("checking"); setConnectionAttempt(value => value + 1); };
   useEffect(() => {
+    if (readOnly) return;
     let cancelled = false;
     void connector<{ saEmail?: string }>("/google-setup")
       .then((g) => {
@@ -310,7 +372,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [readOnly]);
   const appChoices = useMemo(() => {
     const map = new Map(data.apps.map((a) => [a.id, a.name]));
     data.rows.forEach((r) => {
@@ -395,13 +457,18 @@ function RevenueWorkspace({ owner }: { owner: string }) {
     );
   }
   async function saveCloud(next: RevenueData) {
-    if (demo || owner === "device") return;
+    if (!canPublishRevenue({ readOnly, demo, owner, cloudReady, blocked: store.blocked })) return;
     const stamped = {
       ...next,
       meta: { ...next.meta, lastCloudAt: new Date().toISOString() },
     };
-    const res = await pushRevenueSnapshot(owner, stamped);
-    if (res.ok) store.update((d) => ({ ...d, meta: { ...d.meta, lastCloudAt: stamped.meta.lastCloudAt } }), { touch: false });
+    const res = await queuedPush(stamped).catch((error: unknown) => ({ ok: false, error: error instanceof Error ? error.message : "공유 저장 실패" }));
+    if (!mounted.current) return;
+    if (res.ok) {
+      lastPublished.current = next.meta?.updatedAt;
+      store.update((d) => d.meta?.updatedAt === next.meta?.updatedAt
+        ? { ...d, meta: { ...d.meta, lastCloudAt: stamped.meta.lastCloudAt } } : d, { touch: false });
+    }
     setCloudNote(
       res.ok
         ? `클라우드 저장 · ${new Date().toLocaleString("ko-KR")}`
@@ -410,14 +477,16 @@ function RevenueWorkspace({ owner }: { owner: string }) {
   }
 
   async function sync(opts: { auto?: boolean } = {}) {
+    const refreshDailyMonth = section === "daily" ? dailyMonth : currentMonth();
+    if (!canRefresh) return;
     if (demo) {
       if (!opts.auto) setToast("실제 데이터로 전환한 뒤 동기화해 주세요.");
       return;
     }
-    if (syncInFlight.current || store.blocked || !cloudReady) return;
+    if (syncInFlight.current || (!readOnly && (store.blocked || !cloudReady))) return;
     syncInFlight.current = true;
     setBusy(true);
-    setProgress("전체 기간의 보고서를 확인하고 있어요…");
+    setProgress(`전체 기간과 ${refreshDailyMonth} 일별 보고서를 확인하고 있어요…`);
     setToast("");
     setLastSyncDetail([]);
     try {
@@ -426,12 +495,12 @@ function RevenueWorkspace({ owner }: { owner: string }) {
       try { pendingId = sessionStorage.getItem(pendingKey) || ""; } catch { /* storage can be unavailable */ }
       let start: { id: string } | null = null;
       if (pendingId) {
-        try { start = await connector<SyncResult>(`/job?id=${encodeURIComponent(pendingId)}`); }
+        try { start = await workspaceConnector<SyncResult>(`/job?id=${encodeURIComponent(pendingId)}`); }
         catch { try { sessionStorage.removeItem(pendingKey); } catch { /* no persisted job */ } }
       }
-      if (!start) start = await connector<{ id: string }>("/sync", {
+      if (!start) start = await workspaceConnector<{ id: string }>("/sync", {
         method: "POST",
-        body: JSON.stringify({ scope: "all", from: "2026-01" }),
+        body: JSON.stringify({ scope: "all", from: "2026-01", dailyMonth: refreshDailyMonth }),
       });
       try { sessionStorage.setItem(pendingKey, start.id); } catch { /* polling works without storage */ }
       setConnectorHealth("online");
@@ -441,13 +510,24 @@ function RevenueWorkspace({ owner }: { owner: string }) {
         await new Promise((resolve) => setTimeout(resolve, 1200));
         if (!mounted.current) return;
         if (Date.now() > deadline) throw new Error("보고서 응답이 지연되고 있습니다. 기존 자료는 유지되며 잠시 뒤 다시 동기화할 수 있습니다.");
-        result = await connector<SyncResult>(`/job?id=${encodeURIComponent(start.id)}`);
+        result = await workspaceConnector<SyncResult>(`/job?id=${encodeURIComponent(start.id)}`);
         setProgress(result.progress);
       } while (result.state === "running");
+      if (readOnly) {
+        setProgress("공유 자료에 최신 보고서를 반영하고 있어요…");
+        const published = await publishSharedRefresh(start.id);
+        try { sessionStorage.removeItem(pendingKey); } catch { /* optional */ }
+        onSharedRefresh();
+        setToast(published.message || formatSyncToast({ apps: result.apps.length, documents: result.documents, errors: result.errors }));
+        setLastSyncDetail(published.errors || result.errors);
+        return;
+      }
       const parsed: { document: StoreDocument; rows: RevenueRow[] }[] = [];
+      const installReports: InstallReport[] = [];
       const errors = [...result.errors];
       for (const document of result.documents) {
         try {
+          if (document.key.startsWith("google-installs:")) { installReports.push(parseInstallReport(document)); continue; }
           parsed.push({
             document,
             rows: enrichRowsWithApps(
@@ -469,7 +549,8 @@ function RevenueWorkspace({ owner }: { owner: string }) {
         auto: opts.auto,
       });
       const didSave = store.update((prev) => {
-        const next = mergeReports(prev, parsed);
+        const next = reconcileCorrectedApps(mergeReports(prev, parsed), result.apps);
+        next.installReports = mergeInstallReports(prev.installReports,installReports);
         const apps = new Map(next.apps.map((a) => [a.id, a]));
         result.apps.forEach((a) => {
           const prev = apps.get(a.id);
@@ -536,7 +617,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
       setToast(fxIssues.length ? `${toast} · 환율 ${fxIssues.length}건 확인 필요` : toast);
       setLastSyncDetail([...errors, ...fxIssues]);
       if (!errors.length && parsed.length) markAutoSynced(owner, localDate());
-      const refreshed = await connector<Connection>("/status").catch(
+      const refreshed = await workspaceConnector<Connection>("/status").catch(
         () => null,
       );
       if (refreshed) {
@@ -544,6 +625,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
         setConnectorHealth("online");
       }
     } catch (e) {
+      if (readOnly) { try { sessionStorage.removeItem(`revenue-pending-job:${owner}`); } catch { /* optional */ } }
       const message = e instanceof Error ? e.message : "동기화 실패";
       setToast(message);
       setLastSyncDetail([message]);
@@ -561,16 +643,21 @@ function RevenueWorkspace({ owner }: { owner: string }) {
   }
 
   useEffect(() => {
-    if (demo || cloudPulled.current || owner === "device") return;
+    if (readOnly || demo || cloudPulled.current || owner === "device") return;
     cloudPulled.current = true;
     void (async () => {
       setCloudNote("클라우드 자료 확인 중…");
       const remote = await pullRevenueSnapshot(owner);
-      setCloudReady(true);
+      if (!mounted.current) return;
       if (remote.error) {
-        setCloudNote(`클라우드: ${remote.error}`);
+        setCloudLoadError(remote.error);
+        setCloudReady(false);
+        setCloudNote("공유 저장본 확인 필요");
         return;
       }
+      setCloudLoadError("");
+      setCloudReady(true);
+      lastPublished.current = remote.data?.meta?.updatedAt;
       if (!remote.data) {
         setCloudNote("클라우드 저장본 없음 · 동기화 후 폰에서도 볼 수 있습니다");
         return;
@@ -584,10 +671,20 @@ function RevenueWorkspace({ owner }: { owner: string }) {
     })();
   // Loading is tied to this mounted owner; subsequent data edits must not pull again.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [demo, owner]);
+  }, [demo, owner, cloudAttempt]);
 
   useEffect(() => {
-    if (demo) return;
+    if (!canPublishRevenue({ readOnly, demo, owner, cloudReady, blocked: store.blocked }) || busy) return;
+    const revision = store.data.meta?.updatedAt;
+    if (!revision || revision === lastPublished.current) return;
+    const timer = window.setTimeout(() => void saveCloud(store.getData()), 900);
+    return () => window.clearTimeout(timer);
+    // Each local revision is saved after hydration; shared viewers never publish.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.data.meta?.updatedAt, readOnly, demo, owner, cloudReady, store.blocked, busy]);
+
+  useEffect(() => {
+    if (demo || readOnly) return;
     const missing = neededCurrencies(data.rows, month).filter(
       (c) => !data.rates[`${month}:${c}`],
     );
@@ -609,6 +706,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
 
 
   async function importFiles(files: FileList | File[] | null) {
+    if (readOnly) return;
     if (!files?.length) return;
     setBusy(true);
     setProgress("보고서 형식을 확인하고 있습니다…");
@@ -748,81 +846,21 @@ function RevenueWorkspace({ owner }: { owner: string }) {
   };
 
   return (
-    <main className={`rev-page${compactLayout ? " rev-compact" : ""}`}>
+    <main className={`rev-page rev-friendly${compactLayout ? " rev-compact" : ""}`}>
       <header className="rev-page-header">
         <div>
-          <div className="rev-eyebrow">MJ BUSINESS</div>
-          <h1>
-            앱 수익
-            <span className="rev-title-dot" />
-          </h1>
-          <p>흩어진 앱 수익, 이제 한곳에서.</p>
+          <div className="rev-eyebrow">우리 앱의 매출과 입금</div>
+          <h1>앱 수익</h1>
+          <p>얼마나 팔렸고, 얼마를 받았는지 확인하세요.</p>
         </div>
-        <div className="rev-header-actions">
-          <Action
-            icon="sync"
-            primary
-            onClick={() => void sync()}
-            disabled={busy || demo || store.blocked || !cloudReady || connectorHealth !== "online"}
-          >
-            {busy ? "동기화 중…" : "전체 수익 가져오기"}
-          </Action>
-        </div>
+        {canRefresh && <div className="rev-header-actions">
+          <RevenueRefreshButton allowed={canRefresh} busy={busy}
+            blocked={demo || (!readOnly && (store.blocked || !cloudReady))} health={connectorHealth}
+            onRefresh={() => void sync()} onRetry={retryConnection} />
+        </div>}
       </header>
-      <div className="rev-status-strip">
-        <span className="rev-status-left">
-          <span
-            className={`rev-status-dot ${
-              connectorHealth === "online"
-                ? "ready"
-                : connectorHealth === "checking"
-                  ? "checking"
-                  : "down"
-            }`}
-            aria-hidden
-          />
-          <span className="rev-connector-pill" data-state={connectorHealth}>
-            {connectorHealth === "online"
-              ? "수집 서버 연결됨"
-              : connectorHealth === "checking"
-                ? "커넥터 확인 중"
-                : "커넥터 끊김"}
-          </span>
-          {!demo && <span className="rev-status-meta">2026년 출시 이후 조회</span>}
-          <span className="rev-status-meta">
-            {demo
-              ? "샘플 데이터 · 실제 수익 아님"
-              : data.logs[0]
-                ? `최근 시도 ${new Date(data.logs[0].at).toLocaleString("ko-KR")}`
-                : "첫 보고서를 연결해 보세요"}
-          </span>
-        </span>
-
-      </div>
-      {connectorHealth === "offline" && !demo && (
-        <div className="rev-notice rev-notice-warn" role="status">
-          <span>
-            {connectionError ||
-              (isRevenueCloudMode()
-                ? "클라우드 동기화에 연결되지 않았습니다. 로그인 상태와 네트워크를 확인한 뒤 다시 시도해 주세요."
-                : "로컬 수익 커넥터가 꺼져 있습니다. 터미널에서 npm run revenue:connector 실행 후 동기화하세요.")}
-          </span>
-          <button
-            onClick={() => {
-              setConnectorHealth("checking");
-              void connector<Connection>("/status")
-                .then((c) => {
-                  setConnection(c);
-                  setConnectionError("");
-                  setConnectorHealth("online");
-                })
-                .catch(() => setConnectorHealth("offline"));
-            }}
-          >
-            다시 확인
-          </button>
-        </div>
-      )}
+      <p className="rev-updated-at">{readOnly ? "공유 자료 갱신" : "최근 자료 갱신"} · {(readOnly ? shared.updatedAt : lastCollected?.at) ? new Date((readOnly ? shared.updatedAt : lastCollected?.at)!).toLocaleString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "아직 수집된 자료 없음"}</p>
+      {!!cloudLoadError && <div className="rev-notice rev-notice-warn" role="alert"><div>공유 저장본을 확인하지 못해 새 자료 저장을 잠시 멈췄어요. 기존 자료를 확인한 뒤 다시 시도해 주세요.<details className="rev-error-details"><summary>상세 정보</summary>{cloudLoadError}</details></div><button onClick={() => { cloudPulled.current = false; setCloudAttempt(value => value + 1); }}>다시 확인</button></div>}
       {!!lastSyncDetail.length && !toast && (
         <div className="rev-notice rev-notice-detail" role="status">
           <span>
@@ -878,7 +916,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
         ))}
       </nav>
 
-      {!["tax", "overview", "connections"].includes(section) && (
+      {!["tax", "overview", "daily", "connections"].includes(section) && (
         <div className="rev-filters">
           <div className="rev-month">
             <button
@@ -986,9 +1024,10 @@ function RevenueWorkspace({ owner }: { owner: string }) {
         </div>
       )}
 
+      {section === "daily" && <RevenueDaily data={data} month={dailyMonth} onMonthChange={setSelectedDailyMonth} canRefresh={canRefresh} />}
       {section === "overview" && (
         <>
-          <RevenueDashboard data={data} busy={busy} onMonth={(next, nextBasis) => { setMonth(next); setBasis(nextBasis); setPlatform("all"); setAppFilter("all"); setGroupFilter("all"); setSection("transactions"); }} onPayouts={() => setSection("payouts")} onReports={() => setSection("connections")} />
+          <RevenueDashboard data={data} busy={busy} readOnly={readOnly} onMonth={(next, nextBasis) => { setMonth(next); setBasis(nextBasis); setPlatform("all"); setAppFilter("all"); setGroupFilter("all"); setSection("transactions"); }} onPayouts={() => setSection("payouts")} onReports={() => setSection("connections")} />
           <details className="rd-deep-dive"><summary>더 자세한 분석과 마감 체크</summary>
           <RevenueSummary data={data} month={month} rows={coverageRows}
             showPayouts={appFilter === "all" && groupFilter === "all"} platform={platform}
@@ -997,6 +1036,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
           <ReportCoverage data={data} month={month} onReports={() => setSection("connections")} />
           <div className="rev-section-heading rev-detail-heading"><div><h2>{basis === "estimate" ? "예상 판매 상세" : "확정 수익 상세"}</h2><p>{basis === "estimate" ? "판매 보고서 기준 · Google 수익은 확정 보고서에서 확인" : "Apple 회계월과 Google 보고서월 기준 · 입금액과 다를 수 있습니다"}</p></div></div>
           <RevenueInsights
+            readOnly={readOnly}
             data={data}
             month={month}
             connection={connection}
@@ -1028,7 +1068,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
               {totals.missing > 0 && (
                 <span>
                   환율이 없는 {totals.missing}건의 해당 금액은 원화 합계에서 제외했습니다.{" "}
-                  <button onClick={() => setDialog("rates")}>
+                  <button onClick={() => setDialog("rates")} disabled={readOnly}>
                     환율 입력
                   </button>{" "}
                 </span>
@@ -1167,7 +1207,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                 "개발자 수익 기준",
                 <button
                   className="rev-text-button"
-                  onClick={() => setDialog("goal")}
+                  onClick={() => setDialog("goal")} disabled={readOnly}
                 >
                   목표 설정
                 </button>,
@@ -1238,7 +1278,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
           {sectionHeader(
             "내 앱 포트폴리오",
             `${data.apps.length}개 등록 · 앱과 스토어별 최신 빌드 상태`,
-            <Action icon="plus" onClick={() => setDialog("app")}>
+            <Action icon="plus" onClick={() => setDialog("app")} disabled={readOnly}>
               앱 등록
             </Action>,
           )}
@@ -1249,7 +1289,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                 const suggested = suggestAppGroups(data.apps);
                 update((d) => ({ ...d, appGroups: suggested }));
                 setToast(`${suggested.length}개 앱 그룹을 저장했습니다.`);
-              }}
+              }} disabled={readOnly}
             >
               앱 그룹 자동 정리
             </Action>
@@ -1296,7 +1336,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                               : a,
                           ),
                         }))
-                      }
+                      } disabled={readOnly}
                     >
                       <Icon name="star" size={18} />
                     </button>
@@ -1390,7 +1430,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                       onClick={() => {
                         setEditingApp(app);
                         setDialog("app");
-                      }}
+                      }} disabled={readOnly}
                     >
                       편집
                     </button>
@@ -1407,7 +1447,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                 primary
                 icon="sync"
                 onClick={() => void sync()}
-                disabled={busy || connectorHealth === "offline"}
+                disabled={readOnly || (busy || connectorHealth === "offline")}
               >
                 스토어 동기화
               </Action>
@@ -1418,6 +1458,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
 
       {section === "transactions" && (
         <>
+        <button className="rev-text-button" onClick={()=>setSection("daily")}>← 일별 현황으로 돌아가기</button>
         <div className="rev-ledger-summary" aria-label="매출 합계">
           <div className="rev-ledger-summary-head">
             <div>
@@ -1447,7 +1488,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
               {
                 label: basis === "settled" ? "확정 보고서 내 판매액" : "판매액",
                 value: !filtered.length ? "—" : `₩${money(totals.gross)}`,
-                note: `${basis === "settled" && !periodCoverage.completeSettled ? "일부 보고서 소계" : totals.missingGrossFx ? "환산 가능한 금액만" : "고객 결제액"} · ${money(ledgerRows.length)}건`,
+                note: `${basis === "settled" && !periodCoverage.completeSettled ? "일부 보고서 소계" : totals.missingGrossFx ? "환산 가능한 금액만" : "고객 결제액"} · 보고서 ${money(filtered.length)}행`,
               },
               {
                 label: "환불",
@@ -1479,7 +1520,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
         <section className="rev-card">
           {sectionHeader(
             "매출 상세 내역",
-            `${ledgerRows.length}건 · 추정·확정 보고서를 합산하지 않습니다`,
+            `보고서 ${money(ledgerRows.length)}행${basis === "estimate" ? ` · 유료 판매 ${money(countPaidSales(ledgerRows).sold)}건` : ""} · 추정·확정 보고서는 합산하지 않습니다`,
             <Action
               icon="download"
               disabled={!ledgerRows.length}
@@ -1493,6 +1534,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
               CSV 내보내기
             </Action>,
           )}
+          <p className="rev-ledger-row-note">보고서 한 행은 개별 결제 1건이 아닙니다. 무료 다운로드·0원 기록도 포함될 수 있어요.</p>
           <div className="rev-table-controls">
             <div className="rev-search">
               <Icon name="search" size={18} />
@@ -1568,7 +1610,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                             {row.basis === "settled" ? (
                               <button
                                 className={`rev-badge-button ${row.taxClass === "unreviewed" ? "pending" : ""}`}
-                                onClick={() => setTaxRow(row)}
+                                onClick={() => setTaxRow(row)} disabled={readOnly}
                               >
                                 {taxLabels[row.taxClass]}{" "}
                                 <span aria-hidden>↗</span>
@@ -1586,7 +1628,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                 <span>
                   {safePage * 15 + 1}–
                   {Math.min((safePage + 1) * 15, ledgerRows.length)} /{" "}
-                  {ledgerRows.length}
+                  총 {money(ledgerRows.length)}행
                 </span>
                 <button
                   disabled={safePage === 0}
@@ -1607,7 +1649,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
               title="선택한 조건에 매출이 없습니다"
               text="조회 월·앱·추정 또는 확정 기준을 확인하거나 보고서를 가져와 주세요."
             >
-              <Action icon="upload" onClick={() => fileInput.current?.click()}>
+              <Action icon="upload" onClick={() => fileInput.current?.click()} disabled={readOnly}>
                 보고서 가져오기
               </Action>
             </Empty>
@@ -1622,7 +1664,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
             {sectionHeader(
               "입금 대조",
               "선택한 월에 입금 예정인 정산 · 원화 실입금 기준",
-              <Action icon="plus" onClick={() => setDialog("payout")}>
+              <Action icon="plus" onClick={() => setDialog("payout")} disabled={readOnly}>
                 정산 기록
               </Action>,
             )}
@@ -1689,7 +1731,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                             payouts: d.payouts.filter((x) => x.id !== p.id),
                           }));
                           setUndo(previous);
-                        }}
+                        }} disabled={readOnly}
                       >
                         기록 삭제
                       </button>
@@ -1707,7 +1749,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
             {sectionHeader(
               "운영비와 매입 증빙",
               `전체 앱 공통 비용 · ${monthLabel(month)} ₩${money(expenses)}`,
-              <Action icon="plus" onClick={() => setDialog("expense")}>
+              <Action icon="plus" onClick={() => setDialog("expense")} disabled={readOnly}>
                 비용 추가
               </Action>,
             )}
@@ -1753,7 +1795,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                                 ),
                               }));
                               setUndo(previous);
-                            }}
+                            }} disabled={readOnly}
                           >
                             삭제
                           </button>
@@ -1823,15 +1865,6 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                   2기 · 7~12월
                 </button>
               </div>
-              <Action
-                icon="shield"
-                onClick={() => {
-                  update((d) => ({ ...d, rows: applyTaxSuggestions(d.rows) }));
-                  setToast("미검토 거래에 과세 분류 제안을 적용했습니다.");
-                }}
-              >
-                분류 자동 제안
-              </Action>
               <button
                 className="rev-text-button"
                 onClick={() => {
@@ -1844,7 +1877,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
               </button>
               <button
                 className="rev-text-button"
-                onClick={() => setDialog("business")}
+                onClick={() => setDialog("business")} disabled={readOnly}
               >
                 {data.business.name || "사업자 정보 입력"}{" "}
                 <Icon name="chevron" size={15} />
@@ -1861,6 +1894,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                       : "확정 보고서를 먼저 가져와 주세요"}
                 </b>
                 <p>현재 단계: 신고 자료 준비 · 홈택스 제출 전</p>
+                <p>공급가액·부가세는 수익에서 자동 추정하지 않습니다. 증빙에 따라 직접 확인해 입력하며, 과거 자동 제안값은 검토 전까지 합계에서 제외합니다.</p>
               </div>
               <span className="rev-badge">
                 {data.business.kind === "general" ? "일반과세" : "간이과세"}
@@ -1875,7 +1909,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
               ].map(([name, n]) => (
                 <div key={String(name)}>
                   <span>{name}</span>
-                  <b>₩{money(Number(n))}</b>
+                  <b>{name !== "공제 검토 매입세액" && tax.rows.length === tax.pending.length ? "검토 전" : `₩${money(Number(n))}`}</b>
                 </div>
               ))}
             </div>
@@ -1884,7 +1918,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                 검토 잔액 <small>매출세액 − 매입세액 − 입력한 기납부세액</small>
               </span>
               <strong>
-                {data.business.kind === "simplified"
+                {tax.pending.length || !tax.rows.length ? "검토 미완료" : data.business.kind === "simplified"
                   ? "별도 계산 필요"
                   : `₩${money(tax.payable)}`}
               </strong>
@@ -1921,7 +1955,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                             [`${taxYear}-${taxHalf}-${i}`]: e.target.checked,
                           },
                         }))
-                      }
+                      } disabled={readOnly}
                     />
                     <span>{text}</span>
                   </label>
@@ -1979,7 +2013,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
             )}
             <div className="rev-tax-review">
               {tax.rows.slice(page * 10, page * 10 + 10).map((r) => (
-                <button key={r.id} onClick={() => setTaxRow(r)}>
+                <button key={r.id} onClick={() => setTaxRow(r)} disabled={readOnly}>
                   <div>
                     <b>{r.appName}</b>
                     <small>
@@ -2024,22 +2058,30 @@ function RevenueWorkspace({ owner }: { owner: string }) {
 
       {section === "connections" && (
         <>
+      <section className={`rev-health-card ${readOnly ? "is-shared" : ""} ${!readOnly && connectorHealth === "offline" ? "is-offline" : ""}`} aria-label="자료 상태">
+        <div className="rev-health-main"><span className="rev-health-indicator" aria-hidden />
+          <div><strong>{readOnly ? "가족과 함께 보는 수익" : connectorHealth === "offline" ? "저장된 자료를 보고 있어요" : connectorHealth === "checking" ? "새 자료를 가져올 수 있는지 확인 중" : "새 자료를 가져올 수 있어요"}</strong>
+          <p>{readOnly ? (canRefresh ? "함께 보고, 최신 스토어 자료도 가져올 수 있어요" : "조회 전용 · 원본 자료는 변경되지 않아요") : connectorHealth === "offline" ? "새 자료 가져오기가 잠시 중단됐어요. 기존 매출·입금 내역은 그대로 볼 수 있어요." : "연결 상태와 실제 보고서 수집 결과는 별도로 확인해요."}</p></div>
+        </div>
+        <div className="rev-health-meta">
+          <span>{readOnly ? "공유 자료 저장" : "최근 보고서 수집"} <b>{(readOnly ? shared.updatedAt : lastCollected?.at) ? new Date((readOnly ? shared.updatedAt : lastCollected?.at)!).toLocaleString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "아직 없음"}</b></span>
+          {issues.length > 0 && <button onClick={() => setSection("connections")}>확인할 항목 {issues.length}가지 <span aria-hidden>→</span></button>}
+          {readOnly && <span>30초마다 새 저장본 확인</span>}
+        </div>
+        {!readOnly && connectorHealth === "offline" && <details className="rev-error-details"><summary>연결 문제 자세히</summary><p>{connectionError}</p></details>}
+      </section>
           <section className="rev-card">
             {sectionHeader(
-              "보고서 가져오기",
-              "모든 월의 보고서를 한 번에 가져오고, 원본과 연결 상태를 확인합니다",
-              <Action
-                icon="sync"
-                primary
-                disabled={busy || demo || store.blocked || !cloudReady || connectorHealth !== "online"}
-                onClick={() => void sync()}
-              >
-                전체 수익 가져오기
-              </Action>,
+              "자료와 연결 상태",
+              "스토어별 보고서 수집 기록과 연결 정보를 확인할 수 있어요",
             )}
+            {issues.length > 0 && <div className="rev-issue-list" aria-label="확인할 항목">
+              {issues.map(issue => <article key={issue.title}><strong>{issue.title}{issue.count > 1 ? ` · ${issue.count}건` : ""}</strong><p>{issue.description}</p></article>)}
+              <details className="rev-error-details"><summary>최근 수집 결과 원문</summary>{data.logs[0]?.detail?.errors?.map((message, index) => <p key={index}>{message}</p>)}</details>
+            </div>}
             <div className="rd-management-tools"><label>확인할 월 <input type="month" value={month} max={currentMonth()} onChange={e => e.target.value && setMonth(e.target.value)} /></label><button onClick={() => setSection("payouts")}>입금·비용 관리 ↗</button><button onClick={() => setSection("tax")}>세무 검토 ↗</button></div>
             <ReportCoverage data={data} month={month} />
-            <div className="rev-connection-grid">
+            {!readOnly && <div className="rev-connection-grid">
               {(["apple", "google"] as const).map((p) => (
                 <article key={p}>
                   <div className="rev-connection-top">
@@ -2054,10 +2096,10 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                     className={`rev-badge ${connection?.[p].reports ? "positive" : "amber"}`}
                   >
                     {connection?.[p].reports
-                      ? "연결 정보 등록됨 · 수집 결과는 위에서 확인"
+                      ? "연결 설정 있음 · 보고서는 별도 확인"
                       : connection?.[p].configured
-                        ? "API 키 확인 · 보고서 설정 필요"
-                        : "연결 설정 필요"}
+                        ? "계정 설정 있음 · 보고서 경로 확인 필요"
+                        : connection ? "연결 설정 필요" : "연결 확인 전"}
                   </span>
                   <p>
                     {p === "apple"
@@ -2088,9 +2130,9 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                 </article>
               ))}
             </div>
-
-            <details className="rev-advanced-settings"><summary>연결 설정 및 문제 해결</summary>
-            <button className="rev-text-button" onClick={toggleDemo} disabled={busy}>{demo ? "실제 데이터로 돌아가기" : "샘플 둘러보기"}</button>
+}
+            {!readOnly && <details className="rev-advanced-settings"><summary>연결 설정 및 문제 해결</summary>
+            <button className="rev-text-button" onClick={toggleDemo} disabled={readOnly || (busy)}>{demo ? "실제 데이터로 돌아가기" : "샘플 둘러보기"}</button>
             <section className="rev-card rev-google-setup">
               {sectionHeader(
                 "Google Play 정식 연결",
@@ -2285,7 +2327,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
               사용자별 인증 서버 설정이 필요합니다. Google 빌드 조회용 임시
               세션은 조회 후 폐기하며 앱을 배포하지 않습니다.
             </p>
-            </details>
+            </details>}
           </section>
           <div className="rev-overview-grid">
             <section className="rev-card">
@@ -2320,7 +2362,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                 </div>
               </div>
               <div className="rev-tool-list">
-                <button onClick={() => fileInput.current?.click()}>
+                <button onClick={() => fileInput.current?.click()} disabled={readOnly}>
                   <Icon name="upload" />
                   <div>
                     <b>파일 선택</b>
@@ -2367,7 +2409,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                         setDialog("rates");
                       }
                     })();
-                  }}
+                  }} disabled={readOnly}
                 >
                   <Icon name="wallet" />
                   <div>
@@ -2402,7 +2444,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                 </Action>
                 <Action
                   icon="upload"
-                  onClick={() => backupInput.current?.click()}
+                  onClick={() => backupInput.current?.click()} disabled={readOnly}
                 >
                   백업 복원
                 </Action>
@@ -2418,6 +2460,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
               "동기화 기록",
               "오류가 발생해도 기존 데이터는 유지됩니다",
             )}
+            <details className="rev-history"><summary>최근 수집 기록 펼치기</summary>
             <div className="rev-log-list">
               {data.logs.length ? (
                 data.logs.slice(0, 12).map((l) => (
@@ -2461,6 +2504,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                 <p className="rev-muted">아직 동기화 기록이 없습니다.</p>
               )}
             </div>
+            </details>
           </section>
           <section className="rev-card">
             {sectionHeader(
@@ -2491,7 +2535,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
       <footer className="rev-page-footer">
         <span>
           <Icon name="shield" size={14} />{" "}
-          {demo
+          {readOnly ? "가족 공유 · 조회 전용" : demo
             ? "샘플 데이터"
             : cloudNote || "브라우저 저장 · 로그인 시 클라우드 공유"}{" "}
           · 금액 단위 KRW
@@ -2501,6 +2545,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
       <input
         className="rev-sr-only"
         ref={fileInput}
+        disabled={readOnly}
         type="file"
         accept=".csv,.txt,.tsv,.zip,.gz"
         multiple
@@ -2510,6 +2555,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
       <input
         className="rev-sr-only"
         ref={backupInput}
+        disabled={readOnly}
         type="file"
         accept=".json"
         aria-label="백업 파일 선택"
@@ -2548,13 +2594,13 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                 update(undo);
                 setRestoreUndo(null);
                 setToast("삭제를 취소했습니다.");
-              }}
+              }} disabled={readOnly}
             >
               되돌리기
             </button>
             <button
               aria-label="되돌리기 알림 닫기"
-              onClick={() => setRestoreUndo(null)}
+              onClick={() => setRestoreUndo(null)} disabled={readOnly}
             >
               ×
             </button>
@@ -2601,7 +2647,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                   setImportPreview(null);
                   setSection("transactions");
                   setToast("보고서를 반영했습니다. 클라우드에도 저장을 시도합니다.");
-                }}
+                }} disabled={readOnly}
               >
                 보고서 반영
               </Action>
@@ -2639,7 +2685,7 @@ function RevenueWorkspace({ owner }: { owner: string }) {
                   setRestore(null);
                   setAppFilter("all");
                   setToast("백업을 복원했습니다.");
-                }}
+                }} disabled={readOnly}
               >
                 복원 적용
               </Action>
