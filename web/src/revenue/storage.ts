@@ -160,7 +160,7 @@ export function packRevenueData(value: RevenueData): string {
   return PACKED_PREFIX + btoa(binary);
 }
 
-export function unpackRevenueData(saved: string): unknown {
+export function unpackRevenueData(saved: string): ReturnType<typeof JSON.parse> {
   if (!saved.startsWith(PACKED_PREFIX)) return JSON.parse(saved);
   const binary = atob(saved.slice(PACKED_PREFIX.length));
   const bytes = new Uint8Array(binary.length);
@@ -188,7 +188,7 @@ export function createRevenueStorage(
   try {
     storage ??= localStorage;
     const saved = storage.getItem(key);
-    const parsed = saved !== null ? unpackRevenueData(saved) as RevenueData : emptyData();
+    const parsed = saved !== null ? unpackRevenueData(saved) : emptyData();
     if (parsed.business?.prepaid === 0) parsed.business.prepaid = {};
     data = validateBackup(parsed);
   } catch {
