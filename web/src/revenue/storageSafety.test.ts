@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { emptyData } from "./model";
-import { createRevenueStorage } from "./storage";
+import { createRevenueStorage, packRevenueData, unpackRevenueData } from "./storage";
 import { preferNewer } from "./cloudStore";
 import type { RevenueData } from "./types";
 
@@ -45,7 +45,32 @@ describe("revenue storage recovery", () => {
     expect(backups[0][1]).toBe(original);
     expect(store.snapshot()).toMatchObject({ blocked: false, error: "", data: { goal: 2 } });
     expect(store.update((data) => ({ ...data, goal: 3 }))).toBe(true);
-    expect(JSON.parse(storage.values.get(key)!).goal).toBe(3);
+    expect((unpackRevenueData(storage.values.get(key)!) as RevenueData).goal).toBe(3);
+  });
+  it("reads legacy plain JSON and rewrites it in the compact format", () => {
+    const storage = memoryStorage(JSON.stringify({ ...emptyData(), goal: 8 }));
+    const store = createRevenueStorage("test-owner", storage);
+    expect(store.getData().goal).toBe(8);
+    expect(store.update((data) => ({ ...data, goal: 9 }))).toBe(true);
+    const saved = storage.values.get(key)!;
+    expect(saved.startsWith("{")).toBe(false);
+    expect(createRevenueStorage("test-owner", storage).getData().goal).toBe(9);
+  });
+  it("keeps months of Korean-named daily rows far below the iOS Safari storage limit", () => {
+    const rows = Array.from({ length: 6000 }, (_, i) => ({
+      id: String(i).padStart(64, "0"), appId: "apple:6798675892", appName: "봄기출 경찰공무원",
+      basis: "estimate", country: "KR", currency: "KRW", date: "2026-09-01", endDate: "2026-09-01",
+      fee: null, gross: i, period: "2026-09", periodKind: "calendar", platform: "apple", proceeds: i,
+      proceedsCurrency: "KRW", productId: "bomgichul-police", productName: "봄기출 경찰공무원",
+      productType: "7F", refunds: 0, reportKey: `apple-sales:2026-09-${i}`, reportScope: `apple-sales:2026-09-${i}`,
+      source: "apple-sales", tax: null, taxClass: "unreviewed", units: 1,
+    })) as unknown as RevenueData["rows"];
+    const big = { ...emptyData(), rows };
+    expect(JSON.stringify(big).length).toBeGreaterThan(2_600_000);
+    const packed = packRevenueData(big);
+    expect(packed.length).toBeLessThan(1_000_000);
+    expect(/^[\x20-\x7e]*$/.test(packed)).toBe(true);
+    expect(unpackRevenueData(packed)).toEqual(big);
   });
   it("keeps the original and guard when recovery backup cannot be saved", () => {
     const storage = memoryStorage("{unreadable");

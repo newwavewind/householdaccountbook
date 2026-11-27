@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { strFromU8, strToU8, unzlibSync, zlibSync } from "fflate";
 import { normalizeAppGroups } from "./appGroups";
 import { fillGoogleEstimatedShares } from "./googleFee";
 import { withResolvedAppNames } from "./appDisplayNames";
@@ -147,6 +148,26 @@ export function validateBackup(value: unknown): RevenueData {
   if (apps === normalized.apps && rows === normalized.rows) return normalized;
   return { ...normalized, apps, rows };
 }
+// iOS Safari keeps any string containing Korean as UTF-16 and refuses ~2.6M+ characters
+// per origin, which a few months of daily store reports already exceed.
+const PACKED_PREFIX = "mjz1:";
+
+export function packRevenueData(value: RevenueData): string {
+  const bytes = zlibSync(strToU8(JSON.stringify(value)), { level: 6 });
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000)
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return PACKED_PREFIX + btoa(binary);
+}
+
+export function unpackRevenueData(saved: string): unknown {
+  if (!saved.startsWith(PACKED_PREFIX)) return JSON.parse(saved);
+  const binary = atob(saved.slice(PACKED_PREFIX.length));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return JSON.parse(strFromU8(unzlibSync(bytes)));
+}
+
 type RevenueStorage = Pick<Storage, "getItem" | "setItem">;
 type RevenueUpdate = RevenueData | ((previous: RevenueData) => RevenueData);
 type UpdateOptions = { touch?: boolean };
@@ -167,7 +188,7 @@ export function createRevenueStorage(
   try {
     storage ??= localStorage;
     const saved = storage.getItem(key);
-    const parsed = saved !== null ? JSON.parse(saved) : emptyData();
+    const parsed = saved !== null ? unpackRevenueData(saved) as RevenueData : emptyData();
     if (parsed.business?.prepaid === 0) parsed.business.prepaid = {};
     data = validateBackup(parsed);
   } catch {
@@ -189,7 +210,7 @@ export function createRevenueStorage(
         if (candidate === data) return true;
         const valid = validateBackup(candidate);
         const value = options.touch === false ? valid : stamp(valid);
-        storage!.setItem(key, JSON.stringify(value));
+        storage!.setItem(key, packRevenueData(value));
         data = value;
         error = "";
         return true;
@@ -213,7 +234,7 @@ export function createRevenueStorage(
           const recoveryKey = `${key}:recovery:${crypto.randomUUID()}`;
           storage!.setItem(recoveryKey, original);
         }
-        storage!.setItem(key, JSON.stringify(value));
+        storage!.setItem(key, packRevenueData(value));
         data = value;
         error = "";
         blocked = false;
