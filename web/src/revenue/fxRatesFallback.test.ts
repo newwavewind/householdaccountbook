@@ -12,7 +12,7 @@ const csv = (...records: string[]) => [header, ...records].join("\n");
 const blocked = { ok: false, status: 403 };
 function fallback(body: string) {
   const fetcher = vi.fn(async (url: string) =>
-    url.startsWith("https://api.frankfurter.app/") ? blocked : csvResponse(body));
+    url.startsWith("https://api.frankfurter.dev/v1/") ? blocked : csvResponse(body));
   vi.stubGlobal("fetch", fetcher);
   return fetcher;
 }
@@ -151,7 +151,7 @@ describe("official ECB fallback", () => {
     { date: "2026-07-31", base: "EUR" },
     { date: undefined, base: "USD" },
   ])("recovers primary responses that cannot prove their date and currency: %j", async (data) => {
-    const fetcher = vi.fn(async (url: string) => url.startsWith("https://api.frankfurter.app/")
+    const fetcher = vi.fn(async (url: string) => url.startsWith("https://api.frankfurter.dev/v1/")
       ? { ok: true, json: async () => ({ ...data, rates: { KRW: 100 } }) }
       : csvResponse(csv(observation("KRW", "2026-07-31", 1500), observation("USD", "2026-07-31", 1.2))));
     vi.stubGlobal("fetch", fetcher);

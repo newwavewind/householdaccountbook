@@ -490,7 +490,7 @@ describe("FX report dates", () => {
     const fetcher = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ date: "2026-10-08", rates: { KRW: 1300 } }) });
     vi.stubGlobal("fetch", fetcher);
     expect(await fetchMonthRatesKrw("2026-10", ["USD"])).toHaveProperty("2026-10:USD");
-    expect(fetcher).toHaveBeenCalledWith("https://api.frankfurter.app/2026-10-08?from=USD&to=KRW", { signal: expect.any(AbortSignal) });
+    expect(fetcher).toHaveBeenCalledWith("https://api.frankfurter.dev/v1/2026-10-08?from=USD&to=KRW", { signal: expect.any(AbortSignal) });
   });
   it("does not invent rates for a future period", async () => {
     vi.useFakeTimers();

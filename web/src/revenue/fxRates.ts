@@ -108,7 +108,7 @@ export async function fetchMonthRatesKrw(
     try {
       const json = await withTimeout(async (signal) => {
         const response = await fetch(
-          "https://api.frankfurter.app/" + date + "?from=" + encodeURIComponent(code) + "&to=KRW",
+          "https://api.frankfurter.dev/v1/" + date + "?from=" + encodeURIComponent(code) + "&to=KRW",
           { signal },
         );
         if (!response.ok) throw new Error("Frankfurter " + response.status);
